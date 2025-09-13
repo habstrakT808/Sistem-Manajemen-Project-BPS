@@ -50,15 +50,17 @@
 ### **Frontend Stack:**
 
 ```javascript
-Next.js 14 (App Router)
-├── TypeScript (Type Safety)
-├── Tailwind CSS (Styling)
+Next.js 15.5.3 (App Router)
+├── TypeScript 5 (Type Safety)
+├── Tailwind CSS 3.4.17 (Styling)
 ├── Shadcn/ui (Component Library)
-├── Framer Motion (Animations)
-├── TanStack Query (Server State)
-├── Zustand (Client State)
-├── React Hook Form + Zod (Forms)
-└── Sonner (Toast Notifications)
+├── Framer Motion 12.23.12 (Animations)
+├── TanStack Query 5.87.4 (Server State)
+├── Zustand 5.0.8 (Client State)
+├── React Hook Form 7.62.0 + Zod 4.1.8 (Forms)
+├── Sonner 2.0.7 (Toast Notifications)
+├── React 19.1.1 (UI Library)
+└── Recharts 3.2.0 (Charts)
 ```
 
 ### **Backend Stack:**
@@ -188,6 +190,8 @@ project-management-system/
 │   │   │       │   └── route.ts (User CRUD API)
 │   │   │       └── 📁 mitra/
 │   │   │           └── route.ts (Mitra CRUD API)
+│   │   ├── 📁 ketua-tim/ (Empty - Ready for Phase 3)
+│   │   ├── 📁 pegawai/ (Empty - Ready for Phase 5)
 │   │   ├── globals.css
 │   │   ├── layout.tsx (Root Layout)
 │   │   └── page.tsx (Landing Page)
@@ -216,6 +220,14 @@ project-management-system/
 │   │   │   └── Footer.tsx ✅
 │   │   ├── 📁 common/
 │   │   │   └── LoadingSpinner.tsx ✅
+│   │   ├── 📁 ketua-tim/ (Empty - Ready for Phase 3)
+│   │   ├── 📁 pegawai/ (Empty - Ready for Phase 5)
+│   │   ├── 📁 project/ (Empty - Ready for Phase 3)
+│   │   ├── 📁 task/ (Empty - Ready for Phase 4)
+│   │   ├── 📁 mitra/ (Empty - Future expansion)
+│   │   ├── 📁 charts/ (Empty - Ready for analytics)
+│   │   ├── 📁 dashboard/ (Empty - Ready for Phase 5)
+│   │   ├── 📁 forms/ (Empty - Ready for future forms)
 │   │   ├── 📁 ui/ (Shadcn Components) ✅
 │   │   └── providers.tsx ✅
 │   ├── 📁 lib/
@@ -626,27 +638,32 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 1. **Clone Repository:**
 
 ```bash
-git clone [repository-url]
-cd project-management-system
+git clone https://github.com/habstrakT808/Sistem-Manajemen-Project-BPS.git
+cd Sistem-Manajemen-Project-BPS
 ```
 
 2. **Install Dependencies:**
 
 ```bash
 npm install
+# or
+pnpm install
 ```
 
 3. **Environment Setup:**
 
 ```bash
-cp .env.example .env.local
-# Update dengan Supabase credentials
+# Create .env.local file with Supabase credentials:
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
 4. **Database Setup:**
 
 ```bash
-# Run migrations di Supabase SQL Editor:
+# Run migrations di Supabase SQL Editor (in order):
 # 001_initial_schema.sql
 # 002_rls_policies.sql
 # 003_database_functions.sql
@@ -658,6 +675,19 @@ cp .env.example .env.local
 
 ```bash
 npm run dev
+# or
+pnpm dev
+```
+
+6. **Available Scripts:**
+
+```bash
+npm run build      # Build for production
+npm run start      # Start production server
+npm run lint       # Run ESLint
+npm run lint:fix   # Fix ESLint issues
+npm run type-check # TypeScript type checking
+npm run format     # Format code with Prettier
 ```
 
 ### **Test Accounts:**
@@ -672,6 +702,14 @@ Pegawai: pegawai@test.com / pegawai123456
 
 ## 📋 IMMEDIATE NEXT STEPS
 
+### **Current Project Status:**
+
+- ✅ **Admin Panel**: Fully functional with User & Mitra management
+- ✅ **Authentication**: Complete with role-based access
+- ✅ **Database**: All tables, functions, and policies implemented
+- ✅ **UI Components**: Complete Shadcn/ui library integrated
+- 🔄 **Ready for Development**: Empty directories prepared for next phases
+
 ### **Priority 1: Project Management Core (Phase 3)**
 
 1. **Create Ketua Tim Layout** - Professional dashboard layout
@@ -679,6 +717,18 @@ Pegawai: pegawai@test.com / pegawai123456
 3. **Workload Indicators** - Visual team workload tracking
 4. **Financial Validation** - Mitra limit enforcement
 5. **Project Timeline** - Gantt chart visualization
+
+### **Empty Directories Ready for Development:**
+
+- `src/app/ketua-tim/` - Ketua Tim pages and layouts
+- `src/app/pegawai/` - Pegawai pages and layouts
+- `src/components/ketua-tim/` - Ketua Tim components
+- `src/components/pegawai/` - Pegawai components
+- `src/components/project/` - Project management components
+- `src/components/task/` - Task management components
+- `src/components/charts/` - Analytics and visualization components
+- `src/components/dashboard/` - Dashboard components
+- `src/components/forms/` - Additional form components
 
 ### **Priority 2: Task Management (Phase 4)**
 
