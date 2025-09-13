@@ -1,0 +1,8 @@
+export { default as Header } from './Header'
+export { default as HeroSection } from './HeroSection'
+export { default as RoleSelection } from './RoleSelection'
+export { default as Features } from './Features'
+export { default as HowItWorks } from './HowItWorks'
+export { default as FAQ } from './FAQ'
+export { default as Contact } from './Contact'
+export { default as Footer } from './Footer'
