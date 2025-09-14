@@ -3,9 +3,9 @@
 import { MemberDetail } from "@/components/ketua-tim";
 
 interface MemberDetailPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export default async function MemberDetailPage({

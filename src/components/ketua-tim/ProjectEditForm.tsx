@@ -132,14 +132,14 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
       const transportData: Record<string, number> = {};
       const honorData: Record<string, number> = {};
 
-      projectData.project_assignments?.forEach((assignment: any) => {
+      projectData.project_assignments?.forEach((assignment: { assignee_type: string; assignee_id: string; uang_transport?: number; uang_honor?: number }) => {
         if (assignment.assignee_type === "pegawai") {
           pegawaiIds.push(assignment.assignee_id);
           transportData[assignment.assignee_id] =
             assignment.uang_transport || 0;
         } else if (assignment.assignee_type === "mitra") {
           mitraIds.push(assignment.assignee_id);
-          honorData[assignment.assignee_id] = assignment.honor || 0;
+          honorData[assignment.assignee_id] = assignment.uang_honor || 0;
         }
       });
 

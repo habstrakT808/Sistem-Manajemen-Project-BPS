@@ -1,11 +1,12 @@
 import ProjectEditForm from "@/components/ketua-tim/ProjectEditForm";
 
 interface EditProjectPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
-export default function EditProjectPage({ params }: EditProjectPageProps) {
-  return <ProjectEditForm projectId={params.id} />;
+export default async function EditProjectPage({ params }: EditProjectPageProps) {
+  const { id } = await params;
+  return <ProjectEditForm projectId={id} />;
 }

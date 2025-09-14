@@ -179,7 +179,7 @@ export async function POST(request: NextRequest) {
 
     const { error: upsertError } = await supabase
       .from("system_settings")
-      .upsert(settingsData);
+      .upsert(settingsData as any);
 
     if (upsertError) {
       throw upsertError;

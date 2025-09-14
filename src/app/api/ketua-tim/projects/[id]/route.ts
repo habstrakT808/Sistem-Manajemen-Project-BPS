@@ -4,9 +4,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 interface RouteParams {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 interface ProjectAssignment {
@@ -159,7 +159,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const supabase = (await createClient()) as any;
-    const projectId = params.id;
+    const { id: projectId } = await params;
 
     // Check if user is ketua tim
     const {

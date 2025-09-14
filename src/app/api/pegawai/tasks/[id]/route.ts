@@ -10,12 +10,12 @@ interface TaskUpdateData {
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const supabase = (await createClient()) as any;
-    const taskId = params.id;
+    const { id: taskId } = await params;
     const updateData: TaskUpdateData = await request.json();
 
     // Auth check
@@ -84,12 +84,12 @@ export async function PUT(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const supabase = (await createClient()) as any;
-    const taskId = params.id;
+    const { id: taskId } = await params;
 
     // Auth check
     const {

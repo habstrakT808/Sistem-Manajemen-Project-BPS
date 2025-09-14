@@ -83,44 +83,50 @@ export async function GET(request: NextRequest) {
     const currentMonth = startDate.getMonth() + 1;
     const currentYear = startDate.getFullYear();
 
-    // Get financial statistics
-    const { data: financialRecords } = await supabase
-      .from("financial_records")
+    // Get current project assignments for accurate budget calculation
+    const { data: currentAssignments } = await supabase
+      .from("project_assignments")
       .select(
         `
-        amount,
-        recipient_type,
-        bulan,
-        tahun,
-        projects!inner (ketua_tim_id)
+        uang_transport,
+        honor,
+        assignee_type,
+        projects!inner (
+          ketua_tim_id,
+          tanggal_mulai
+        )
       `
       )
-      .eq("projects.ketua_tim_id", user.id)
-      .eq("bulan", currentMonth)
-      .eq("tahun", currentYear);
+      .eq("projects.ketua_tim_id", user.id);
 
-    const totalSpending = (financialRecords || []).reduce(
-      (sum: number, record: { amount: number }) => sum + record.amount,
+    // Calculate spending based on current assignments (not historical financial_records)
+    const totalSpending = (currentAssignments || []).reduce(
+      (
+        sum: number,
+        assignment: { uang_transport: number | null; honor: number | null }
+      ) => sum + (assignment.uang_transport || 0) + (assignment.honor || 0),
       0
     );
 
-    const transportSpending = (financialRecords || [])
+    const transportSpending = (currentAssignments || [])
       .filter(
-        (record: { recipient_type: string }) =>
-          record.recipient_type === "pegawai"
+        (assignment: { assignee_type: string }) =>
+          assignment.assignee_type === "pegawai"
       )
       .reduce(
-        (sum: number, record: { amount: number }) => sum + record.amount,
+        (sum: number, assignment: { uang_transport: number | null }) =>
+          sum + (assignment.uang_transport || 0),
         0
       );
 
-    const honorSpending = (financialRecords || [])
+    const honorSpending = (currentAssignments || [])
       .filter(
-        (record: { recipient_type: string }) =>
-          record.recipient_type === "mitra"
+        (assignment: { assignee_type: string }) =>
+          assignment.assignee_type === "mitra"
       )
       .reduce(
-        (sum: number, record: { amount: number }) => sum + record.amount,
+        (sum: number, assignment: { honor: number | null }) =>
+          sum + (assignment.honor || 0),
         0
       );
 
@@ -188,7 +194,7 @@ export async function GET(request: NextRequest) {
       0
     );
 
-    // Get spending trends (last 4 months)
+    // Get spending trends (last 4 months) - using current assignments for consistency
     const spendingTrends: SpendingTrend[] = [];
     for (let i = 3; i >= 0; i--) {
       const date = new Date();
@@ -196,36 +202,27 @@ export async function GET(request: NextRequest) {
       const month = date.getMonth() + 1;
       const year = date.getFullYear();
 
-      const { data: monthlyRecords } = await supabase
-        .from("financial_records")
-        .select(
-          `
-          amount,
-          recipient_type,
-          projects!inner (ketua_tim_id)
-        `
-        )
-        .eq("projects.ketua_tim_id", user.id)
-        .eq("bulan", month)
-        .eq("tahun", year);
-
-      const monthlyTransport = (monthlyRecords || [])
+      // For historical data, we'll use current assignments as proxy
+      // In a real system, you might want to maintain historical snapshots
+      const monthlyTransport = (currentAssignments || [])
         .filter(
-          (record: { recipient_type: string }) =>
-            record.recipient_type === "pegawai"
+          (assignment: { assignee_type: string }) =>
+            assignment.assignee_type === "pegawai"
         )
         .reduce(
-          (sum: number, record: { amount: number }) => sum + record.amount,
+          (sum: number, assignment: { uang_transport: number | null }) =>
+            sum + (assignment.uang_transport || 0),
           0
         );
 
-      const monthlyHonor = (monthlyRecords || [])
+      const monthlyHonor = (currentAssignments || [])
         .filter(
-          (record: { recipient_type: string }) =>
-            record.recipient_type === "mitra"
+          (assignment: { assignee_type: string }) =>
+            assignment.assignee_type === "mitra"
         )
         .reduce(
-          (sum: number, record: { amount: number }) => sum + record.amount,
+          (sum: number, assignment: { honor: number | null }) =>
+            sum + (assignment.honor || 0),
           0
         );
 
@@ -240,24 +237,22 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Get top spenders
+    // Get top spenders from current assignments
     // Top Pegawai
-    const { data: pegawaiSpending } = await supabase
-      .from("financial_records")
+    const { data: pegawaiAssignments } = await supabase
+      .from("project_assignments")
       .select(
         `
-        amount,
-        recipient_id,
+        uang_transport,
+        assignee_id,
         users!inner (nama_lengkap),
-        projects!inner (ketua_tim_id)
+        projects!inner (ketua_tim_id, id)
       `
       )
-      .eq("recipient_type", "pegawai")
-      .eq("projects.ketua_tim_id", user.id)
-      .eq("bulan", currentMonth)
-      .eq("tahun", currentYear);
+      .eq("assignee_type", "pegawai")
+      .eq("projects.ketua_tim_id", user.id);
 
-    const pegawaiTotals = (pegawaiSpending || []).reduce(
+    const pegawaiTotals = (pegawaiAssignments || []).reduce(
       (
         acc: {
           [key: string]: {
@@ -266,22 +261,22 @@ export async function GET(request: NextRequest) {
             projects: Set<string>;
           };
         },
-        record: {
-          amount: number;
-          recipient_id: string;
+        assignment: {
+          uang_transport: number | null;
+          assignee_id: string;
           users: { nama_lengkap: string };
           projects: { id: string };
         }
       ) => {
-        if (!acc[record.recipient_id]) {
-          acc[record.recipient_id] = {
-            name: record.users.nama_lengkap,
+        if (!acc[assignment.assignee_id]) {
+          acc[assignment.assignee_id] = {
+            name: assignment.users.nama_lengkap,
             amount: 0,
             projects: new Set(),
           };
         }
-        acc[record.recipient_id].amount += record.amount;
-        acc[record.recipient_id].projects.add(record.projects.id);
+        acc[assignment.assignee_id].amount += assignment.uang_transport || 0;
+        acc[assignment.assignee_id].projects.add(assignment.projects.id);
         return acc;
       },
       {}
@@ -306,22 +301,20 @@ export async function GET(request: NextRequest) {
       .slice(0, 5);
 
     // Top Mitra
-    const { data: mitraSpending } = await supabase
-      .from("financial_records")
+    const { data: mitraAssignments } = await supabase
+      .from("project_assignments")
       .select(
         `
-        amount,
-        recipient_id,
+        honor,
+        assignee_id,
         mitra!inner (nama_mitra),
-        projects!inner (ketua_tim_id)
+        projects!inner (ketua_tim_id, id)
       `
       )
-      .eq("recipient_type", "mitra")
-      .eq("projects.ketua_tim_id", user.id)
-      .eq("bulan", currentMonth)
-      .eq("tahun", currentYear);
+      .eq("assignee_type", "mitra")
+      .eq("projects.ketua_tim_id", user.id);
 
-    const mitraTotals = (mitraSpending || []).reduce(
+    const mitraTotals = (mitraAssignments || []).reduce(
       (
         acc: {
           [key: string]: {
@@ -330,22 +323,22 @@ export async function GET(request: NextRequest) {
             projects: Set<string>;
           };
         },
-        record: {
-          amount: number;
-          recipient_id: string;
+        assignment: {
+          honor: number | null;
+          assignee_id: string;
           mitra: { nama_mitra: string };
           projects: { id: string };
         }
       ) => {
-        if (!acc[record.recipient_id]) {
-          acc[record.recipient_id] = {
-            name: record.mitra.nama_mitra,
+        if (!acc[assignment.assignee_id]) {
+          acc[assignment.assignee_id] = {
+            name: assignment.mitra.nama_mitra,
             amount: 0,
             projects: new Set(),
           };
         }
-        acc[record.recipient_id].amount += record.amount;
-        acc[record.recipient_id].projects.add(record.projects.id);
+        acc[assignment.assignee_id].amount += assignment.honor || 0;
+        acc[assignment.assignee_id].projects.add(assignment.projects.id);
         return acc;
       },
       {}

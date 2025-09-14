@@ -19,6 +19,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -96,6 +106,16 @@ export default function TaskManagement() {
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [selectedProject, setSelectedProject] = useState<string>("all");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [projectMembers, setProjectMembers] = useState<
+    { id: string; nama_lengkap: string; email: string }[]
+  >([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<TaskData | null>(null);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchTasks = useCallback(async () => {
     try {
@@ -190,6 +210,33 @@ export default function TaskManagement() {
     }
   }, []);
 
+  const fetchProjectMembers = useCallback(async (projectId: string) => {
+    if (!projectId) {
+      setProjectMembers([]);
+      return;
+    }
+
+    setLoadingMembers(true);
+    try {
+      const response = await fetch(
+        `/api/ketua-tim/projects/${projectId}/members`
+      );
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to fetch project members");
+      }
+
+      setProjectMembers(result.data || []);
+    } catch (error) {
+      console.error("Error fetching project members:", error);
+      toast.error("Failed to load team members");
+      setProjectMembers([]);
+    } finally {
+      setLoadingMembers(false);
+    }
+  }, []);
+
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
@@ -241,6 +288,97 @@ export default function TaskManagement() {
     }
   };
 
+  const handleViewTask = (task: TaskData) => {
+    setSelectedTask(task);
+    setIsViewDialogOpen(true);
+  };
+
+  const handleEditTask = async (task: TaskData) => {
+    setSelectedTask(task);
+    setFormData({
+      project_id: task.project_id,
+      pegawai_id: task.pegawai_id,
+      tanggal_tugas: task.tanggal_tugas,
+      deskripsi_tugas: task.deskripsi_tugas,
+    });
+    // Fetch members for the selected project
+    await fetchProjectMembers(task.project_id);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleUpdateTask = async () => {
+    if (!selectedTask) return;
+
+    if (
+      !formData.project_id ||
+      !formData.pegawai_id ||
+      !formData.tanggal_tugas ||
+      !formData.deskripsi_tugas
+    ) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
+    setUpdating(true);
+    try {
+      const response = await fetch(`/api/ketua-tim/tasks/${selectedTask.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to update task");
+      }
+
+      toast.success("Task updated successfully!");
+      setFormData(initialFormData);
+      setSelectedTask(null);
+      setIsEditDialogOpen(false);
+      fetchTasks();
+    } catch (error) {
+      console.error("Error updating task:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to update task"
+      );
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleDeleteTask = async () => {
+    if (!selectedTask) return;
+
+    setDeleting(true);
+    try {
+      const response = await fetch(`/api/ketua-tim/tasks/${selectedTask.id}`, {
+        method: "DELETE",
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to delete task");
+      }
+
+      toast.success("Task deleted successfully!");
+      setSelectedTask(null);
+      setIsDeleteDialogOpen(false);
+      fetchTasks();
+    } catch (error) {
+      console.error("Error deleting task:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete task"
+      );
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "pending":
@@ -265,11 +403,6 @@ export default function TaskManagement() {
       default:
         return Clock;
     }
-  };
-
-  const getSelectedProjectPegawai = () => {
-    const project = projects.find((p) => p.id === formData.project_id);
-    return project?.pegawai_assignments || [];
   };
 
   const filteredTasks = tasks.filter((task) => {
@@ -334,13 +467,14 @@ export default function TaskManagement() {
                 <Label htmlFor="project">Project *</Label>
                 <Select
                   value={formData.project_id}
-                  onValueChange={(value) =>
+                  onValueChange={(value) => {
                     setFormData((prev) => ({
                       ...prev,
                       project_id: value,
-                      pegawai_id: "",
-                    }))
-                  }
+                      pegawai_id: "", // Reset pegawai selection
+                    }));
+                    fetchProjectMembers(value); // Fetch members untuk selected project
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select project" />
@@ -362,18 +496,28 @@ export default function TaskManagement() {
                   onValueChange={(value) =>
                     setFormData((prev) => ({ ...prev, pegawai_id: value }))
                   }
-                  disabled={!formData.project_id}
+                  disabled={!formData.project_id || loadingMembers}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select team member" />
+                    <SelectValue
+                      placeholder={
+                        loadingMembers
+                          ? "Loading team members..."
+                          : projectMembers.length === 0
+                            ? "No team members in this project"
+                            : "Select team member"
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent>
-                    {getSelectedProjectPegawai().map((assignment) => (
-                      <SelectItem
-                        key={assignment.assignee_id}
-                        value={assignment.assignee_id}
-                      >
-                        {assignment.users?.nama_lengkap || "Unknown"}
+                    {projectMembers.map((member) => (
+                      <SelectItem key={member.id} value={member.id}>
+                        <div className="flex items-center justify-between w-full">
+                          <span>{member.nama_lengkap}</span>
+                          <span className="text-xs text-gray-500 ml-2">
+                            {member.email}
+                          </span>
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -440,6 +584,327 @@ export default function TaskManagement() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* View Task Dialog */}
+        <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Task Details</DialogTitle>
+              <DialogDescription>
+                View detailed information about this task.
+              </DialogDescription>
+            </DialogHeader>
+
+            {selectedTask && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">
+                        Status
+                      </Label>
+                      <div className="mt-1">
+                        <Badge
+                          className={`${getStatusColor(selectedTask.status)} border flex items-center space-x-1 w-fit`}
+                        >
+                          {(() => {
+                            const StatusIcon = getStatusIcon(
+                              selectedTask.status
+                            );
+                            return (
+                              <>
+                                <StatusIcon className="w-3 h-3" />
+                                <span>
+                                  {selectedTask.status
+                                    .replace("_", " ")
+                                    .toUpperCase()}
+                                </span>
+                              </>
+                            );
+                          })()}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">
+                        Task Date
+                      </Label>
+                      <p className="mt-1 text-sm text-gray-900">
+                        {new Date(
+                          selectedTask.tanggal_tugas
+                        ).toLocaleDateString("id-ID")}
+                      </p>
+                    </div>
+
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">
+                        Assigned To
+                      </Label>
+                      <p className="mt-1 text-sm text-gray-900">
+                        {selectedTask.users.nama_lengkap}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {selectedTask.users.email}
+                      </p>
+                    </div>
+
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">
+                        Project
+                      </Label>
+                      <p className="mt-1 text-sm text-gray-900">
+                        {selectedTask.projects.nama_project}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">
+                        Task Description
+                      </Label>
+                      <div className="mt-1 p-3 bg-gray-50 rounded-lg">
+                        <p className="text-sm text-gray-900 whitespace-pre-wrap">
+                          {selectedTask.deskripsi_tugas}
+                        </p>
+                      </div>
+                    </div>
+
+                    {selectedTask.response_pegawai && (
+                      <div>
+                        <Label className="text-sm font-medium text-gray-500">
+                          Employee Response
+                        </Label>
+                        <div className="mt-1 p-3 bg-blue-50 rounded-lg">
+                          <p className="text-sm text-blue-900 whitespace-pre-wrap">
+                            {selectedTask.response_pegawai}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <div className="grid grid-cols-2 gap-4 text-xs text-gray-500">
+                    <div>
+                      <span className="font-medium">Created:</span>{" "}
+                      {new Date(selectedTask.created_at).toLocaleDateString(
+                        "id-ID"
+                      )}{" "}
+                      at{" "}
+                      {new Date(selectedTask.created_at).toLocaleTimeString(
+                        "id-ID"
+                      )}
+                    </div>
+                    <div>
+                      <span className="font-medium">Updated:</span>{" "}
+                      {new Date(selectedTask.updated_at).toLocaleDateString(
+                        "id-ID"
+                      )}{" "}
+                      at{" "}
+                      {new Date(selectedTask.updated_at).toLocaleTimeString(
+                        "id-ID"
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setIsViewDialogOpen(false)}
+              >
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Task Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Task</DialogTitle>
+              <DialogDescription>
+                Update the task details and assignment.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-project">Project *</Label>
+                <Select
+                  value={formData.project_id}
+                  onValueChange={(value) => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      project_id: value,
+                      pegawai_id: "", // Reset pegawai selection
+                    }));
+                    fetchProjectMembers(value); // Fetch members untuk selected project
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects.map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.nama_project}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-pegawai">Team Member *</Label>
+                <Select
+                  value={formData.pegawai_id}
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({ ...prev, pegawai_id: value }))
+                  }
+                  disabled={!formData.project_id || loadingMembers}
+                >
+                  <SelectTrigger>
+                    <SelectValue
+                      placeholder={
+                        loadingMembers
+                          ? "Loading team members..."
+                          : projectMembers.length === 0
+                            ? "No team members in this project"
+                            : "Select team member"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projectMembers.map((member) => (
+                      <SelectItem key={member.id} value={member.id}>
+                        <div className="flex items-center justify-between w-full">
+                          <span>{member.nama_lengkap}</span>
+                          <span className="text-xs text-gray-500 ml-2">
+                            {member.email}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-tanggal_tugas">Task Date *</Label>
+                <Input
+                  id="edit-tanggal_tugas"
+                  type="date"
+                  value={formData.tanggal_tugas}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      tanggal_tugas: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-deskripsi_tugas">Task Description *</Label>
+                <Textarea
+                  id="edit-deskripsi_tugas"
+                  value={formData.deskripsi_tugas}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      deskripsi_tugas: e.target.value,
+                    }))
+                  }
+                  placeholder="Describe the task in detail..."
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setIsEditDialogOpen(false)}
+                disabled={updating}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleUpdateTask}
+                disabled={updating}
+                className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+              >
+                {updating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <Edit className="w-4 h-4 mr-2" />
+                    Update Task
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Task Dialog */}
+        <AlertDialog
+          open={isDeleteDialogOpen}
+          onOpenChange={setIsDeleteDialogOpen}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Task</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this task? This action cannot be
+                undone.
+                {selectedTask && (
+                  <div className="mt-2 p-3 bg-red-50 rounded-lg">
+                    <p className="text-sm font-medium text-red-900">
+                      Task Details:
+                    </p>
+                    <p className="text-sm text-red-800 mt-1">
+                      {selectedTask.deskripsi_tugas}
+                    </p>
+                    <p className="text-xs text-red-700 mt-1">
+                      Assigned to: {selectedTask.users.nama_lengkap}
+                    </p>
+                  </div>
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteTask}
+                disabled={deleting}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                {deleting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete Task
+                  </>
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
 
       {/* Search & Filters */}
@@ -613,6 +1078,7 @@ export default function TaskManagement() {
                             variant="outline"
                             size="sm"
                             className="border-blue-200 text-blue-600 hover:bg-blue-50"
+                            onClick={() => handleViewTask(task)}
                           >
                             <Eye className="w-4 h-4 mr-1" />
                             View
@@ -621,6 +1087,7 @@ export default function TaskManagement() {
                             variant="outline"
                             size="sm"
                             className="border-green-200 text-green-600 hover:bg-green-50"
+                            onClick={() => handleEditTask(task)}
                           >
                             <Edit className="w-4 h-4 mr-1" />
                             Edit
@@ -629,6 +1096,10 @@ export default function TaskManagement() {
                             variant="outline"
                             size="sm"
                             className="border-red-200 text-red-600 hover:bg-red-50"
+                            onClick={() => {
+                              setSelectedTask(task);
+                              setIsDeleteDialogOpen(true);
+                            }}
                           >
                             <Trash2 className="w-4 h-4 mr-1" />
                             Delete
