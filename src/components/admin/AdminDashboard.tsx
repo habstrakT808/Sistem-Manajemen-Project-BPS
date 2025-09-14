@@ -2,12 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -51,7 +46,6 @@ export default function AdminDashboard() {
         return;
       }
 
-      // @ts-expect-error - RPC function not properly typed in database types
       const { data, error } = await supabase.rpc("get_dashboard_stats", {
         user_id: user.id,
       });
@@ -91,8 +85,8 @@ export default function AdminDashboard() {
       bgColor: "from-blue-50 to-blue-100",
       textColor: "text-blue-600",
       href: "/admin/users",
-      change: "+12%",
-      changeType: "positive",
+      change: "0%",
+      changeType: "neutral",
     },
     {
       title: "Active Projects",
@@ -103,8 +97,8 @@ export default function AdminDashboard() {
       bgColor: "from-green-50 to-green-100",
       textColor: "text-green-600",
       href: "/admin/projects",
-      change: "+8%",
-      changeType: "positive",
+      change: "0%",
+      changeType: "neutral",
     },
     {
       title: "Total Mitra",
@@ -115,8 +109,8 @@ export default function AdminDashboard() {
       bgColor: "from-purple-50 to-purple-100",
       textColor: "text-purple-600",
       href: "/admin/mitra",
-      change: "+5%",
-      changeType: "positive",
+      change: "0%",
+      changeType: "neutral",
     },
     {
       title: "Monthly Spending",
@@ -127,8 +121,8 @@ export default function AdminDashboard() {
       bgColor: "from-orange-50 to-orange-100",
       textColor: "text-orange-600",
       href: "/admin/financial",
-      change: "-3%",
-      changeType: "negative",
+      change: "0%",
+      changeType: "neutral",
     },
   ];
 
@@ -238,9 +232,9 @@ export default function AdminDashboard() {
             asChild
             className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
           >
-            <Link href="/admin/users/new">
+            <Link href="/admin/users">
               <UserPlus className="w-4 h-4 mr-2" />
-              Add User
+              Manage Users
             </Link>
           </Button>
           <Button
@@ -248,9 +242,9 @@ export default function AdminDashboard() {
             asChild
             className="border-2 border-purple-200 text-purple-600 hover:bg-purple-50 font-semibold px-6 py-3 rounded-xl transition-all duration-300 hover:border-purple-300"
           >
-            <Link href="/admin/mitra/new">
+            <Link href="/admin/mitra">
               <Plus className="w-4 h-4 mr-2" />
-              Add Mitra
+              Manage Mitra
             </Link>
           </Button>
         </div>
@@ -315,17 +309,17 @@ export default function AdminDashboard() {
       {/* Quick Actions & System Status */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
         {/* Quick Actions */}
-        <Card className="border-0 shadow-xl overflow-hidden">
+        <div className="border-0 shadow-xl rounded-xl overflow-hidden">
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6">
-            <CardTitle className="flex items-center text-white text-xl">
+            <div className="font-semibold flex items-center text-white text-xl">
               <Zap className="w-6 h-6 mr-3" />
               Quick Actions
-            </CardTitle>
-            <CardDescription className="text-blue-100 mt-2">
+            </div>
+            <div className="text-sm text-blue-100 mt-2">
               Common administrative tasks
-            </CardDescription>
+            </div>
           </div>
-          <CardContent className="p-6 space-y-4">
+          <div className="p-6 space-y-4">
             {quickActions.map((action, index) => {
               const IconComponent = action.icon;
               return (
@@ -349,21 +343,21 @@ export default function AdminDashboard() {
                 </Link>
               );
             })}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {/* System Status */}
-        <Card className="border-0 shadow-xl overflow-hidden">
+        <div className="border-0 shadow-xl rounded-xl overflow-hidden">
           <div className="bg-gradient-to-r from-green-600 to-teal-600 p-6">
-            <CardTitle className="flex items-center text-white text-xl">
+            <div className="font-semibold flex items-center text-white text-xl">
               <Activity className="w-6 h-6 mr-3" />
               System Status
-            </CardTitle>
-            <CardDescription className="text-green-100 mt-2">
+            </div>
+            <div className="text-sm text-green-100 mt-2">
               Current system health and status
-            </CardDescription>
+            </div>
           </div>
-          <CardContent className="p-6 space-y-6">
+          <div className="p-6 space-y-6">
             {systemStatus.map((system, index) => {
               const IconComponent = system.icon;
               return (
@@ -393,8 +387,8 @@ export default function AdminDashboard() {
                 </div>
               );
             })}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
       {/* Performance Stats */}

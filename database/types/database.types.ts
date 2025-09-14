@@ -274,6 +274,29 @@ export type Database = {
           created_at?: string;
         };
       };
+      system_settings: {
+        Row: {
+          id: number;
+          config: Json;
+          updated_by: string | null;
+          updated_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          config: Json;
+          updated_by?: string | null;
+          updated_at?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          config?: Json;
+          updated_by?: string | null;
+          updated_at?: string;
+          created_at?: string;
+        };
+      };
     };
     Views: {
       [_ in never]: never;
@@ -315,6 +338,65 @@ export type Database = {
           user_id: string;
         };
         Returns: Json;
+      };
+      get_user_registration_trends: {
+        Args: {
+          days_back: number;
+        };
+        Returns: {
+          date: string;
+          total_registrations: number;
+          admin_count: number;
+          ketua_tim_count: number;
+          pegawai_count: number;
+        }[];
+      };
+      get_project_analytics: {
+        Args: {
+          days_back: number;
+        };
+        Returns: {
+          date: string;
+          projects_created: number;
+          projects_completed: number;
+          active_projects: number;
+          total_projects: number;
+        }[];
+      };
+      get_financial_analytics: {
+        Args: {
+          months_back: number;
+        };
+        Returns: {
+          month_year: string;
+          total_spending: number;
+          transport_spending: number;
+          honor_spending: number;
+          project_count: number;
+        }[];
+      };
+      get_system_performance_metrics: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          database_size: string;
+          total_tables: number;
+          total_users: number;
+          active_users: number;
+          total_projects: number;
+          active_projects: number;
+          completed_projects: number;
+          total_tasks: number;
+          pending_tasks: number;
+          completed_tasks: number;
+          total_mitra: number;
+          active_mitra: number;
+          total_notifications: number;
+          unread_notifications: number;
+          this_month_spending: number;
+          avg_project_duration: number;
+          user_roles_distribution: Record<string, number>;
+          project_status_distribution: Record<string, number>;
+        }[];
       };
     };
     Enums: {

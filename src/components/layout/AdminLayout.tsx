@@ -226,9 +226,6 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
                 className="relative hover:bg-blue-50 rounded-xl p-3 group"
               >
                 <Bell className="w-5 h-5 group-hover:text-blue-600 transition-colors" />
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-r from-red-500 to-pink-500 rounded-full text-xs flex items-center justify-center text-white font-bold animate-pulse">
-                  3
-                </span>
               </Button>
 
               {/* User menu */}
