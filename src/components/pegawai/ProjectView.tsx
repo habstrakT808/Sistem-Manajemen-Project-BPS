@@ -2,7 +2,7 @@
 
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +16,7 @@ import {
   Target,
   User,
   ClipboardList,
+  Loader2,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import Link from "next/link";
@@ -49,6 +50,8 @@ interface ProjectViewProps {
 }
 
 export default function ProjectView({ projects, loading }: ProjectViewProps) {
+  const [loadingProjectId, setLoadingProjectId] = useState<string | null>(null);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "active":
@@ -277,10 +280,21 @@ export default function ProjectView({ projects, loading }: ProjectViewProps) {
                   <Button
                     asChild
                     className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
+                    disabled={loadingProjectId === project.id}
+                    onClick={() => setLoadingProjectId(project.id)}
                   >
                     <Link href={`/pegawai/projects/${project.id}`}>
-                      <FolderOpen className="w-4 h-4 mr-2" />
-                      View Details
+                      {loadingProjectId === project.id ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Loading...
+                        </>
+                      ) : (
+                        <>
+                          <FolderOpen className="w-4 h-4 mr-2" />
+                          View Details
+                        </>
+                      )}
                     </Link>
                   </Button>
 

@@ -130,7 +130,7 @@ export async function GET(request: NextRequest) {
         0
       );
 
-    // Get active projects with budget calculation
+    // Get projects (include completed so the card isn't empty after projects finish)
     const { data: activeProjects } = await supabase
       .from("projects")
       .select(
@@ -146,7 +146,7 @@ export async function GET(request: NextRequest) {
       `
       )
       .eq("ketua_tim_id", user.id)
-      .in("status", ["upcoming", "active"]);
+      .in("status", ["upcoming", "active", "completed"]);
 
     const projectBudgets: ProjectBudget[] = (activeProjects || []).map(
       (project: {
@@ -237,50 +237,71 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Get top spenders from current assignments
-    // Top Pegawai
+    // Get top spenders from current assignments (avoid inner joins that may be blocked by RLS)
+    // Aggregate Pegawai by assignee_id
     const { data: pegawaiAssignments } = await supabase
       .from("project_assignments")
-      .select(
-        `
-        uang_transport,
-        assignee_id,
-        users!inner (nama_lengkap),
-        projects!inner (ketua_tim_id, id)
-      `
-      )
-      .eq("assignee_type", "pegawai")
-      .eq("projects.ketua_tim_id", user.id);
+      .select(`uang_transport, assignee_id, project_id, assignee_type`)
+      .eq("assignee_type", "pegawai");
 
-    const pegawaiTotals = (pegawaiAssignments || []).reduce(
-      (
-        acc: {
-          [key: string]: {
-            name: string;
-            amount: number;
-            projects: Set<string>;
-          };
-        },
-        assignment: {
-          uang_transport: number | null;
-          assignee_id: string;
-          users: { nama_lengkap: string };
-          projects: { id: string };
-        }
-      ) => {
-        if (!acc[assignment.assignee_id]) {
-          acc[assignment.assignee_id] = {
-            name: assignment.users.nama_lengkap,
-            amount: 0,
-            projects: new Set(),
-          };
-        }
-        acc[assignment.assignee_id].amount += assignment.uang_transport || 0;
-        acc[assignment.assignee_id].projects.add(assignment.projects.id);
-        return acc;
-      },
-      {}
+    // Restrict to projects owned by this ketua tim
+    const { data: ownedProjects } = await supabase
+      .from("projects")
+      .select("id")
+      .eq("ketua_tim_id", user.id);
+    const ownedProjectIds = new Set(
+      (ownedProjects || []).map((p: { id: string }) => p.id)
     );
+
+    const pegawaiTotals = (pegawaiAssignments || [])
+      .filter((a: { project_id: string }) => ownedProjectIds.has(a.project_id))
+      .reduce(
+        (
+          acc: {
+            [key: string]: {
+              name: string;
+              amount: number;
+              projects: Set<string>;
+            };
+          },
+          assignment: {
+            uang_transport: number | null;
+            assignee_id: string;
+            project_id: string;
+          }
+        ) => {
+          if (!acc[assignment.assignee_id]) {
+            acc[assignment.assignee_id] = {
+              name: assignment.assignee_id, // temporary, will be replaced with fetched name below
+              amount: 0,
+              projects: new Set(),
+            };
+          }
+          acc[assignment.assignee_id].amount += assignment.uang_transport || 0;
+          acc[assignment.assignee_id].projects.add(assignment.project_id);
+          return acc;
+        },
+        {}
+      );
+
+    // Try to resolve pegawai names in batch; fallback to masked id if RLS blocks
+    const pegawaiIds = Object.keys(pegawaiTotals);
+    let pegawaiNames: Record<string, string> = {};
+    if (pegawaiIds.length > 0) {
+      const { data: usersRows } = await supabase
+        .from("users")
+        .select("id, nama_lengkap")
+        .in("id", pegawaiIds);
+      for (const row of usersRows || []) {
+        pegawaiNames[(row as { id: string }).id] = (
+          row as { nama_lengkap: string }
+        ).nama_lengkap;
+      }
+    }
+    for (const [id, rec] of Object.entries(pegawaiTotals)) {
+      if (pegawaiNames[id]) rec.name = pegawaiNames[id];
+      else rec.name = `User ${id.slice(0, 6)}`;
+    }
 
     const topPegawai = Object.values(pegawaiTotals)
       .map((p) => {
@@ -300,49 +321,61 @@ export async function GET(request: NextRequest) {
       )
       .slice(0, 5);
 
-    // Top Mitra
+    // Aggregate Mitra by assignee_id
     const { data: mitraAssignments } = await supabase
       .from("project_assignments")
-      .select(
-        `
-        honor,
-        assignee_id,
-        mitra!inner (nama_mitra),
-        projects!inner (ketua_tim_id, id)
-      `
-      )
-      .eq("assignee_type", "mitra")
-      .eq("projects.ketua_tim_id", user.id);
+      .select(`honor, assignee_id, project_id, assignee_type`)
+      .eq("assignee_type", "mitra");
 
-    const mitraTotals = (mitraAssignments || []).reduce(
-      (
-        acc: {
-          [key: string]: {
-            name: string;
-            amount: number;
-            projects: Set<string>;
-          };
+    const mitraTotals = (mitraAssignments || [])
+      .filter((a: { project_id: string }) => ownedProjectIds.has(a.project_id))
+      .reduce(
+        (
+          acc: {
+            [key: string]: {
+              name: string;
+              amount: number;
+              projects: Set<string>;
+            };
+          },
+          assignment: {
+            honor: number | null;
+            assignee_id: string;
+            project_id: string;
+          }
+        ) => {
+          if (!acc[assignment.assignee_id]) {
+            acc[assignment.assignee_id] = {
+              name: assignment.assignee_id, // temporary, will be replaced with fetched name below
+              amount: 0,
+              projects: new Set(),
+            };
+          }
+          acc[assignment.assignee_id].amount += assignment.honor || 0;
+          acc[assignment.assignee_id].projects.add(assignment.project_id);
+          return acc;
         },
-        assignment: {
-          honor: number | null;
-          assignee_id: string;
-          mitra: { nama_mitra: string };
-          projects: { id: string };
-        }
-      ) => {
-        if (!acc[assignment.assignee_id]) {
-          acc[assignment.assignee_id] = {
-            name: assignment.mitra.nama_mitra,
-            amount: 0,
-            projects: new Set(),
-          };
-        }
-        acc[assignment.assignee_id].amount += assignment.honor || 0;
-        acc[assignment.assignee_id].projects.add(assignment.projects.id);
-        return acc;
-      },
-      {}
-    );
+        {}
+      );
+
+    // Resolve mitra names in batch; mitra likely public/visible via RLS
+    const mitraIds = Object.keys(mitraTotals);
+    let mitraNames: Record<string, string> = {};
+    if (mitraIds.length > 0) {
+      const { data: mitraRows } = await supabase
+        .from("mitra")
+        .select("id, nama_mitra")
+        .in("id", mitraIds);
+      for (const row of mitraRows || []) {
+        mitraNames[(row as { id: string }).id] = (
+          row as { nama_mitra: string }
+        ).nama_mitra;
+      }
+    }
+    for (const [id, rec] of Object.entries(mitraTotals)) {
+      if (mitraNames[id]) rec.name = mitraNames[id];
+      else rec.name = `Mitra ${id.slice(0, 6)}`;
+    }
 
     const topMitra = Object.values(mitraTotals)
       .map((m) => {

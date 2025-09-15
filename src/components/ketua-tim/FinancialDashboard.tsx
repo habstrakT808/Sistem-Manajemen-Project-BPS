@@ -30,6 +30,9 @@ import {
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import Link from "next/link";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { id as localeId } from "date-fns/locale";
 
 interface FinancialStats {
   total_monthly_spending: number;
@@ -81,6 +84,31 @@ export default function FinancialDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState("current_month");
+  const [activeTab, setActiveTab] = useState<"overview" | "spending">(
+    "overview"
+  );
+  const [daily, setDaily] = useState<{
+    month: number;
+    year: number;
+    days: Array<{
+      date: string;
+      total: number;
+      transport: number;
+      honor: number;
+    }>;
+  } | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [dailyDetails, setDailyDetails] = useState<{
+    date: string;
+    details: Array<{
+      recipient_type: string;
+      recipient_id: string;
+      recipient_name: string;
+      amount: number;
+      project_id: string;
+      project_name: string | null;
+    }>;
+  } | null>(null);
 
   // File: src/components/ketua-tim/FinancialDashboard.tsx (Update fetchFinancialData function)
 
@@ -116,6 +144,35 @@ export default function FinancialDashboard() {
     toast.success("Financial data refreshed");
   };
 
+  const fetchDaily = useCallback(async (date: Date) => {
+    try {
+      const month = date.getMonth() + 1;
+      const year = date.getFullYear();
+      const res = await fetch(
+        `/api/ketua-tim/financial/daily?month=${month}&year=${year}`
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to fetch daily data");
+      setDaily(json);
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to load daily spending");
+    }
+  }, []);
+
+  const fetchDailyDetails = useCallback(async (date: Date) => {
+    try {
+      const ymd = format(date, "yyyy-MM-dd");
+      const res = await fetch(`/api/ketua-tim/financial/daily?day=${ymd}`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to fetch details");
+      setDailyDetails(json);
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to load spending details");
+    }
+  }, []);
+
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
@@ -125,6 +182,13 @@ export default function FinancialDashboard() {
 
     loadData();
   }, [fetchFinancialData]);
+
+  useEffect(() => {
+    if (activeTab === "spending") {
+      fetchDaily(selectedDate);
+      fetchDailyDetails(selectedDate);
+    }
+  }, [activeTab, selectedDate, fetchDaily, fetchDailyDetails]);
 
   // Loading skeleton
   if (loading) {
@@ -244,6 +308,28 @@ export default function FinancialDashboard() {
         </div>
 
         <div className="flex items-center space-x-4">
+          <div className="hidden md:flex items-center rounded-lg border border-gray-200 overflow-hidden">
+            <button
+              onClick={() => setActiveTab("overview")}
+              className={`px-4 py-2 text-sm font-medium ${
+                activeTab === "overview"
+                  ? "bg-gray-100 text-gray-900"
+                  : "text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              Overview
+            </button>
+            <button
+              onClick={() => setActiveTab("spending")}
+              className={`px-4 py-2 text-sm font-medium ${
+                activeTab === "spending"
+                  ? "bg-gray-100 text-gray-900"
+                  : "text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              Spending Detail
+            </button>
+          </div>
           <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
             <SelectTrigger className="w-40">
               <SelectValue />
@@ -328,205 +414,327 @@ export default function FinancialDashboard() {
         })}
       </div>
 
-      {/* Project Budgets & Top Spenders */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-        {/* Project Budgets */}
-        <div className="border-0 shadow-xl rounded-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center text-white text-xl font-semibold">
-                <FolderOpen className="w-6 h-6 mr-3" />
-                Project Budgets
-              </div>
-              <Badge className="bg-white/20 text-white">
-                {project_budgets.length}
-              </Badge>
-            </div>
-            <div className="text-purple-100 mt-2 text-sm">
-              Budget allocation by project
-            </div>
-          </div>
-          <div className="p-6 space-y-4">
-            {project_budgets.map((project, index) => (
-              <Link key={index} href={`/ketua-tim/projects/${project.id}`}>
-                <div className="group flex items-center p-4 rounded-2xl hover:bg-gradient-to-r hover:from-gray-50 hover:to-purple-50 transition-all duration-300 transform hover:scale-105 cursor-pointer border border-gray-100 hover:border-purple-200 hover:shadow-lg">
-                  <div className="flex-1">
-                    <div className="font-semibold text-gray-900 group-hover:text-purple-600 transition-colors">
-                      {project.nama_project}
-                    </div>
-                    <div className="text-sm text-gray-500 group-hover:text-purple-500 mt-1">
-                      Transport: {formatCurrency(project.transport_budget)} •
-                      Honor: {formatCurrency(project.honor_budget)}
-                    </div>
-                    <div className="text-sm text-gray-400 mt-1">
-                      Deadline:{" "}
-                      {new Date(project.deadline).toLocaleDateString("id-ID")}
-                    </div>
+      {activeTab === "overview" && (
+        <>
+          {/* Project Budgets & Top Spenders */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+            {/* Project Budgets */}
+            <div className="border-0 shadow-xl rounded-xl overflow-hidden">
+              <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center text-white text-xl font-semibold">
+                    <FolderOpen className="w-6 h-6 mr-3" />
+                    Project Budgets
                   </div>
-                  <div className="ml-4 text-right">
-                    <div className="text-lg font-bold text-gray-900">
-                      {formatCurrency(project.total_budget)}
-                    </div>
-                    <Badge
-                      className={`${
-                        project.status === "active"
-                          ? "bg-green-100 text-green-800"
-                          : project.status === "upcoming"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-gray-100 text-gray-800"
-                      }`}
-                    >
-                      {project.status.toUpperCase()}
-                    </Badge>
-                  </div>
+                  <Badge className="bg-white/20 text-white">
+                    {project_budgets.length}
+                  </Badge>
                 </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        {/* Top Spenders */}
-        <div className="border-0 shadow-xl rounded-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-orange-600 to-red-600 p-6">
-            <div className="flex items-center text-white text-xl font-semibold">
-              <BarChart3 className="w-6 h-6 mr-3" />
-              Top Spenders
-            </div>
-            <div className="text-orange-100 mt-2 text-sm">
-              Highest budget allocations
-            </div>
-          </div>
-          <div className="p-6 space-y-6">
-            {/* Top Pegawai */}
-            <div>
-              <h4 className="font-semibold text-gray-900 mb-3">Team Members</h4>
-              <div className="space-y-2">
-                {top_spenders.pegawai.map((pegawai, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-3 rounded-lg bg-blue-50 border border-blue-100"
-                  >
-                    <div>
-                      <div className="font-medium text-gray-900">
-                        {pegawai.name}
+                <div className="text-purple-100 mt-2 text-sm">
+                  Budget allocation by project
+                </div>
+              </div>
+              <div className="p-6 space-y-4">
+                {project_budgets.map((project, index) => (
+                  <Link key={index} href={`/ketua-tim/projects/${project.id}`}>
+                    <div className="group flex items-center p-4 rounded-2xl hover:bg-gradient-to-r hover:from-gray-50 hover:to-purple-50 transition-all duration-300 transform hover:scale-105 cursor-pointer border border-gray-100 hover:border-purple-200 hover:shadow-lg">
+                      <div className="flex-1">
+                        <div className="font-semibold text-gray-900 group-hover:text-purple-600 transition-colors">
+                          {project.nama_project}
+                        </div>
+                        <div className="text-sm text-gray-500 group-hover:text-purple-500 mt-1">
+                          Transport: {formatCurrency(project.transport_budget)}{" "}
+                          • Honor: {formatCurrency(project.honor_budget)}
+                        </div>
+                        <div className="text-sm text-gray-400 mt-1">
+                          Deadline:{" "}
+                          {new Date(project.deadline).toLocaleDateString(
+                            "id-ID"
+                          )}
+                        </div>
                       </div>
-                      <div className="text-sm text-gray-500">
-                        {pegawai.projects} projects
+                      <div className="ml-4 text-right">
+                        <div className="text-lg font-bold text-gray-900">
+                          {formatCurrency(project.total_budget)}
+                        </div>
+                        <Badge
+                          className={`${
+                            project.status === "active"
+                              ? "bg-green-100 text-green-800"
+                              : project.status === "upcoming"
+                                ? "bg-blue-100 text-blue-800"
+                                : "bg-gray-100 text-gray-800"
+                          }`}
+                        >
+                          {project.status.toUpperCase()}
+                        </Badge>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="font-semibold text-blue-600">
-                        {formatCurrency(pegawai.amount)}
-                      </div>
-                    </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             </div>
 
-            {/* Top Mitra */}
-            <div>
-              <h4 className="font-semibold text-gray-900 mb-3">Partners</h4>
-              <div className="space-y-2">
-                {top_spenders.mitra.map((mitra, index) => (
-                  <div
-                    key={index}
-                    className={`flex items-center justify-between p-3 rounded-lg border ${
-                      mitra.remaining_limit < 0
-                        ? "bg-red-50 border-red-200"
-                        : "bg-green-50 border-green-100"
-                    }`}
-                  >
-                    <div>
-                      <div className="font-medium text-gray-900">
-                        {mitra.name}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {mitra.projects} projects
-                      </div>
-                      {mitra.remaining_limit < 0 && (
-                        <div className="text-xs text-red-600 flex items-center mt-1">
-                          <AlertCircle className="w-3 h-3 mr-1" />
-                          Exceeds limit by{" "}
-                          {formatCurrency(Math.abs(mitra.remaining_limit))}
-                        </div>
-                      )}
-                    </div>
-                    <div className="text-right">
+            {/* Top Spenders */}
+            <div className="border-0 shadow-xl rounded-xl overflow-hidden">
+              <div className="bg-gradient-to-r from-orange-600 to-red-600 p-6">
+                <div className="flex items-center text-white text-xl font-semibold">
+                  <BarChart3 className="w-6 h-6 mr-3" />
+                  Top Spenders
+                </div>
+                <div className="text-orange-100 mt-2 text-sm">
+                  Highest budget allocations
+                </div>
+              </div>
+              <div className="p-6 space-y-6">
+                {/* Top Pegawai */}
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-3">
+                    Team Members
+                  </h4>
+                  <div className="space-y-2">
+                    {top_spenders.pegawai.map((pegawai, index) => (
                       <div
-                        className={`font-semibold ${
+                        key={index}
+                        className="flex items-center justify-between p-3 rounded-lg bg-blue-50 border border-blue-100"
+                      >
+                        <div>
+                          <div className="font-medium text-gray-900">
+                            {pegawai.name}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {pegawai.projects} projects
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-semibold text-blue-600">
+                            {formatCurrency(pegawai.amount)}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Top Mitra */}
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-3">Partners</h4>
+                  <div className="space-y-2">
+                    {top_spenders.mitra.map((mitra, index) => (
+                      <div
+                        key={index}
+                        className={`flex items-center justify-between p-3 rounded-lg border ${
                           mitra.remaining_limit < 0
-                            ? "text-red-600"
-                            : "text-green-600"
+                            ? "bg-red-50 border-red-200"
+                            : "bg-green-50 border-green-100"
                         }`}
                       >
-                        {formatCurrency(mitra.amount)}
+                        <div>
+                          <div className="font-medium text-gray-900">
+                            {mitra.name}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {mitra.projects} projects
+                          </div>
+                          {mitra.remaining_limit < 0 && (
+                            <div className="text-xs text-red-600 flex items-center mt-1">
+                              <AlertCircle className="w-3 h-3 mr-1" />
+                              Exceeds limit by{" "}
+                              {formatCurrency(Math.abs(mitra.remaining_limit))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <div
+                            className={`font-semibold ${
+                              mitra.remaining_limit < 0
+                                ? "text-red-600"
+                                : "text-green-600"
+                            }`}
+                          >
+                            {formatCurrency(mitra.amount)}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {mitra.remaining_limit >= 0
+                              ? `${formatCurrency(mitra.remaining_limit)} left`
+                              : "Over limit"}
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-500">
-                        {mitra.remaining_limit >= 0
-                          ? `${formatCurrency(mitra.remaining_limit)} left`
-                          : "Over limit"}
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="border-0 shadow-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white overflow-hidden rounded-xl">
+            <div className="p-8">
+              <h3 className="text-2xl font-bold mb-6">
+                Financial Reports & Actions
+              </h3>
+              <div className="grid md:grid-cols-3 gap-6">
+                <Button
+                  asChild
+                  className="bg-white/20 hover:bg-white/30 text-white border-white/30 h-auto p-4 justify-start"
+                >
+                  <Link href="/ketua-tim/reports">
+                    <div className="flex items-center">
+                      <FileText className="w-6 h-6 mr-3" />
+                      <div className="text-left">
+                        <div className="font-semibold">Generate Report</div>
+                        <div className="text-sm opacity-80">
+                          Monthly financial report
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                </Button>
+
+                <Button
+                  asChild
+                  className="bg-white/20 hover:bg-white/30 text-white border-white/30 h-auto p-4 justify-start"
+                >
+                  <Link href="/ketua-tim/projects/new">
+                    <div className="flex items-center">
+                      <FolderOpen className="w-6 h-6 mr-3" />
+                      <div className="text-left">
+                        <div className="font-semibold">New Project</div>
+                        <div className="text-sm opacity-80">
+                          Create with budget
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                </Button>
+
+                <Button className="bg-white/20 hover:bg-white/30 text-white border-white/30 h-auto p-4 justify-start">
+                  <div className="flex items-center">
+                    <CheckCircle className="w-6 h-6 mr-3" />
+                    <div className="text-left">
+                      <div className="font-semibold">Budget Review</div>
+                      <div className="text-sm opacity-80">
+                        Review allocations
                       </div>
                     </div>
                   </div>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {activeTab === "spending" && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 border-0 shadow-xl rounded-xl overflow-hidden">
+            <div className="bg-gradient-to-r from-teal-600 to-emerald-600 p-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-white">
+                  Spending Calendar
+                </h2>
+                <div className="text-white text-sm">
+                  {format(selectedDate, "MMMM yyyy", { locale: localeId })}
+                </div>
+              </div>
+            </div>
+            <div className="p-5">
+              <Calendar
+                mode="single"
+                month={selectedDate}
+                onMonthChange={(d) => setSelectedDate(d)}
+                selected={selectedDate}
+                onSelect={(d) => d && setSelectedDate(d)}
+                className="!w-full"
+                modifiers={{
+                  lowWorkload: (date) => {
+                    const ymd = format(date, "yyyy-MM-dd");
+                    const rec = daily?.days.find((d) => d.date === ymd);
+                    return !!rec && rec.total < 1_000_000;
+                  },
+                  mediumWorkload: (date) => {
+                    const ymd = format(date, "yyyy-MM-dd");
+                    const rec = daily?.days.find((d) => d.date === ymd);
+                    return (
+                      !!rec && rec.total >= 1_000_000 && rec.total <= 3_000_000
+                    );
+                  },
+                  highWorkload: (date) => {
+                    const ymd = format(date, "yyyy-MM-dd");
+                    const rec = daily?.days.find((d) => d.date === ymd);
+                    return !!rec && rec.total > 3_000_000;
+                  },
+                  hasEvents: (date) => {
+                    const ymd = format(date, "yyyy-MM-dd");
+                    return !!daily?.days.find(
+                      (d) => d.date === ymd && d.total > 0
+                    );
+                  },
+                }}
+              />
+              <div className="mt-4 flex flex-wrap items-center gap-3 text-xs">
+                <span className="text-gray-500">Legend:</span>
+                <Badge className="bg-green-100 text-green-800 border-green-200">
+                  &lt; 1 juta
+                </Badge>
+                <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">
+                  1 - 3 juta
+                </Badge>
+                <Badge className="bg-red-100 text-red-800 border-red-200">
+                  &gt; 3 juta
+                </Badge>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-0 shadow-xl rounded-xl overflow-hidden">
+            <div className="bg-gradient-to-r from-orange-600 to-red-600 p-4">
+              <h3 className="font-bold text-white">Spending Details</h3>
+            </div>
+            <div className="p-4 space-y-3">
+              <div className="text-sm text-gray-600">
+                {format(selectedDate, "EEEE, dd MMMM yyyy", {
+                  locale: localeId,
+                })}
+              </div>
+              <Button
+                variant="outline"
+                className="border-2 border-gray-200 hover:bg-gray-50"
+                onClick={() => fetchDailyDetails(selectedDate)}
+              >
+                <RefreshCw className="w-4 h-4 mr-2" /> Refresh Day
+              </Button>
+              <div className="divide-y">
+                {(dailyDetails?.details || []).map((d, i) => (
+                  <div
+                    key={i}
+                    className="py-3 flex items-center justify-between"
+                  >
+                    <div>
+                      <div className="font-medium text-gray-900">
+                        {d.recipient_name}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {d.recipient_type.toUpperCase()} •{" "}
+                        {d.project_name || d.project_id}
+                      </div>
+                    </div>
+                    <div className="font-semibold text-gray-900">
+                      {formatCurrency(d.amount)}
+                    </div>
+                  </div>
                 ))}
+                {(!dailyDetails || dailyDetails.details.length === 0) && (
+                  <div className="text-sm text-gray-500 py-6">
+                    Tidak ada pengeluaran untuk tanggal ini.
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="border-0 shadow-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white overflow-hidden rounded-xl">
-        <div className="p-8">
-          <h3 className="text-2xl font-bold mb-6">
-            Financial Reports & Actions
-          </h3>
-          <div className="grid md:grid-cols-3 gap-6">
-            <Button
-              asChild
-              className="bg-white/20 hover:bg-white/30 text-white border-white/30 h-auto p-4 justify-start"
-            >
-              <Link href="/ketua-tim/reports">
-                <div className="flex items-center">
-                  <FileText className="w-6 h-6 mr-3" />
-                  <div className="text-left">
-                    <div className="font-semibold">Generate Report</div>
-                    <div className="text-sm opacity-80">
-                      Monthly financial report
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            </Button>
-
-            <Button
-              asChild
-              className="bg-white/20 hover:bg-white/30 text-white border-white/30 h-auto p-4 justify-start"
-            >
-              <Link href="/ketua-tim/projects/new">
-                <div className="flex items-center">
-                  <FolderOpen className="w-6 h-6 mr-3" />
-                  <div className="text-left">
-                    <div className="font-semibold">New Project</div>
-                    <div className="text-sm opacity-80">Create with budget</div>
-                  </div>
-                </div>
-              </Link>
-            </Button>
-
-            <Button className="bg-white/20 hover:bg-white/30 text-white border-white/30 h-auto p-4 justify-start">
-              <div className="flex items-center">
-                <CheckCircle className="w-6 h-6 mr-3" />
-                <div className="text-left">
-                  <div className="font-semibold">Budget Review</div>
-                  <div className="text-sm opacity-80">Review allocations</div>
-                </div>
-              </div>
-            </Button>
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   );
 }

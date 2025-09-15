@@ -40,6 +40,10 @@ interface Project {
   project_assignments?: ProjectAssignment[];
 }
 
+interface ProjectWithProgress extends Project {
+  progress?: number;
+}
+
 export async function POST(request: NextRequest) {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -251,11 +255,31 @@ export async function GET(request: NextRequest) {
       query = query.eq("status", status);
     }
 
-    // Get total count
+    // Get total count (all projects for this ketua tim)
     const { count } = await supabase
       .from("projects")
       .select("*", { count: "exact", head: true })
       .eq("ketua_tim_id", user.id);
+
+    // Get per-status counts
+    const [upcomingCountRes, activeCountRes, completedCountRes] =
+      await Promise.all([
+        supabase
+          .from("projects")
+          .select("id", { count: "exact", head: true })
+          .eq("ketua_tim_id", user.id)
+          .eq("status", "upcoming"),
+        supabase
+          .from("projects")
+          .select("id", { count: "exact", head: true })
+          .eq("ketua_tim_id", user.id)
+          .eq("status", "active"),
+        supabase
+          .from("projects")
+          .select("id", { count: "exact", head: true })
+          .eq("ketua_tim_id", user.id)
+          .eq("status", "completed"),
+      ]);
 
     // Get paginated results
     const from = (page - 1) * limit;
@@ -306,12 +330,51 @@ export async function GET(request: NextRequest) {
           return {
             ...project,
             project_assignments: enrichedAssignments,
-          };
+          } as ProjectWithProgress;
         }
 
-        return project;
+        return project as ProjectWithProgress;
       })
     );
+
+    // Compute progress for each project based on tasks
+    const projectIds = (enrichedProjects || []).map((p) => p.id);
+    if (projectIds.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: tasks } = await (supabase as any)
+        .from("tasks")
+        .select("id, project_id, status")
+        .in("project_id", projectIds);
+
+      const idToProgress = new Map<string, number>();
+      if (tasks && Array.isArray(tasks)) {
+        const grouped: Record<string, { total: number; completed: number }> =
+          {};
+        for (const t of tasks as Array<{
+          id: string;
+          project_id: string;
+          status: string;
+        }>) {
+          const key = t.project_id;
+          if (!grouped[key]) grouped[key] = { total: 0, completed: 0 };
+          grouped[key].total += 1;
+          if (t.status === "completed") grouped[key].completed += 1;
+        }
+        for (const [pid, stats] of Object.entries(grouped)) {
+          const pct =
+            stats.total > 0
+              ? Math.round((stats.completed / stats.total) * 100)
+              : 0;
+          idToProgress.set(pid, pct);
+        }
+      }
+
+      for (const p of enrichedProjects as ProjectWithProgress[]) {
+        // If project status is completed, force 100%
+        p.progress =
+          p.status === "completed" ? 100 : (idToProgress.get(p.id) ?? 0);
+      }
+    }
 
     return NextResponse.json({
       data: enrichedProjects,
@@ -320,6 +383,11 @@ export async function GET(request: NextRequest) {
         limit,
         total: count || 0,
         totalPages: Math.ceil((count || 0) / limit),
+      },
+      statusCounts: {
+        upcoming: upcomingCountRes.count || 0,
+        active: activeCountRes.count || 0,
+        completed: completedCountRes.count || 0,
       },
     });
   } catch (error) {

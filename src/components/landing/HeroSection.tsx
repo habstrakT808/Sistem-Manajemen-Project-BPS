@@ -61,7 +61,11 @@ const HeroSection = () => {
             {/* CTAs */}
             <div className="flex flex-col sm:flex-row gap-4">
               <button
-                onClick={() => router.push("/auth/login")}
+                onClick={() => {
+                  document
+                    .getElementById("role-selection")
+                    ?.scrollIntoView({ behavior: "smooth" });
+                }}
                 className="group bg-gradient-to-r from-blue-600 to-blue-700 text-white px-8 py-4 rounded-xl font-semibold hover:from-blue-700 hover:to-blue-800 transition-all duration-300 transform hover:scale-105 hover:shadow-xl flex items-center justify-center space-x-2"
               >
                 <span>Mulai Sekarang</span>

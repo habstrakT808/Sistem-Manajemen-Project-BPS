@@ -2,7 +2,15 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Menu, X, User, LogIn } from "lucide-react";
+import { Menu, X, User, LogIn, Shield, Users } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -46,15 +54,38 @@ const Header = () => {
             ))}
           </nav>
 
-          {/* CTA Button */}
+          {/* CTA Button with Role Dropdown (Desktop) */}
           <div className="hidden md:flex">
-            <button
-              onClick={() => router.push("/auth/login")}
-              className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-2 rounded-lg font-semibold hover:from-blue-700 hover:to-blue-800 transition-all duration-200 transform hover:scale-105 flex items-center space-x-2"
-            >
-              <LogIn className="w-4 h-4" />
-              <span>Masuk Sistem</span>
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-2 rounded-lg font-semibold hover:from-blue-700 hover:to-blue-800 transition-all duration-200 transform hover:scale-105 flex items-center space-x-2">
+                  <LogIn className="w-4 h-4" />
+                  <span>Masuk Sistem</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Masuk sebagai</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onSelect={() => router.push("/auth/login?role=admin")}
+                >
+                  <Shield className="w-4 h-4 text-red-600" />
+                  <span>Admin</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => router.push("/auth/login?role=ketua_tim")}
+                >
+                  <Users className="w-4 h-4 text-blue-600" />
+                  <span>Ketua Tim</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => router.push("/auth/login?role=pegawai")}
+                >
+                  <User className="w-4 h-4 text-green-600" />
+                  <span>Pegawai</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           {/* Mobile Menu Button */}
@@ -84,16 +115,45 @@ const Header = () => {
                   {item.label}
                 </a>
               ))}
-              <button
-                onClick={() => {
-                  router.push("/auth/login");
-                  setIsMenuOpen(false);
-                }}
-                className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-2 rounded-lg font-semibold hover:from-blue-700 hover:to-blue-800 transition-all duration-200 transform hover:scale-105 flex items-center justify-center space-x-2 mt-4"
-              >
-                <LogIn className="w-4 h-4" />
-                <span>Masuk Sistem</span>
-              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-2 rounded-lg font-semibold hover:from-blue-700 hover:to-blue-800 transition-all duration-200 transform hover:scale-105 flex items-center justify-center space-x-2 mt-4">
+                    <LogIn className="w-4 h-4" />
+                    <span>Masuk Sistem</span>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>Masuk sebagai</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      router.push("/auth/login?role=admin");
+                      setIsMenuOpen(false);
+                    }}
+                  >
+                    <Shield className="w-4 h-4 text-red-600" />
+                    <span>Admin</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      router.push("/auth/login?role=ketua_tim");
+                      setIsMenuOpen(false);
+                    }}
+                  >
+                    <Users className="w-4 h-4 text-blue-600" />
+                    <span>Ketua Tim</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      router.push("/auth/login?role=pegawai");
+                      setIsMenuOpen(false);
+                    }}
+                  >
+                    <User className="w-4 h-4 text-green-600" />
+                    <span>Pegawai</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </nav>
           </div>
         )}

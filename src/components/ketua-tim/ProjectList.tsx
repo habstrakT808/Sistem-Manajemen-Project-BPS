@@ -3,6 +3,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +24,14 @@ import {
   AlertTriangle,
   Loader2,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -54,11 +63,18 @@ interface ProjectsResponse {
     total: number;
     totalPages: number;
   };
+  statusCounts?: {
+    upcoming: number;
+    active: number;
+    completed: number;
+  };
 }
 
 export default function ProjectList() {
   const [projects, setProjects] = useState<ProjectData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [finishingId, setFinishingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
@@ -68,6 +84,13 @@ export default function ProjectList() {
     total: 0,
     totalPages: 0,
   });
+  const [statusCounts, setStatusCounts] = useState({
+    upcoming: 0,
+    active: 0,
+    completed: 0,
+  });
+
+  const router = useRouter();
 
   const fetchProjects = useCallback(async (page = 1, status?: string) => {
     setLoading(true);
@@ -92,6 +115,9 @@ export default function ProjectList() {
 
       setProjects(result.data);
       setPagination(result.pagination);
+      if (result.statusCounts) {
+        setStatusCounts(result.statusCounts);
+      }
       setCurrentPage(page);
     } catch (error) {
       console.error("Error fetching projects:", error);
@@ -104,6 +130,60 @@ export default function ProjectList() {
   useEffect(() => {
     fetchProjects(1, selectedStatus);
   }, [fetchProjects, selectedStatus]);
+
+  const handleFinishProject = async (projectId: string) => {
+    const confirmed = window.confirm(
+      "Tandai project sebagai selesai sekarang? Semua tugas tersisa akan ditandai selesai dan deadline di-set ke hari ini."
+    );
+    if (!confirmed) return;
+
+    setFinishingId(projectId);
+    try {
+      const response = await fetch(
+        `/api/ketua-tim/projects/${projectId}/finish`,
+        {
+          method: "POST",
+        }
+      );
+      const result = await response.json();
+      if (!response.ok)
+        throw new Error(result.error || "Gagal menyelesaikan project");
+
+      toast.success("Project selesai lebih awal");
+      // Refresh list keeping current filters/page
+      fetchProjects(currentPage, selectedStatus);
+    } catch (err) {
+      console.error("Finish project error:", err);
+      toast.error(err instanceof Error ? err.message : "Terjadi kesalahan");
+    } finally {
+      setFinishingId(null);
+    }
+  };
+
+  const handleDeleteProject = async (projectId: string) => {
+    const confirmed = window.confirm(
+      "Hapus project ini? Tindakan ini tidak dapat dibatalkan. Semua tugas dan assignment terkait akan dihapus."
+    );
+    if (!confirmed) return;
+
+    setDeletingId(projectId);
+    try {
+      const response = await fetch(`/api/ketua-tim/projects/${projectId}`, {
+        method: "DELETE",
+      });
+      const result = await response.json();
+      if (!response.ok)
+        throw new Error(result.error || "Gagal menghapus project");
+
+      toast.success("Project berhasil dihapus");
+      fetchProjects(currentPage, selectedStatus);
+    } catch (err) {
+      console.error("Delete project error:", err);
+      toast.error(err instanceof Error ? err.message : "Terjadi kesalahan");
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -161,9 +241,9 @@ export default function ProjectList() {
 
   const statusTabs = [
     { value: "all", label: "All Projects", count: pagination.total },
-    { value: "upcoming", label: "Upcoming", count: 0 },
-    { value: "active", label: "Active", count: 0 },
-    { value: "completed", label: "Completed", count: 0 },
+    { value: "upcoming", label: "Upcoming", count: statusCounts.upcoming },
+    { value: "active", label: "Active", count: statusCounts.active },
+    { value: "completed", label: "Completed", count: statusCounts.completed },
   ];
 
   if (loading) {
@@ -343,37 +423,81 @@ export default function ProjectList() {
                         </div>
 
                         <div className="flex items-center space-x-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            asChild
-                            className="border-blue-200 text-blue-600 hover:bg-blue-50"
-                          >
-                            <Link href={`/ketua-tim/projects/${project.id}`}>
-                              <Eye className="w-4 h-4 mr-1" />
-                              View
-                            </Link>
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            asChild
-                            className="border-green-200 text-green-600 hover:bg-green-50"
-                          >
-                            <Link
-                              href={`/ketua-tim/projects/${project.id}/edit`}
-                            >
-                              <Edit className="w-4 h-4 mr-1" />
-                              Edit
-                            </Link>
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="border-gray-200 text-gray-600 hover:bg-gray-50"
-                          >
-                            <MoreVertical className="w-4 h-4" />
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="border-gray-200 text-gray-600 hover:bg-gray-50"
+                              >
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-56">
+                              <DropdownMenuLabel>
+                                Aksi Project
+                              </DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onSelect={() =>
+                                  router.push(
+                                    `/ketua-tim/projects/${project.id}`
+                                  )
+                                }
+                              >
+                                <Eye className="w-4 h-4" />
+                                <span>View</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onSelect={() =>
+                                  router.push(
+                                    `/ketua-tim/projects/${project.id}/edit`
+                                  )
+                                }
+                              >
+                                <Edit className="w-4 h-4" />
+                                <span>Edit</span>
+                              </DropdownMenuItem>
+                              {project.status !== "completed" && (
+                                <DropdownMenuItem
+                                  onSelect={() =>
+                                    handleFinishProject(project.id)
+                                  }
+                                  disabled={finishingId === project.id}
+                                >
+                                  {finishingId === project.id ? (
+                                    <>
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                      <span>Finishing...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <CheckCircle className="w-4 h-4" />
+                                      <span>Finish Project</span>
+                                    </>
+                                  )}
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                variant="destructive"
+                                onSelect={() => handleDeleteProject(project.id)}
+                                disabled={deletingId === project.id}
+                              >
+                                {deletingId === project.id ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    <span>Deleting...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <AlertTriangle className="w-4 h-4" />
+                                    <span>Delete Project</span>
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </div>
 
@@ -382,13 +506,24 @@ export default function ProjectList() {
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-600">Progress</span>
                           <span className="font-semibold text-gray-900">
-                            0%
+                            {typeof (project as any).progress === "number"
+                              ? `${(project as any).progress}%`
+                              : project.status === "completed"
+                                ? "100%"
+                                : "0%"}
                           </span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div
                             className="bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full transition-all duration-300"
-                            style={{ width: "0%" }}
+                            style={{
+                              width:
+                                typeof (project as any).progress === "number"
+                                  ? `${(project as any).progress}%`
+                                  : project.status === "completed"
+                                    ? "100%"
+                                    : "0%",
+                            }}
                           ></div>
                         </div>
                       </div>

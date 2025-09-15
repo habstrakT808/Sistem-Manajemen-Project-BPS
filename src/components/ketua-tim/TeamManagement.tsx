@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MitraReviews } from ".";
 import {
   Select,
   SelectContent,
@@ -316,9 +317,10 @@ export default function TeamManagement() {
       )}
 
       <Tabs defaultValue="team" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="team">Team Overview</TabsTrigger>
           <TabsTrigger value="analytics">Analytics & Performance</TabsTrigger>
+          <TabsTrigger value="mitra-reviews">Mitra Reviews</TabsTrigger>
         </TabsList>
 
         <TabsContent value="team" className="space-y-6">
@@ -679,6 +681,10 @@ export default function TeamManagement() {
               </p>
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="mitra-reviews" className="space-y-6">
+          <MitraReviews />
         </TabsContent>
       </Tabs>
     </div>

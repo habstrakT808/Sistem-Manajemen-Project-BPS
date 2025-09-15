@@ -278,3 +278,88 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     );
   }
 }
+
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const supabase = (await createClient()) as any;
+    const { id: projectId } = await params;
+
+    // Auth: must be ketua_tim
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { data: userProfile, error: profileError } = await supabase
+      .from("users")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (
+      profileError ||
+      !userProfile ||
+      (userProfile as { role: string }).role !== "ketua_tim"
+    ) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    // Ensure the project belongs to this ketua tim
+    const { data: project, error: projectError } = await supabase
+      .from("projects")
+      .select("id")
+      .eq("id", projectId)
+      .eq("ketua_tim_id", user.id)
+      .single();
+
+    if (projectError || !project) {
+      return NextResponse.json(
+        { error: "Project not found or access denied" },
+        { status: 404 }
+      );
+    }
+
+    // Delete dependent rows first (assignments, tasks)
+    const { error: deleteAssignmentsError } = await supabase
+      .from("project_assignments")
+      .delete()
+      .eq("project_id", projectId);
+
+    if (deleteAssignmentsError) {
+      console.error("Failed to delete assignments:", deleteAssignmentsError);
+    }
+
+    const { error: deleteTasksError } = await supabase
+      .from("tasks")
+      .delete()
+      .eq("project_id", projectId);
+
+    if (deleteTasksError) {
+      console.error("Failed to delete tasks:", deleteTasksError);
+    }
+
+    // Delete the project
+    const { error: deleteProjectError } = await supabase
+      .from("projects")
+      .delete()
+      .eq("id", projectId)
+      .eq("ketua_tim_id", user.id);
+
+    if (deleteProjectError) {
+      throw deleteProjectError;
+    }
+
+    return NextResponse.json({ message: "Project deleted" });
+  } catch (error) {
+    console.error("Project delete error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}

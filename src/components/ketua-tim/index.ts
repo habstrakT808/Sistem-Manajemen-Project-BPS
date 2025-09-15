@@ -10,3 +10,4 @@ export { default as TeamManagement } from "./TeamManagement";
 export { default as FinancialDashboard } from "./FinancialDashboard";
 export { default as AnalyticsDashboard } from "./AnalyticsDashboard";
 export { default as MemberDetail } from "./MemberDetail";
+export { default as MitraReviews } from "./MitraReviews";

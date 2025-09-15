@@ -507,22 +507,22 @@ export default function ProjectDetailPage({
 
       {/* Detailed Tabs */}
       <Tabs defaultValue="tasks" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 bg-white shadow-lg rounded-xl p-2">
+        <TabsList className="grid w-full grid-cols-3 bg-white shadow-lg rounded-xl p-1 h-auto">
           <TabsTrigger
             value="tasks"
-            className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-teal-500 data-[state=active]:text-white rounded-lg"
+            className="flex items-center justify-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-teal-500 data-[state=active]:text-white rounded-lg px-3 py-2 transition-all duration-200 h-10"
           >
             My Tasks ({project.my_task_stats.total})
           </TabsTrigger>
           <TabsTrigger
             value="team"
-            className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-indigo-500 data-[state=active]:text-white rounded-lg"
+            className="flex items-center justify-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-indigo-500 data-[state=active]:text-white rounded-lg px-3 py-2 transition-all duration-200 h-10"
           >
             Team Members ({project.team_members.length})
           </TabsTrigger>
           <TabsTrigger
             value="partners"
-            className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-pink-500 data-[state=active]:text-white rounded-lg"
+            className="flex items-center justify-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-pink-500 data-[state=active]:text-white rounded-lg px-3 py-2 transition-all duration-200 h-10"
           >
             Partners ({project.mitra_partners.length})
           </TabsTrigger>

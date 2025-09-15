@@ -2,14 +2,18 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 
 export async function GET(request: NextRequest) {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const supabase = (await createClient()) as any;
+    const supabase = await createClient();
     const { searchParams } = new URL(request.url);
-    const month = searchParams.get("month") || new Date().getMonth() + 1;
-    const year = searchParams.get("year") || new Date().getFullYear();
+    const monthParam = searchParams.get("month");
+    const yearParam = searchParams.get("year");
+    const month = monthParam
+      ? parseInt(monthParam, 10)
+      : new Date().getMonth() + 1;
+    const year = yearParam ? parseInt(yearParam, 10) : new Date().getFullYear();
 
     // Auth check
     const {
@@ -35,20 +39,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Get monthly earnings
-    const { data: financialRecords, error: recordsError } = await supabase
+    // Use service client to bypass RLS for analytics aggregations
+    const serviceClient = createServiceClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    // Get monthly earnings (explicit select to avoid ambiguity)
+    const { data: financialRecords, error: recordsError } = await serviceClient
       .from("financial_records")
       .select(
-        `
-        amount,
-        description,
-        created_at,
-        projects!inner (
-          nama_project,
-          tanggal_mulai,
-          deadline
-        )
-      `
+        `amount, description, created_at, project_id,
+         projects ( nama_project, tanggal_mulai, deadline )`
       )
       .eq("recipient_type", "pegawai")
       .eq("recipient_id", user.id)
@@ -74,7 +76,7 @@ export async function GET(request: NextRequest) {
       const histMonth = date.getMonth() + 1;
       const histYear = date.getFullYear();
 
-      const { data: histRecords } = await supabase
+      const { data: histRecords } = await serviceClient
         .from("financial_records")
         .select("amount")
         .eq("recipient_type", "pegawai")
