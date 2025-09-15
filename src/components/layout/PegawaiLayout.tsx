@@ -9,14 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   Home,
   ClipboardList,
   FolderOpen,
@@ -25,15 +17,12 @@ import {
   Star,
   User,
   LogOut,
-  Menu,
   X,
   Bell,
   Settings,
   CheckSquare,
   Play,
   Leaf,
-  Clock,
-  TrendingUp,
 } from "lucide-react";
 import { useAuth } from "@/lib/hooks/useAuth";
 
@@ -269,136 +258,7 @@ export function PegawaiLayout({ children }: PegawaiLayoutProps) {
       </div>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col min-h-screen lg:ml-64">
-        {/* Top header */}
-        <header className="bg-white shadow-lg border-b border-gray-100 backdrop-blur-md bg-opacity-95">
-          <div className="flex items-center justify-between h-20 px-8">
-            <div className="flex items-center space-x-6">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSidebarOpen(true)}
-                className="lg:hidden hover:bg-green-50"
-              >
-                <Menu className="w-5 h-5" />
-              </Button>
-
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900 bg-gradient-to-r from-green-600 to-teal-600 bg-clip-text text-transparent">
-                  My Workspace
-                </h1>
-                <div className="flex items-center space-x-2 mt-1">
-                  <Badge className="bg-gradient-to-r from-green-500 to-teal-600 text-white border-0">
-                    <Leaf className="w-3 h-3 mr-1" />
-                    Pegawai Access
-                  </Badge>
-                  <Badge className="bg-white text-green-600 border border-green-200">
-                    <Clock className="w-3 h-3 mr-1" />
-                    {new Date().toLocaleDateString("id-ID", {
-                      weekday: "short",
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  </Badge>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-4">
-              {/* Performance indicator */}
-              <div className="hidden md:flex items-center space-x-2 px-3 py-2 bg-gradient-to-r from-green-50 to-teal-50 rounded-xl">
-                <TrendingUp className="w-4 h-4 text-green-600" />
-                <span className="text-sm font-semibold text-green-600">
-                  Productive Day!
-                </span>
-              </div>
-
-              {/* Notifications */}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="relative hover:bg-green-50 rounded-xl p-3 group"
-              >
-                <Bell className="w-5 h-5 group-hover:text-green-600 transition-colors" />
-                {/* Notification dot */}
-                <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-              </Button>
-
-              {/* User menu */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="flex items-center space-x-3 hover:bg-green-50 rounded-2xl p-3 transition-all duration-200"
-                  >
-                    <Avatar className="w-10 h-10 border-2 border-green-100">
-                      <AvatarImage src="" />
-                      <AvatarFallback className="bg-gradient-to-r from-green-500 to-teal-600 text-white font-bold">
-                        {userProfile?.nama_lengkap?.charAt(0) ||
-                          user?.email?.charAt(0).toUpperCase() ||
-                          "P"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="hidden md:block text-left">
-                      <div className="text-sm font-semibold text-gray-900">
-                        {userProfile?.nama_lengkap || user?.email || "Pegawai"}
-                      </div>
-                      <div className="text-xs text-gray-500">Team Member</div>
-                    </div>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="end"
-                  className="w-64 rounded-2xl shadow-2xl border-0 bg-white"
-                >
-                  <DropdownMenuLabel className="p-4">
-                    <div className="flex items-center space-x-3">
-                      <Avatar className="w-10 h-10">
-                        <AvatarFallback className="bg-gradient-to-r from-green-500 to-teal-600 text-white">
-                          {userProfile?.nama_lengkap?.charAt(0) ||
-                            user?.email?.charAt(0).toUpperCase() ||
-                            "P"}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="font-semibold text-gray-900">
-                          My Account
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {user?.email}
-                        </div>
-                      </div>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    asChild
-                    className="p-3 rounded-xl mx-2 my-1"
-                  >
-                    <Link href="/pegawai/profile">
-                      <User className="w-4 h-4 mr-3" />
-                      Profile Settings
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="p-3 rounded-xl mx-2 my-1">
-                    <Settings className="w-4 h-4 mr-3" />
-                    Preferences
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={handleSignOut}
-                    className="text-red-600 p-3 rounded-xl mx-2 my-1 hover:bg-red-50"
-                  >
-                    <LogOut className="w-4 h-4 mr-3" />
-                    Sign out
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-        </header>
-
-        {/* Page content */}
+      <div className="flex-1 flex flex-col min-h-screen">
         <main className="flex-1 p-8">{children}</main>
       </div>
     </div>

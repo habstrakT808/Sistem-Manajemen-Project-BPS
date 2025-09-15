@@ -20,6 +20,7 @@ import {
   Play,
   CheckSquare,
   Calendar,
+  Leaf,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
@@ -263,7 +264,40 @@ export default function PegawaiDashboard() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
+      {/* Workspace Header */}
+      <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 bg-gradient-to-r from-green-600 to-teal-600 bg-clip-text text-transparent">
+              My Workspace
+            </h1>
+            <div className="flex items-center space-x-2 mt-2">
+              <Badge className="bg-gradient-to-r from-green-500 to-teal-600 text-white border-0">
+                <Leaf className="w-3 h-3 mr-1" />
+                Pegawai Access
+              </Badge>
+              <Badge className="bg-white text-green-600 border border-green-200">
+                <Calendar className="w-3 h-3 mr-1" />
+                {new Date().toLocaleDateString("id-ID", {
+                  weekday: "short",
+                  month: "short",
+                  day: "numeric",
+                })}
+              </Badge>
+            </div>
+          </div>
+          <div className="flex items-center space-x-4">
+            <div className="hidden md:flex items-center space-x-2 px-3 py-2 bg-gradient-to-r from-green-50 to-teal-50 rounded-xl">
+              <TrendingUp className="w-4 h-4 text-green-600" />
+              <span className="text-sm font-semibold text-green-600">
+                Productive Day!
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Dashboard Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">

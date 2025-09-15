@@ -163,40 +163,40 @@ export default function TasksPage() {
         onValueChange={setActiveTab}
         className="space-y-6"
       >
-        <TabsList className="grid w-full grid-cols-4 bg-white shadow-lg rounded-xl p-2">
+        <TabsList className="grid w-full grid-cols-4 bg-white shadow-lg rounded-xl p-1 h-auto">
           <TabsTrigger
             value="all"
-            className="flex items-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-teal-500 data-[state=active]:text-white rounded-lg"
+            className="flex items-center justify-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-teal-500 data-[state=active]:text-white rounded-lg px-3 py-2 transition-all duration-200 h-10"
           >
-            <span>All Tasks</span>
-            <Badge className="bg-gray-100 text-gray-800 text-xs">
+            <span className="text-sm font-medium">All Tasks</span>
+            <Badge className="bg-gray-100 text-gray-800 text-xs px-1.5 py-0.5">
               {taskCounts.all}
             </Badge>
           </TabsTrigger>
           <TabsTrigger
             value="pending"
-            className="flex items-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-yellow-500 data-[state=active]:to-orange-500 data-[state=active]:text-white rounded-lg"
+            className="flex items-center justify-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-yellow-500 data-[state=active]:to-orange-500 data-[state=active]:text-white rounded-lg px-3 py-2 transition-all duration-200 h-10"
           >
-            <span>Pending</span>
-            <Badge className="bg-yellow-100 text-yellow-800 text-xs">
+            <span className="text-sm font-medium">Pending</span>
+            <Badge className="bg-yellow-100 text-yellow-800 text-xs px-1.5 py-0.5">
               {taskCounts.pending}
             </Badge>
           </TabsTrigger>
           <TabsTrigger
             value="in_progress"
-            className="flex items-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-indigo-500 data-[state=active]:text-white rounded-lg"
+            className="flex items-center justify-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-indigo-500 data-[state=active]:text-white rounded-lg px-3 py-2 transition-all duration-200 h-10"
           >
-            <span>In Progress</span>
-            <Badge className="bg-blue-100 text-blue-800 text-xs">
+            <span className="text-sm font-medium">In Progress</span>
+            <Badge className="bg-blue-100 text-blue-800 text-xs px-1.5 py-0.5">
               {taskCounts.in_progress}
             </Badge>
           </TabsTrigger>
           <TabsTrigger
             value="completed"
-            className="flex items-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-emerald-500 data-[state=active]:text-white rounded-lg"
+            className="flex items-center justify-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-emerald-500 data-[state=active]:text-white rounded-lg px-3 py-2 transition-all duration-200 h-10"
           >
-            <span>Completed</span>
-            <Badge className="bg-green-100 text-green-800 text-xs">
+            <span className="text-sm font-medium">Completed</span>
+            <Badge className="bg-green-100 text-green-800 text-xs px-1.5 py-0.5">
               {taskCounts.completed}
             </Badge>
           </TabsTrigger>

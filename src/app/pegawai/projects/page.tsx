@@ -1,31 +1,12 @@
-// File: src/app/pegawai/projects/page.tsx
-
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  FolderOpen,
-  RefreshCw,
-  Search,
-  Filter,
-  AlertCircle,
-  TrendingUp,
-  Calendar,
-  AlertTriangle,
-  DollarSign,
-} from "lucide-react";
+import { RefreshCw, Calendar, AlertCircle } from "lucide-react";
 import ProjectView from "@/components/pegawai/ProjectView";
 import { toast } from "sonner";
-import { formatCurrency } from "@/lib/utils";
 
 interface ProjectData {
   id: string;
@@ -55,8 +36,7 @@ export default function ProjectsPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [activeTab, setActiveTab] = useState("all");
 
   const fetchProjects = useCallback(async () => {
     try {
@@ -95,19 +75,6 @@ export default function ProjectsPage() {
     loadData();
   }, [fetchProjects]);
 
-  const filteredProjects = projects.filter((project) => {
-    const matchesSearch =
-      project.nama_project.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      project.ketua_tim.nama_lengkap
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase());
-
-    const matchesStatus =
-      statusFilter === "all" || project.status === statusFilter;
-
-    return matchesSearch && matchesStatus;
-  });
-
   const projectCounts = {
     all: projects.length,
     upcoming: projects.filter((p) => p.status === "upcoming").length,
@@ -115,17 +82,10 @@ export default function ProjectsPage() {
     completed: projects.filter((p) => p.status === "completed").length,
   };
 
-  const totalEarnings = projects.reduce(
-    (sum, project) => sum + project.uang_transport,
-    0
-  );
-  const averageProgress =
-    projects.length > 0
-      ? Math.round(
-          projects.reduce((sum, project) => sum + project.my_progress, 0) /
-            projects.length
-        )
-      : 0;
+  const getFilteredProjects = (status: string) => {
+    if (status === "all") return projects;
+    return projects.filter((project) => project.status === status);
+  };
 
   // Error state
   if (error && !projects.length) {
@@ -191,128 +151,60 @@ export default function ProjectsPage() {
         </div>
       </div>
 
-      {/* Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="border-0 shadow-xl rounded-xl overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-blue-100 opacity-50"></div>
-          <div className="relative p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold text-gray-600 mb-1">
-                  Total Projects
-                </p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {projects.length}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-                <FolderOpen className="w-6 h-6 text-white" />
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Status Tabs */}
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="space-y-6"
+      >
+        <TabsList className="grid w-full grid-cols-4 bg-white shadow-lg rounded-xl p-1 h-auto">
+          <TabsTrigger
+            value="all"
+            className="flex items-center justify-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-teal-500 data-[state=active]:text-white rounded-lg px-3 py-2 transition-all duration-200 h-10"
+          >
+            <span className="text-sm font-medium">All Projects</span>
+            <Badge className="bg-gray-100 text-gray-800 text-xs px-1.5 py-0.5">
+              {projectCounts.all}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger
+            value="upcoming"
+            className="flex items-center justify-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-indigo-500 data-[state=active]:text-white rounded-lg px-3 py-2 transition-all duration-200 h-10"
+          >
+            <span className="text-sm font-medium">Upcoming</span>
+            <Badge className="bg-blue-100 text-blue-800 text-xs px-1.5 py-0.5">
+              {projectCounts.upcoming}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger
+            value="active"
+            className="flex items-center justify-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-yellow-500 data-[state=active]:to-orange-500 data-[state=active]:text-white rounded-lg px-3 py-2 transition-all duration-200 h-10"
+          >
+            <span className="text-sm font-medium">Active</span>
+            <Badge className="bg-yellow-100 text-yellow-800 text-xs px-1.5 py-0.5">
+              {projectCounts.active}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger
+            value="completed"
+            className="flex items-center justify-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-emerald-500 data-[state=active]:text-white rounded-lg px-3 py-2 transition-all duration-200 h-10"
+          >
+            <span className="text-sm font-medium">Completed</span>
+            <Badge className="bg-green-100 text-green-800 text-xs px-1.5 py-0.5">
+              {projectCounts.completed}
+            </Badge>
+          </TabsTrigger>
+        </TabsList>
 
-        <div className="border-0 shadow-xl rounded-xl overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-green-50 to-green-100 opacity-50"></div>
-          <div className="relative p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold text-gray-600 mb-1">
-                  Avg Progress
-                </p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {averageProgress}%
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-white" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="border-0 shadow-xl rounded-xl overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-50 to-purple-100 opacity-50"></div>
-          <div className="relative p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold text-gray-600 mb-1">
-                  Active Projects
-                </p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {projectCounts.active}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
-                <AlertTriangle className="w-6 h-6 text-white" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="border-0 shadow-xl rounded-xl overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-yellow-50 to-yellow-100 opacity-50"></div>
-          <div className="relative p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold text-gray-600 mb-1">
-                  Total Earnings
-                </p>
-                <p className="text-lg font-bold text-gray-900">
-                  {formatCurrency(totalEarnings)}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-white" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Search & Filters */}
-      <div className="flex items-center space-x-4 bg-white p-4 rounded-xl shadow-lg">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-          <Input
-            placeholder="Search projects or ketua tim..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 border-gray-200"
-          />
-        </div>
-
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-48">
-            <SelectValue placeholder="Filter by status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">
-              All Projects ({projectCounts.all})
-            </SelectItem>
-            <SelectItem value="upcoming">
-              Upcoming ({projectCounts.upcoming})
-            </SelectItem>
-            <SelectItem value="active">
-              Active ({projectCounts.active})
-            </SelectItem>
-            <SelectItem value="completed">
-              Completed ({projectCounts.completed})
-            </SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Button
-          variant="outline"
-          className="border-2 border-gray-200 text-gray-600 hover:bg-gray-50"
-        >
-          <Filter className="w-4 h-4 mr-2" />
-          More Filters
-        </Button>
-      </div>
-
-      {/* Projects List */}
-      <ProjectView projects={filteredProjects} loading={loading} />
+        {["all", "upcoming", "active", "completed"].map((status) => (
+          <TabsContent key={status} value={status}>
+            <ProjectView
+              projects={getFilteredProjects(status)}
+              loading={loading}
+            />
+          </TabsContent>
+        ))}
+      </Tabs>
     </div>
   );
 }

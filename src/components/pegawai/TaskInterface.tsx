@@ -490,21 +490,31 @@ export default function TaskInterface({
 
           <div className="space-y-4">
             <div>
-              <Label htmlFor="task-description">Task Description</Label>
-              <div className="mt-1 p-3 bg-gray-50 rounded-lg text-sm text-gray-700">
+              <Label
+                htmlFor="task-description"
+                className="text-sm font-medium text-gray-700"
+              >
+                Task Description
+              </Label>
+              <div className="mt-3 p-3 bg-gray-50 rounded-lg text-sm text-gray-700">
                 {selectedTask?.deskripsi_tugas}
               </div>
             </div>
 
             <div>
-              <Label htmlFor="response">Your Response (Optional)</Label>
+              <Label
+                htmlFor="response"
+                className="text-sm font-medium text-gray-700"
+              >
+                Your Response (Optional)
+              </Label>
               <Textarea
                 id="response"
                 value={response}
                 onChange={(e) => setResponse(e.target.value)}
                 placeholder="Describe what you accomplished, any issues encountered, or additional notes..."
                 rows={4}
-                className="mt-1"
+                className="mt-3"
               />
             </div>
           </div>

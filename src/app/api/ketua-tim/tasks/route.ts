@@ -163,7 +163,15 @@ export async function GET(request: NextRequest) {
       .from("tasks")
       .select(
         `
-        *,
+        id,
+        project_id,
+        pegawai_id,
+        tanggal_tugas,
+        deskripsi_tugas,
+        status,
+        response_pegawai,
+        created_at,
+        updated_at,
         projects!inner (
           id,
           nama_project,
@@ -182,7 +190,7 @@ export async function GET(request: NextRequest) {
 
     // Apply filters
     if (projectId) {
-      query = query.eq("project_id", projectId);
+      query = query.eq("projects.id", projectId);
     }
 
     if (status) {
