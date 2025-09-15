@@ -55,6 +55,11 @@ const RoleSelection = () => {
     },
   ];
 
+  const prefetchAndPush = (href: string) => {
+    router.prefetch(href);
+    router.push(href);
+  };
+
   return (
     <section id="role-selection" className="py-20 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -108,7 +113,12 @@ const RoleSelection = () => {
                 </div>
 
                 <button
-                  onClick={() => router.push(`/auth/login?role=${role.role}`)}
+                  onMouseEnter={() =>
+                    router.prefetch(`/auth/login?role=${role.role}`)
+                  }
+                  onClick={() =>
+                    prefetchAndPush(`/auth/login?role=${role.role}`)
+                  }
                   className={`w-full bg-gradient-to-r ${role.color} text-white py-3 px-6 rounded-xl font-semibold hover:shadow-lg transition-all duration-300 transform group-hover:scale-105 flex items-center justify-center space-x-2`}
                 >
                   <span>Login sebagai {role.title}</span>

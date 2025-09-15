@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,41 +33,26 @@ interface DashboardStats {
 }
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const router = useRouter();
   const supabase = createClient();
 
   const fetchDashboardStats = useCallback(async () => {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user?.id) {
-        console.error("User not authenticated");
-        setLoading(false);
-        return;
-      }
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user?.id) return null;
 
-      const { data, error } = await supabase.rpc("get_dashboard_stats", {
-        user_id: user.id,
-      });
-
-      if (error) {
-        console.error("Error fetching dashboard stats:", error);
-        return;
-      }
-
-      setStats(data);
-    } catch (error) {
-      console.error("Error fetching dashboard stats:", error);
-    } finally {
-      setLoading(false);
-    }
+    const { data } = await supabase.rpc("get_dashboard_stats", {
+      user_id: user.id,
+    });
+    return data as DashboardStats;
   }, [supabase]);
 
-  useEffect(() => {
-    fetchDashboardStats();
-  }, [fetchDashboardStats]);
+  const { data: stats, isLoading } = useQuery<DashboardStats | null, Error>({
+    queryKey: ["admin", "dashboard", "stats"],
+    queryFn: fetchDashboardStats,
+    staleTime: 5 * 60 * 1000,
+  });
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("id-ID", {
@@ -189,7 +176,7 @@ export default function AdminDashboard() {
     },
   ];
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="space-y-8">
         <div className="flex items-center justify-between">
@@ -232,7 +219,11 @@ export default function AdminDashboard() {
             asChild
             className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
           >
-            <Link href="/admin/users">
+            <Link
+              href="/admin/users"
+              prefetch
+              onMouseEnter={() => router.prefetch("/admin/users")}
+            >
               <UserPlus className="w-4 h-4 mr-2" />
               Manage Users
             </Link>
@@ -242,7 +233,11 @@ export default function AdminDashboard() {
             asChild
             className="border-2 border-purple-200 text-purple-600 hover:bg-purple-50 font-semibold px-6 py-3 rounded-xl transition-all duration-300 hover:border-purple-300"
           >
-            <Link href="/admin/mitra">
+            <Link
+              href="/admin/mitra"
+              prefetch
+              onMouseEnter={() => router.prefetch("/admin/mitra")}
+            >
               <Plus className="w-4 h-4 mr-2" />
               Manage Mitra
             </Link>
@@ -255,7 +250,12 @@ export default function AdminDashboard() {
         {statsCards.map((stat, index) => {
           const IconComponent = stat.icon;
           return (
-            <Link key={index} href={stat.href}>
+            <Link
+              key={index}
+              href={stat.href}
+              prefetch
+              onMouseEnter={() => router.prefetch(stat.href)}
+            >
               <Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 cursor-pointer group overflow-hidden">
                 <div
                   className={`absolute inset-0 bg-gradient-to-br ${stat.bgColor} opacity-50`}
@@ -283,11 +283,7 @@ export default function AdminDashboard() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
                       <span
-                        className={`text-sm font-semibold ${
-                          stat.changeType === "positive"
-                            ? "text-green-600"
-                            : "text-red-600"
-                        }`}
+                        className={`text-sm font-semibold ${stat.changeType === "positive" ? "text-green-600" : "text-red-600"}`}
                       >
                         {stat.change}
                       </span>
@@ -323,7 +319,12 @@ export default function AdminDashboard() {
             {quickActions.map((action, index) => {
               const IconComponent = action.icon;
               return (
-                <Link key={index} href={action.href}>
+                <Link
+                  key={index}
+                  href={action.href}
+                  prefetch
+                  onMouseEnter={() => router.prefetch(action.href)}
+                >
                   <div className="group flex items-center p-4 rounded-2xl hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50 transition-all duration-300 transform hover:scale-105 cursor-pointer border border-gray-100 hover:border-blue-200 hover:shadow-lg">
                     <div
                       className={`w-12 h-12 bg-gradient-to-r ${action.color} rounded-xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform duration-300`}

@@ -2,8 +2,9 @@
 
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -48,38 +49,32 @@ interface ProjectDetailProps {
   projectId: string;
 }
 
+async function fetchProjectDetailRequest(
+  projectId: string
+): Promise<ProjectDetailData> {
+  const response = await fetch(`/api/ketua-tim/projects/${projectId}`, {
+    cache: "no-store",
+  });
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result.error || "Failed to fetch project");
+  }
+  return result.data;
+}
+
 export default function ProjectDetail({ projectId }: ProjectDetailProps) {
   const router = useRouter();
-  const [project, setProject] = useState<ProjectDetailData | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  const fetchProject = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(`/api/ketua-tim/projects/${projectId}`);
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to fetch project");
-      }
-
-      // Debug log to see what data we're getting
-      console.log("Project data:", result.data);
-      console.log("Project assignments:", result.data?.project_assignments);
-
-      setProject(result.data);
-    } catch (error) {
-      console.error("Error fetching project:", error);
-      toast.error("Failed to load project details");
-      router.push("/ketua-tim/projects");
-    } finally {
-      setLoading(false);
-    }
-  }, [projectId, router]);
-
-  useEffect(() => {
-    fetchProject();
-  }, [fetchProject]);
+  const {
+    data: project,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery<ProjectDetailData, Error>({
+    queryKey: ["ketua", "projects", "detail", projectId],
+    queryFn: () => fetchProjectDetailRequest(projectId),
+    staleTime: 5 * 60 * 1000,
+  });
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -129,13 +124,35 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
     );
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="space-y-8">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
           <p>Loading project details...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          Failed to load project
+        </h3>
+        <p className="text-gray-500 mb-6">{error.message}</p>
+        <Button asChild>
+          <Link
+            href="/ketua-tim/projects"
+            prefetch
+            onMouseEnter={() => router.prefetch("/ketua-tim/projects")}
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Projects
+          </Link>
+        </Button>
       </div>
     );
   }
@@ -151,7 +168,11 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
           The project you&apos;re looking for doesn&apos;t exist.
         </p>
         <Button asChild>
-          <Link href="/ketua-tim/projects">
+          <Link
+            href="/ketua-tim/projects"
+            prefetch
+            onMouseEnter={() => router.prefetch("/ketua-tim/projects")}
+          >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Projects
           </Link>
@@ -164,6 +185,8 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
   const pegawaiAssignments = getPegawaiAssignments();
   const mitraAssignments = getMitraAssignments();
   const totalBudget = calculateTotalBudget();
+
+  const editHref = `/ketua-tim/projects/${project.id}/edit`;
 
   return (
     <div className="space-y-8">
@@ -203,7 +226,11 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
             variant="outline"
             className="border-2 border-blue-200 text-blue-600 hover:bg-blue-50"
           >
-            <Link href={`/ketua-tim/projects/${project.id}/edit`}>
+            <Link
+              href={editHref}
+              prefetch
+              onMouseEnter={() => router.prefetch(editHref)}
+            >
               <Edit className="w-4 h-4 mr-2" />
               Edit Project
             </Link>

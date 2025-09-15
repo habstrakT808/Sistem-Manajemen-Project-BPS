@@ -4,6 +4,140 @@
 
 ---
 
+## ⚡ Arsitektur Performa & Real-time (Update 2025-09)
+
+Sistem telah dioptimalkan agar setelah suatu halaman pernah dibuka, kunjungan berikutnya berlangsung instan tanpa loading terlihat, serta seluruh data tersinkron secara real-time lintas halaman tanpa reload manual. Bagian ini adalah referensi utama untuk menjaga konsistensi kinerja pada semua pengembangan selanjutnya.
+
+### Komponen Kunci
+
+- React Query v5 untuk manajemen server state, caching, prefetching, dan invalidation.
+- Persistensi cache ke `localStorage` via `@tanstack/react-query-persist-client` dan `@tanstack/query-sync-storage-persister` di `src/components/providers.tsx` dengan fallback aman saat persister belum siap.
+- Next.js App Router prefetch: `router.prefetch()` dan `<Link prefetch>` pada seluruh navigasi dan CTA.
+- Konsistensi `queryKey` per domain: pola `["role/domain", ...]` untuk memudahkan prefetch, reuse cache, dan invalidasi terarah.
+- Invalidasi cache pasca CUD untuk menjaga konsistensi data real-time tanpa reload.
+
+### Pola Query & Prefetch
+
+- Migrasi semua fetching dari `useEffect` ke `useQuery`.
+- Definisikan `queryKey` stabil, contoh:
+  - Admin: `["admin","users"]`, `["admin","analytics",{timeRange}]`.
+  - Ketua Tim: `["ketua","projects",{page,status}]`, `["ketua","team","member",memberId]`.
+  - Pegawai: `["pegawai","tasks"]`, `["pegawai","projects","detail",projectId]`.
+- Prefetch route dan data sebelum navigasi:
+  - Tambahkan `prefetch` ke semua `<Link>` internal.
+  - Gunakan `router.prefetch(href)` pada `onMouseEnter` untuk hover warming.
+  - Prefetch data via `queryClient.prefetchQuery({ queryKey, queryFn, staleTime })`.
+- Prefetch agresif pada listing: setelah data utama siap, prefetch detail untuk item teratas (mis. 10 pertama) agar detail page instan.
+
+### Invalidasi Cache untuk Real-time
+
+- Jalankan invalidasi setelah create/update/delete pada domain terkait agar semua view yang relevan langsung refresh:
+  - Projects (Ketua Tim): invalidasi `["ketua","projects"]`, `["ketua","dashboard"]`, `["ketua","tasks"]`, `["ketua","financial"]`, `["ketua","team"]`.
+  - Tasks (Ketua Tim): invalidasi `["ketua","tasks"]` dan ringkasan terkait (dashboard/projects) jika berdampak.
+  - Admin Users/Mitra: invalidasi `["admin","users"]`, `["admin","mitra"]`, dan analytics terkait.
+  - Pegawai: invalidasi `["pegawai","tasks"]`, `["pegawai","projects"]`, `["pegawai","dashboard"]` sesuai efek.
+
+### Login/Logout Super Cepat
+
+- Login (`src/components/auth/LoginForm.tsx`):
+  - Prefetch rute dashboard umum dan berdasarkan hint `?role=admin|ketua_tim|pegawai`.
+  - Setelah auth sukses, navigasi optimistik ke rute berdasar hint, sambil fetch profil minimal (`role,is_active`) untuk verifikasi otoritatif; push ulang jika perlu.
+- Logout (semua role):
+  - Navigasi non-blocking ke `/` dulu (`router.prefetch("/"); router.push("/");`), kemudian `await signOut()`.
+  - Sudah diterapkan di `AdminLayout`, `KetuaTimLayout`, dan `PegawaiLayout`.
+
+### Standar Implementasi Komponen
+
+1. Selalu gunakan `useQuery` untuk data server.
+2. Tambahkan prefetch pada semua navigasi (`<Link prefetch>`) dan `router.prefetch()` pada hover container/card.
+3. Untuk halaman daftar, prefetch detail item di atas fold (mis. 10 teratas) segera setelah data siap.
+4. Setelah mutasi (CUD), lakukan invalidasi pada query terkait; hindari reload halaman.
+5. Samakan `queryKey` antara listing dan detail agar hasil prefetch langsung terpakai.
+
+### Anti-Patterns yang Dihindari
+
+- Fetch di `useEffect` tanpa caching.
+- Menunda navigasi hingga fetch selesai (lakukan prefetch + navigate segera).
+- Mengandalkan full page reload untuk sinkronisasi data.
+
+### Struktur Kode Terkait Performa
+
+- Provider React Query: `src/components/providers.tsx`.
+- Layout dengan prefetch navigasi:
+  - `src/components/layout/AdminLayout.tsx`
+  - `src/components/layout/KetuaTimLayout.tsx`
+  - `src/components/layout/PegawaiLayout.tsx`
+- Contoh listing + prefetch detail:
+  - `src/components/ketua-tim/ProjectList.tsx`
+  - `src/components/ketua-tim/TeamManagement.tsx`
+  - `src/components/pegawai/ProjectView.tsx`
+- Detail page dengan query key konsisten:
+  - `src/components/ketua-tim/MemberDetail.tsx`
+  - `src/components/ketua-tim/ProjectDetail.tsx`
+
+### Panduan Invalidasi per Domain (Ringkas)
+
+- Admin
+  - Users: `["admin","users"]`
+  - Mitra: `["admin","mitra"]`
+  - Analytics: `["admin","analytics"]` atau keyed dgn filter aktif
+- Ketua Tim
+  - Projects: `["ketua","projects"]` dan ringkasan terkait
+  - Tasks: `["ketua","tasks"]` dan ringkasan terkait
+  - Team: `["ketua","team","members"]`, serta detail member jika terdampak
+  - Financial: `["ketua","financial"]` + varian harian/bulanan
+- Pegawai
+  - Tasks: `["pegawai","tasks"]`
+  - Projects: `["pegawai","projects"]` + detail aktif
+  - Dashboard: `["pegawai","dashboard"]`
+
+### Panduan Pengembangan
+
+Menambah halaman/fitur baru:
+
+1. Gunakan `useQuery` dengan `queryKey` konsisten.
+2. Tambahkan prefetch di semua navigasi, hover, dan prefetch agresif pada daftar.
+3. Lengkapi invalidasi pasca mutasi pada semua query yang terkena dampak.
+
+Cuplikan pola kode:
+
+```tsx
+// useQuery
+const { data } = useQuery({
+  queryKey: ["ketua", "projects", { page, status }],
+  queryFn: () => fetchProjects(page, status),
+  staleTime: 5 * 60 * 1000,
+});
+
+// prefetch detail + route
+const prefetchProjectDetail = (id: string) => {
+  queryClient.prefetchQuery({
+    queryKey: ["ketua", "projects", "detail", id],
+    queryFn: () => fetchProjectDetail(id),
+    staleTime: 5 * 60 * 1000,
+  });
+  router.prefetch(`/ketua-tim/projects/${id}`);
+};
+
+// invalidasi setelah mutasi
+await mutate();
+queryClient.invalidateQueries({ queryKey: ["ketua", "projects"] });
+queryClient.invalidateQueries({ queryKey: ["ketua", "dashboard"] });
+```
+
+### Environment & Build
+
+- Next.js 15 (App Router), TypeScript, Tailwind CSS.
+- Supabase: auth + database. Isi `.env.local` sesuai kredensial.
+- Jalankan pengembangan: `pnpm dev` atau `npm run dev`.
+
+### QA Checklist Performa
+
+- Navigasi antar halaman setelah sekali kunjung tidak menampilkan loading.
+- Hover pada item list membuat halaman detail instan.
+- Mutasi data langsung memantul ke semua halaman relevan tanpa reload.
+- Login cepat dan logout langsung ke `/`.
+
 ## 🎯 OVERVIEW PROJECT
 
 ### **Apa itu Project ini?**

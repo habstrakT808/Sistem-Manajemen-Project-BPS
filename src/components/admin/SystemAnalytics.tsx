@@ -2,7 +2,8 @@
 
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,89 +27,71 @@ import { formatCurrency } from "@/lib/utils";
 interface AnalyticsData {
   userTrends: Array<{
     date: string;
-    total_registrations: number;
-    admin_count: number;
-    ketua_tim_count: number;
-    pegawai_count: number;
+    new_users: number;
+    active_users: number;
   }>;
   projectAnalytics: Array<{
-    date: string;
-    projects_created: number;
-    projects_completed: number;
-    active_projects: number;
+    month: string;
     total_projects: number;
+    completed_projects: number;
   }>;
   financialAnalytics: Array<{
-    month_year: string;
+    month: string;
     total_spending: number;
-    transport_spending: number;
-    honor_spending: number;
-    project_count: number;
+    total_income: number;
   }>;
   systemMetrics: {
-    database_size: string;
-    total_tables: number;
-    total_users: number;
-    active_users: number;
-    total_projects: number;
-    active_projects: number;
-    completed_projects: number;
-    total_tasks: number;
-    pending_tasks: number;
-    completed_tasks: number;
-    total_mitra: number;
-    active_mitra: number;
-    total_notifications: number;
-    unread_notifications: number;
-    this_month_spending: number;
-    avg_project_duration: number;
-    user_roles_distribution: Record<string, number>;
+    uptime: number;
+    response_time: number;
+    error_rate: number;
     project_status_distribution: Record<string, number>;
   };
 }
 
 export default function SystemAnalytics() {
-  const [data, setData] = useState<AnalyticsData | null>(null);
-  const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState("30");
 
-  const fetchAnalyticsData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [userTrends, projectAnalytics, financialAnalytics, systemMetrics] =
-        await Promise.all([
-          fetch(
-            `/api/admin/analytics?type=user_trends&days_back=${timeRange}`
-          ).then((res) => res.json()),
-          fetch(
-            `/api/admin/analytics?type=project_analytics&days_back=${timeRange}`
-          ).then((res) => res.json()),
-          fetch(
-            `/api/admin/analytics?type=financial_analytics&months_back=12`
-          ).then((res) => res.json()),
-          fetch(`/api/admin/analytics?type=system_metrics`).then((res) =>
-            res.json()
-          ),
-        ]);
+  const fetchAnalyticsData = useCallback(async (daysBack: string) => {
+    const [userTrends, projectAnalytics, financialAnalytics, systemMetrics] =
+      await Promise.all([
+        fetch(
+          `/api/admin/analytics?type=user_trends&days_back=${daysBack}`
+        ).then((res) => res.json()),
+        fetch(
+          `/api/admin/analytics?type=project_analytics&days_back=${daysBack}`
+        ).then((res) => res.json()),
+        fetch(
+          `/api/admin/analytics?type=financial_analytics&months_back=12`
+        ).then((res) => res.json()),
+        fetch(`/api/admin/analytics?type=system_metrics`).then((res) =>
+          res.json()
+        ),
+      ]);
 
-      setData({
-        userTrends: userTrends.data || [],
-        projectAnalytics: projectAnalytics.data || [],
-        financialAnalytics: financialAnalytics.data || [],
-        systemMetrics: systemMetrics.data || {},
-      });
-    } catch (error) {
-      console.error("Error fetching analytics:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [timeRange]);
+    const data: AnalyticsData = {
+      userTrends: userTrends.data || [],
+      projectAnalytics: projectAnalytics.data || [],
+      financialAnalytics: financialAnalytics.data || [],
+      systemMetrics: systemMetrics.data || {},
+    };
+
+    return data;
+  }, []);
+
+  const { data, isLoading, refetch, isFetching } = useQuery<
+    AnalyticsData,
+    Error
+  >({
+    queryKey: ["admin", "analytics", { timeRange }],
+    queryFn: () => fetchAnalyticsData(timeRange),
+    staleTime: 5 * 60 * 1000,
+  });
 
   useEffect(() => {
-    fetchAnalyticsData();
-  }, [timeRange, fetchAnalyticsData]);
+    // trigger refetch when timeRange changes (React Query already does via key)
+  }, [timeRange]);
 
-  if (loading) {
+  if (isLoading && !data) {
     return (
       <div className="space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

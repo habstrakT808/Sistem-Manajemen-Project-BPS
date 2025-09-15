@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,64 +32,55 @@ interface ProjectData {
   team_size: number;
 }
 
+async function fetchProjectsRequest(): Promise<ProjectData[]> {
+  const response = await fetch("/api/pegawai/projects", { cache: "no-store" });
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result.error || "Failed to fetch projects");
+  }
+  return result.data || [];
+}
+
 export default function ProjectsPage() {
-  const [projects, setProjects] = useState<ProjectData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("all");
 
-  const fetchProjects = useCallback(async () => {
-    try {
-      setError(null);
-      const response = await fetch("/api/pegawai/projects");
-      const result = await response.json();
+  const {
+    data: projects = [],
+    isLoading,
+    isFetching,
+    error,
+    refetch,
+  } = useQuery<ProjectData[], Error>({
+    queryKey: ["pegawai", "projects"],
+    queryFn: fetchProjectsRequest,
+    staleTime: 5 * 60 * 1000,
+  });
 
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to fetch projects");
-      }
-
-      setProjects(result.data || []);
-    } catch (error) {
-      console.error("Error fetching projects:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to load projects";
-      setError(errorMessage);
-      toast.error(errorMessage);
-    }
-  }, []);
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await fetchProjects();
-    setRefreshing(false);
-    toast.success("Projects refreshed");
-  };
-
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      await fetchProjects();
-      setLoading(false);
-    };
-
-    loadData();
-  }, [fetchProjects]);
-
-  const projectCounts = {
-    all: projects.length,
-    upcoming: projects.filter((p) => p.status === "upcoming").length,
-    active: projects.filter((p) => p.status === "active").length,
-    completed: projects.filter((p) => p.status === "completed").length,
-  };
+  const projectCounts = useMemo(
+    () => ({
+      all: projects.length,
+      upcoming: projects.filter((p) => p.status === "upcoming").length,
+      active: projects.filter((p) => p.status === "active").length,
+      completed: projects.filter((p) => p.status === "completed").length,
+    }),
+    [projects]
+  );
 
   const getFilteredProjects = (status: string) => {
     if (status === "all") return projects;
     return projects.filter((project) => project.status === status);
   };
 
-  // Error state
-  if (error && !projects.length) {
+  const handleRefresh = async () => {
+    const res = await refetch();
+    if (res.error) {
+      toast.error(res.error.message);
+    } else {
+      toast.success("Projects refreshed");
+    }
+  };
+
+  if (error && projects.length === 0) {
     return (
       <div className="space-y-8">
         <div className="flex items-center justify-center min-h-[400px]">
@@ -97,16 +89,14 @@ export default function ProjectsPage() {
             <h2 className="text-2xl font-bold text-gray-900">
               Failed to Load Projects
             </h2>
-            <p className="text-gray-600 max-w-md">{error}</p>
+            <p className="text-gray-600 max-w-md">{error.message}</p>
             <Button
-              onClick={() => {
-                setError(null);
-                setLoading(true);
-                fetchProjects().finally(() => setLoading(false));
-              }}
+              onClick={handleRefresh}
               className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700"
             >
-              <RefreshCw className="w-4 h-4 mr-2" />
+              <RefreshCw
+                className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`}
+              />
               Try Again
             </Button>
           </div>
@@ -117,7 +107,6 @@ export default function ProjectsPage() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
@@ -131,12 +120,12 @@ export default function ProjectsPage() {
         <div className="flex items-center space-x-4">
           <Button
             onClick={handleRefresh}
-            disabled={refreshing}
+            disabled={isFetching}
             variant="outline"
             className="border-2 border-gray-200 hover:bg-gray-50"
           >
             <RefreshCw
-              className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`}
+              className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`}
             />
             Refresh
           </Button>
@@ -151,7 +140,6 @@ export default function ProjectsPage() {
         </div>
       </div>
 
-      {/* Status Tabs */}
       <Tabs
         value={activeTab}
         onValueChange={setActiveTab}
@@ -200,7 +188,7 @@ export default function ProjectsPage() {
           <TabsContent key={status} value={status}>
             <ProjectView
               projects={getFilteredProjects(status)}
-              loading={loading}
+              loading={isLoading && projects.length === 0}
             />
           </TabsContent>
         ))}

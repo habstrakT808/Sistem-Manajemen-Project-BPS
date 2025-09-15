@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -77,6 +78,7 @@ interface ProjectEditFormProps {
 
 export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [project, setProject] = useState<ProjectData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -132,16 +134,23 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
       const transportData: Record<string, number> = {};
       const honorData: Record<string, number> = {};
 
-      projectData.project_assignments?.forEach((assignment: { assignee_type: string; assignee_id: string; uang_transport?: number; uang_honor?: number }) => {
-        if (assignment.assignee_type === "pegawai") {
-          pegawaiIds.push(assignment.assignee_id);
-          transportData[assignment.assignee_id] =
-            assignment.uang_transport || 0;
-        } else if (assignment.assignee_type === "mitra") {
-          mitraIds.push(assignment.assignee_id);
-          honorData[assignment.assignee_id] = assignment.uang_honor || 0;
+      projectData.project_assignments?.forEach(
+        (assignment: {
+          assignee_type: string;
+          assignee_id: string;
+          uang_transport?: number;
+          uang_honor?: number;
+        }) => {
+          if (assignment.assignee_type === "pegawai") {
+            pegawaiIds.push(assignment.assignee_id);
+            transportData[assignment.assignee_id] =
+              assignment.uang_transport || 0;
+          } else if (assignment.assignee_type === "mitra") {
+            mitraIds.push(assignment.assignee_id);
+            honorData[assignment.assignee_id] = assignment.uang_honor || 0;
+          }
         }
-      });
+      );
 
       setSelectedPegawai(pegawaiIds);
       setSelectedMitra(mitraIds);
@@ -150,6 +159,7 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
     } catch (error) {
       console.error("Error fetching project:", error);
       toast.error("Failed to load project details");
+      router.prefetch("/ketua-tim/projects");
       router.push("/ketua-tim/projects");
     } finally {
       setLoading(false);
@@ -269,7 +279,16 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
       }
 
       toast.success("Project updated successfully!");
-      router.push(`/ketua-tim/projects/${projectId}`);
+
+      // Invalidate related caches so other pages update instantly
+      queryClient.invalidateQueries({ queryKey: ["ketua", "projects"] });
+      queryClient.invalidateQueries({ queryKey: ["ketua", "dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["ketua", "financial"] });
+      queryClient.invalidateQueries({ queryKey: ["ketua", "team"] });
+
+      const detailHref = `/ketua-tim/projects/${projectId}`;
+      router.prefetch(detailHref);
+      router.push(detailHref);
     } catch (error) {
       console.error("Error updating project:", error);
       toast.error("Failed to update project");

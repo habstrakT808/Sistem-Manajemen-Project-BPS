@@ -88,8 +88,10 @@ export function PegawaiLayout({ children }: PegawaiLayoutProps) {
   const router = useRouter();
 
   const handleSignOut = async () => {
-    await signOut();
+    router.prefetch("/");
     router.push("/");
+    // Fire and forget sign out to avoid blocking UI navigation
+    signOut();
   };
 
   return (
@@ -178,6 +180,8 @@ export function PegawaiLayout({ children }: PegawaiLayoutProps) {
                   href={item.href}
                   className="group block"
                   onClick={() => setSidebarOpen(false)}
+                  prefetch
+                  onMouseEnter={() => router.prefetch(item.href)}
                 >
                   <div className="flex items-center px-4 py-3 text-sm font-medium rounded-2xl hover:bg-gradient-to-r hover:from-green-50 hover:to-teal-50 transition-all duration-300 transform hover:scale-105 hover:shadow-md border border-transparent hover:border-green-100">
                     <div
@@ -209,7 +213,13 @@ export function PegawaiLayout({ children }: PegawaiLayoutProps) {
                 asChild
                 className="w-full bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
               >
-                <Link href="/pegawai/tasks?status=pending">
+                <Link
+                  href="/pegawai/tasks?status=pending"
+                  prefetch
+                  onMouseEnter={() =>
+                    router.prefetch("/pegawai/tasks?status=pending")
+                  }
+                >
                   <Play className="w-4 h-4 mr-2" />
                   Start Tasks
                 </Link>
@@ -219,7 +229,13 @@ export function PegawaiLayout({ children }: PegawaiLayoutProps) {
                 asChild
                 className="w-full border-2 border-blue-200 text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-300"
               >
-                <Link href="/pegawai/tasks?status=completed">
+                <Link
+                  href="/pegawai/tasks?status=completed"
+                  prefetch
+                  onMouseEnter={() =>
+                    router.prefetch("/pegawai/tasks?status=completed")
+                  }
+                >
                   <CheckSquare className="w-4 h-4 mr-2" />
                   View Completed
                 </Link>

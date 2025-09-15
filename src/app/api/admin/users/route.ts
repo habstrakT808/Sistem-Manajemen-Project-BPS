@@ -110,24 +110,25 @@ export async function PUT(request: NextRequest) {
     const { id, email, role, nama_lengkap, no_telepon, alamat, is_active } =
       body;
 
-    // Validate required fields
-    if (!id || !email || !role || !nama_lengkap) {
+    // Only require id for partial updates
+    if (!id) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: "User ID is required" },
         { status: 400 }
       );
     }
 
-    // Update user profile
+    // Build partial update object only with provided fields
     const updateData: Database["public"]["Tables"]["users"]["Update"] = {
-      email,
-      role,
-      nama_lengkap,
-      no_telepon: no_telepon || null,
-      alamat: alamat || null,
-      is_active: is_active !== undefined ? is_active : true,
       updated_at: new Date().toISOString(),
-    };
+    } as Database["public"]["Tables"]["users"]["Update"];
+
+    if (email !== undefined) updateData.email = email;
+    if (role !== undefined) updateData.role = role;
+    if (nama_lengkap !== undefined) updateData.nama_lengkap = nama_lengkap;
+    if (no_telepon !== undefined) updateData.no_telepon = no_telepon || null;
+    if (alamat !== undefined) updateData.alamat = alamat || null;
+    if (typeof is_active === "boolean") updateData.is_active = is_active;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error: profileError } = await (supabaseAdmin as any)

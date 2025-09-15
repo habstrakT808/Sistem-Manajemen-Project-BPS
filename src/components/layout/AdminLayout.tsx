@@ -77,8 +77,9 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
   const router = useRouter();
 
   const handleSignOut = async () => {
-    await signOut();
+    router.prefetch("/");
     router.push("/");
+    await signOut();
   };
 
   return (
@@ -141,6 +142,8 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
                   href={item.href}
                   className="group block"
                   onClick={() => setSidebarOpen(false)}
+                  prefetch
+                  onMouseEnter={() => router.prefetch(item.href)}
                 >
                   <div className="flex items-center px-4 py-3 text-sm font-medium rounded-2xl hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-300 transform hover:scale-105 hover:shadow-md border border-transparent hover:border-blue-100">
                     <div

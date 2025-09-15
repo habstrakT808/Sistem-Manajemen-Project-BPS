@@ -4,6 +4,7 @@
 
 import React, { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 // Removed unused Card imports
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,6 +75,7 @@ const initialFormData: ProjectFormData = {
 
 export default function ProjectWizard() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<ProjectFormData>(initialFormData);
   const [pegawaiData, setPegawaiData] = useState<PegawaiData[]>([]);
@@ -266,7 +268,19 @@ export default function ProjectWizard() {
       }
 
       toast.success("Project created successfully!");
-      router.push(`/ketua-tim/projects/${result.project.id}`);
+
+      // Invalidate related caches so other pages update instantly
+      queryClient.invalidateQueries({ queryKey: ["ketua", "projects"] });
+      queryClient.invalidateQueries({ queryKey: ["ketua", "dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["ketua", "financial"] });
+      queryClient.invalidateQueries({ queryKey: ["ketua", "team"] });
+      queryClient.invalidateQueries({
+        queryKey: ["ketua", "projects", "forTasks"],
+      });
+
+      const detailHref = `/ketua-tim/projects/${result.project.id}`;
+      router.prefetch(detailHref);
+      router.push(detailHref);
     } catch (error) {
       console.error("Error creating project:", error);
       toast.error(
@@ -827,6 +841,7 @@ export default function ProjectWizard() {
         <div className="flex space-x-4">
           <Button
             variant="outline"
+            onMouseEnter={() => router.prefetch("/ketua-tim/projects")}
             onClick={() => router.push("/ketua-tim/projects")}
             className="border-2 border-red-200 text-red-600 hover:bg-red-50"
           >

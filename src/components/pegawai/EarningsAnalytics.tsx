@@ -3,6 +3,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -115,58 +116,53 @@ type PeriodType = "monthly" | "quarterly" | "yearly" | "custom";
 type ViewType = "overview" | "trends" | "projects" | "detailed";
 
 export function EarningsAnalytics() {
-  const [earningsData, setEarningsData] = useState<EarningsData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodType>("monthly");
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [currentView, setCurrentView] = useState<ViewType>("overview");
   const [exportLoading, setExportLoading] = useState<string | null>(null);
 
-  // Advanced memoized calculations
   const periodParams = useMemo(() => {
     const params = new URLSearchParams();
     params.set("period", selectedPeriod);
     params.set("year", selectedYear.toString());
-    if (selectedPeriod === "monthly") {
+    if (selectedPeriod === "monthly")
       params.set("month", selectedMonth.toString());
-    }
     return params.toString();
   }, [selectedPeriod, selectedYear, selectedMonth]);
 
-  const fetchEarningsData = useCallback(async () => {
-    try {
-      setError(null);
-      const response = await fetch(
-        `/api/pegawai/earnings/analytics?${periodParams}`
+  const fetchEarningsData = useCallback(async (): Promise<EarningsData> => {
+    const response = await fetch(
+      `/api/pegawai/earnings/analytics?${periodParams}`,
+      { cache: "no-store" }
+    );
+    if (!response.ok) {
+      const errorResult = await response.json();
+      throw new Error(
+        errorResult.error || "Failed to fetch earnings analytics"
       );
-
-      if (!response.ok) {
-        const errorResult = await response.json();
-        throw new Error(
-          errorResult.error || "Failed to fetch earnings analytics"
-        );
-      }
-
-      const result = await response.json();
-      setEarningsData(result);
-    } catch (err) {
-      console.error("Error fetching earnings analytics:", err);
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to load earnings data";
-      setError(errorMessage);
-      toast.error(errorMessage);
     }
+    const result = await response.json();
+    return result as EarningsData;
   }, [periodParams]);
 
+  const {
+    data: earningsData,
+    isLoading,
+    error,
+    refetch,
+    isFetching,
+  } = useQuery<EarningsData, Error>({
+    queryKey: ["pegawai", "earnings", "analytics", { periodParams }],
+    queryFn: fetchEarningsData,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const handleRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await fetchEarningsData();
-    setRefreshing(false);
-    toast.success("Earnings data refreshed successfully");
-  }, [fetchEarningsData]);
+    const res = await refetch();
+    if (res.error) toast.error(res.error.message);
+    else toast.success("Earnings data refreshed successfully");
+  }, [refetch]);
 
   const handlePeriodNavigation = useCallback(
     (direction: "prev" | "next") => {
@@ -209,11 +205,7 @@ export function EarningsAnalytics() {
             month: selectedMonth,
           }),
         });
-
-        if (!response.ok) {
-          throw new Error("Export failed");
-        }
-
+        if (!response.ok) throw new Error("Export failed");
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -223,7 +215,6 @@ export function EarningsAnalytics() {
         a.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
-
         toast.success(`Earnings report exported as ${format.toUpperCase()}`);
       } catch {
         toast.error("Export failed. Please try again.");
@@ -235,13 +226,8 @@ export function EarningsAnalytics() {
   );
 
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      await fetchEarningsData();
-      setLoading(false);
-    };
-    loadData();
-  }, [fetchEarningsData]);
+    // no-op; React Query handles fetching on key change
+  }, [periodParams]);
 
   // Chart data transformations
   const chartData = useMemo(() => {
@@ -298,8 +284,7 @@ export function EarningsAnalytics() {
     return "Custom Period";
   }, [selectedPeriod, selectedYear, selectedMonth]);
 
-  // Loading skeleton
-  if (loading) {
+  if (isLoading && !earningsData) {
     return (
       <div className="space-y-8 animate-pulse">
         <div className="flex items-center justify-between">
@@ -331,7 +316,6 @@ export function EarningsAnalytics() {
     );
   }
 
-  // Error state
   if (error && !earningsData) {
     return (
       <div className="space-y-8">
@@ -341,16 +325,14 @@ export function EarningsAnalytics() {
             <h2 className="text-2xl font-bold text-gray-900">
               Failed to Load Earnings Data
             </h2>
-            <p className="text-gray-600 max-w-md">{error}</p>
+            <p className="text-gray-600 max-w-md">{error.message}</p>
             <Button
-              onClick={() => {
-                setError(null);
-                setLoading(true);
-                fetchEarningsData().finally(() => setLoading(false));
-              }}
+              onClick={handleRefresh}
               className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700"
             >
-              <RefreshCw className="w-4 h-4 mr-2" />
+              <RefreshCw
+                className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`}
+              />
               Try Again
             </Button>
           </div>
@@ -468,12 +450,12 @@ export function EarningsAnalytics() {
 
           <Button
             onClick={handleRefresh}
-            disabled={refreshing}
+            disabled={isFetching}
             variant="outline"
             className="border-2 border-gray-200 hover:bg-gray-50"
           >
             <RefreshCw
-              className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`}
+              className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`}
             />
             Refresh
           </Button>

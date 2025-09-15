@@ -2,8 +2,9 @@
 
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React from "react";
 import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -119,50 +120,38 @@ interface MemberDetailProps {
 
 export default function MemberDetail({ memberId }: MemberDetailProps) {
   const router = useRouter();
-  const [memberData, setMemberData] = useState<MemberDetailData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedCalendarMonth, setSelectedCalendarMonth] = useState(
+  const [selectedCalendarMonth, setSelectedCalendarMonth] = React.useState(
     new Date()
   );
 
-  const fetchMemberData = useCallback(async () => {
-    try {
-      setError(null);
-      const response = await fetch(`/api/ketua-tim/team/${memberId}`);
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to fetch member data");
-      }
-
-      setMemberData(result.data);
-    } catch (error) {
-      console.error("Error fetching member data:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to load member data";
-      setError(errorMessage);
-      toast.error(errorMessage);
-    }
-  }, [memberId]);
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await fetchMemberData();
-    setRefreshing(false);
-    toast.success("Member data refreshed");
+  const fetchMemberDetailRequest = async (): Promise<MemberDetailData> => {
+    const response = await fetch(`/api/ketua-tim/team/${memberId}`, {
+      cache: "no-store",
+    });
+    const result = await response.json();
+    if (!response.ok)
+      throw new Error(result.error || "Failed to fetch member data");
+    return result.data as MemberDetailData;
   };
 
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      await fetchMemberData();
-      setLoading(false);
-    };
+  const {
+    data: memberData,
+    isLoading,
+    error,
+    refetch,
+    isFetching,
+  } = useQuery<MemberDetailData, Error>({
+    queryKey: ["ketua", "team", "member", memberId],
+    queryFn: fetchMemberDetailRequest,
+    staleTime: 5 * 60 * 1000,
+  });
 
-    loadData();
-  }, [fetchMemberData]);
+  const refreshing = isFetching;
+  const handleRefresh = async () => {
+    const res = await refetch();
+    if (res.error) toast.error(res.error.message);
+    else toast.success("Member data refreshed");
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -231,7 +220,7 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
   };
 
   // Loading state
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="space-y-8">
         <div className="flex items-center space-x-4">
@@ -283,11 +272,7 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
             </h2>
             <p className="text-gray-600 max-w-md">{error}</p>
             <Button
-              onClick={() => {
-                setError(null);
-                setLoading(true);
-                fetchMemberData().finally(() => setLoading(false));
-              }}
+              onClick={handleRefresh}
               className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
             >
               <RefreshCw className="w-4 h-4 mr-2" />

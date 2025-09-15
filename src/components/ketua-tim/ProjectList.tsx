@@ -2,8 +2,9 @@
 
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -70,66 +71,125 @@ interface ProjectsResponse {
   };
 }
 
+async function fetchProjectsRequest(
+  page: number,
+  status?: string
+): Promise<ProjectsResponse> {
+  const params = new URLSearchParams({ page: page.toString(), limit: "10" });
+  if (status && status !== "all") params.append("status", status);
+  const response = await fetch(`/api/ketua-tim/projects?${params.toString()}`, {
+    cache: "no-store",
+  });
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(
+      (result.data as unknown as string) || "Failed to fetch projects"
+    );
+  }
+  return result as ProjectsResponse;
+}
+
 export default function ProjectList() {
-  const [projects, setProjects] = useState<ProjectData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [finishingId, setFinishingId] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
-  const [pagination, setPagination] = useState({
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const [finishingId, setFinishingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const { data, isLoading, isFetching, refetch } = useQuery<
+    ProjectsResponse,
+    Error
+  >({
+    queryKey: [
+      "ketua",
+      "projects",
+      { page: currentPage, status: selectedStatus },
+    ],
+    queryFn: () => fetchProjectsRequest(currentPage, selectedStatus),
+    keepPreviousData: true,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const projects = data?.data || [];
+  const pagination = data?.pagination || {
     page: 1,
     limit: 10,
     total: 0,
     totalPages: 0,
-  });
-  const [statusCounts, setStatusCounts] = useState({
+  };
+  const statusCounts = data?.statusCounts || {
     upcoming: 0,
     active: 0,
     completed: 0,
-  });
-
-  const router = useRouter();
-
-  const fetchProjects = useCallback(async (page = 1, status?: string) => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: "10",
-      });
-
-      if (status && status !== "all") {
-        params.append("status", status);
-      }
-
-      const response = await fetch(`/api/ketua-tim/projects?${params}`);
-      const result: ProjectsResponse = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          (result.data as unknown as string) || "Failed to fetch projects"
-        );
-      }
-
-      setProjects(result.data);
-      setPagination(result.pagination);
-      if (result.statusCounts) {
-        setStatusCounts(result.statusCounts);
-      }
-      setCurrentPage(page);
-    } catch (error) {
-      console.error("Error fetching projects:", error);
-      toast.error("Failed to load projects");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  };
 
   useEffect(() => {
-    fetchProjects(1, selectedStatus);
-  }, [fetchProjects, selectedStatus]);
+    // Prefetch next page
+    if (pagination.page < (pagination.totalPages || 0)) {
+      const nextPage = pagination.page + 1;
+      queryClient.prefetchQuery({
+        queryKey: [
+          "ketua",
+          "projects",
+          { page: nextPage, status: selectedStatus },
+        ],
+        queryFn: () => fetchProjectsRequest(nextPage, selectedStatus),
+      });
+    }
+  }, [pagination.page, pagination.totalPages, selectedStatus, queryClient]);
+
+  const calculateProjectBudget = (
+    assignments: ProjectData["project_assignments"]
+  ) => {
+    return assignments.reduce((total, assignment) => {
+      return total + (assignment.uang_transport || 0) + (assignment.honor || 0);
+    }, 0);
+  };
+
+  const getTeamSummary = (assignments: ProjectData["project_assignments"]) => {
+    const pegawaiCount = assignments.filter(
+      (a) => a.assignee_type === "pegawai"
+    ).length;
+    const mitraCount = assignments.filter(
+      (a) => a.assignee_type === "mitra"
+    ).length;
+    return `${pegawaiCount} Pegawai, ${mitraCount} Mitra`;
+  };
+
+  const prefetchProjectDetail = (projectId: string) => {
+    const key = ["ketua", "projects", "detail", projectId];
+    queryClient.prefetchQuery({
+      queryKey: key,
+      queryFn: () =>
+        fetch(`/api/ketua-tim/projects/${projectId}`, { cache: "no-store" })
+          .then((res) => res.json())
+          .then((result) => result.data),
+      staleTime: 5 * 60 * 1000,
+    });
+  };
+
+  const filteredProjects = useMemo(() => {
+    if (!searchTerm) return projects;
+    const term = searchTerm.toLowerCase();
+    return projects.filter(
+      (project) =>
+        project.nama_project.toLowerCase().includes(term) ||
+        project.deskripsi.toLowerCase().includes(term)
+    );
+  }, [projects, searchTerm]);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const statusTabs = [
+    { value: "all", label: "All Projects", count: pagination.total },
+    { value: "upcoming", label: "Upcoming", count: statusCounts.upcoming },
+    { value: "active", label: "Active", count: statusCounts.active },
+    { value: "completed", label: "Completed", count: statusCounts.completed },
+  ];
 
   const handleFinishProject = async (projectId: string) => {
     const confirmed = window.confirm(
@@ -141,17 +201,18 @@ export default function ProjectList() {
     try {
       const response = await fetch(
         `/api/ketua-tim/projects/${projectId}/finish`,
-        {
-          method: "POST",
-        }
+        { method: "POST" }
       );
       const result = await response.json();
       if (!response.ok)
         throw new Error(result.error || "Gagal menyelesaikan project");
-
       toast.success("Project selesai lebih awal");
-      // Refresh list keeping current filters/page
-      fetchProjects(currentPage, selectedStatus);
+      await refetch();
+      // Invalidate related views instantly
+      queryClient.invalidateQueries({ queryKey: ["ketua", "projects"] });
+      queryClient.invalidateQueries({ queryKey: ["ketua", "dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["ketua", "tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["ketua", "financial"] });
     } catch (err) {
       console.error("Finish project error:", err);
       toast.error(err instanceof Error ? err.message : "Terjadi kesalahan");
@@ -174,9 +235,13 @@ export default function ProjectList() {
       const result = await response.json();
       if (!response.ok)
         throw new Error(result.error || "Gagal menghapus project");
-
       toast.success("Project berhasil dihapus");
-      fetchProjects(currentPage, selectedStatus);
+      await refetch();
+      // Invalidate related views instantly
+      queryClient.invalidateQueries({ queryKey: ["ketua", "projects"] });
+      queryClient.invalidateQueries({ queryKey: ["ketua", "dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["ketua", "tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["ketua", "financial"] });
     } catch (err) {
       console.error("Delete project error:", err);
       toast.error(err instanceof Error ? err.message : "Terjadi kesalahan");
@@ -185,68 +250,7 @@ export default function ProjectList() {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "upcoming":
-        return "bg-blue-100 text-blue-800 border-blue-200";
-      case "active":
-        return "bg-green-100 text-green-800 border-green-200";
-      case "completed":
-        return "bg-gray-100 text-gray-800 border-gray-200";
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200";
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "upcoming":
-        return Clock;
-      case "active":
-        return AlertTriangle;
-      case "completed":
-        return CheckCircle;
-      default:
-        return Clock;
-    }
-  };
-
-  const calculateProjectBudget = (
-    assignments: ProjectData["project_assignments"]
-  ) => {
-    return assignments.reduce((total, assignment) => {
-      return total + (assignment.uang_transport || 0) + (assignment.honor || 0);
-    }, 0);
-  };
-
-  const getTeamSummary = (assignments: ProjectData["project_assignments"]) => {
-    const pegawaiCount = assignments.filter(
-      (a) => a.assignee_type === "pegawai"
-    ).length;
-    const mitraCount = assignments.filter(
-      (a) => a.assignee_type === "mitra"
-    ).length;
-    return `${pegawaiCount} Pegawai, ${mitraCount} Mitra`;
-  };
-
-  const filteredProjects = projects.filter(
-    (project) =>
-      project.nama_project.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      project.deskripsi.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const handlePageChange = (page: number) => {
-    fetchProjects(page, selectedStatus);
-  };
-
-  const statusTabs = [
-    { value: "all", label: "All Projects", count: pagination.total },
-    { value: "upcoming", label: "Upcoming", count: statusCounts.upcoming },
-    { value: "active", label: "Active", count: statusCounts.active },
-    { value: "completed", label: "Completed", count: statusCounts.completed },
-  ];
-
-  if (loading) {
+  if (isLoading && !data) {
     return (
       <div className="space-y-8">
         <div className="text-center">
@@ -274,7 +278,11 @@ export default function ProjectList() {
           asChild
           className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
         >
-          <Link href="/ketua-tim/projects/new">
+          <Link
+            href="/ketua-tim/projects/new"
+            prefetch
+            onMouseEnter={() => router.prefetch("/ketua-tim/projects/new")}
+          >
             <Plus className="w-4 h-4 mr-2" />
             Create Project
           </Link>
@@ -304,7 +312,10 @@ export default function ProjectList() {
       {/* Status Tabs */}
       <Tabs
         value={selectedStatus}
-        onValueChange={setSelectedStatus}
+        onValueChange={(v) => {
+          setSelectedStatus(v);
+          setCurrentPage(1);
+        }}
         className="space-y-6"
       >
         <TabsList className="grid w-full grid-cols-4">
@@ -340,7 +351,13 @@ export default function ProjectList() {
                   asChild
                   className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
                 >
-                  <Link href="/ketua-tim/projects/new">
+                  <Link
+                    href="/ketua-tim/projects/new"
+                    prefetch
+                    onMouseEnter={() =>
+                      router.prefetch("/ketua-tim/projects/new")
+                    }
+                  >
                     <Plus className="w-4 h-4 mr-2" />
                     Create Project
                   </Link>
@@ -348,16 +365,33 @@ export default function ProjectList() {
               </div>
             ) : (
               filteredProjects.map((project) => {
-                const StatusIcon = getStatusIcon(project.status);
+                const StatusIcon = ((): any => {
+                  switch (project.status) {
+                    case "upcoming":
+                      return Clock;
+                    case "active":
+                      return AlertTriangle;
+                    case "completed":
+                      return CheckCircle;
+                    default:
+                      return Clock;
+                  }
+                })();
                 const budget = calculateProjectBudget(
                   project.project_assignments
                 );
                 const teamSummary = getTeamSummary(project.project_assignments);
+                const viewHref = `/ketua-tim/projects/${project.id}`;
+                const editHref = `/ketua-tim/projects/${project.id}/edit`;
 
                 return (
                   <div
                     key={project.id}
                     className="border-0 shadow-xl rounded-xl overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1"
+                    onMouseEnter={() => {
+                      router.prefetch(viewHref);
+                      prefetchProjectDetail(project.id);
+                    }}
                   >
                     <div className="p-6">
                       <div className="flex items-start justify-between mb-4">
@@ -367,7 +401,7 @@ export default function ProjectList() {
                               {project.nama_project}
                             </h3>
                             <Badge
-                              className={`${getStatusColor(project.status)} border flex items-center space-x-1`}
+                              className={`${(project.status === "upcoming" && "bg-blue-100 text-blue-800 border-blue-200") || (project.status === "active" && "bg-green-100 text-green-800 border-green-200") || (project.status === "completed" && "bg-gray-100 text-gray-800 border-gray-200")} border flex items-center space-x-1`}
                             >
                               <StatusIcon className="w-3 h-3" />
                               <span>{project.status.toUpperCase()}</span>
@@ -439,21 +473,18 @@ export default function ProjectList() {
                               </DropdownMenuLabel>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
-                                onSelect={() =>
-                                  router.push(
-                                    `/ketua-tim/projects/${project.id}`
-                                  )
-                                }
+                                onSelect={() => router.push(viewHref)}
+                                onMouseEnter={() => {
+                                  router.prefetch(viewHref);
+                                  prefetchProjectDetail(project.id);
+                                }}
                               >
                                 <Eye className="w-4 h-4" />
                                 <span>View</span>
                               </DropdownMenuItem>
                               <DropdownMenuItem
-                                onSelect={() =>
-                                  router.push(
-                                    `/ketua-tim/projects/${project.id}/edit`
-                                  )
-                                }
+                                onSelect={() => router.push(editHref)}
+                                onMouseEnter={() => router.prefetch(editHref)}
                               >
                                 <Edit className="w-4 h-4" />
                                 <span>Edit</span>
@@ -547,7 +578,7 @@ export default function ProjectList() {
                   variant="outline"
                   size="sm"
                   onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={currentPage === 1}
+                  disabled={currentPage === 1 || isFetching}
                 >
                   Previous
                 </Button>
@@ -556,6 +587,17 @@ export default function ProjectList() {
                     key={i}
                     variant={currentPage === i + 1 ? "default" : "outline"}
                     size="sm"
+                    onMouseEnter={() =>
+                      queryClient.prefetchQuery({
+                        queryKey: [
+                          "ketua",
+                          "projects",
+                          { page: i + 1, status: selectedStatus },
+                        ],
+                        queryFn: () =>
+                          fetchProjectsRequest(i + 1, selectedStatus),
+                      })
+                    }
                     onClick={() => handlePageChange(i + 1)}
                     className={
                       currentPage === i + 1 ? "bg-blue-600 text-white" : ""
@@ -568,7 +610,7 @@ export default function ProjectList() {
                   variant="outline"
                   size="sm"
                   onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage === pagination.totalPages}
+                  disabled={currentPage === pagination.totalPages || isFetching}
                 >
                   Next
                 </Button>

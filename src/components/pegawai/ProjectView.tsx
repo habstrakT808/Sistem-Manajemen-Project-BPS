@@ -3,6 +3,8 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,8 +51,20 @@ interface ProjectViewProps {
   loading?: boolean;
 }
 
+async function fetchProjectDetailRequest(projectId: string) {
+  const response = await fetch(`/api/pegawai/projects/${projectId}`, {
+    cache: "no-store",
+  });
+  const result = await response.json();
+  if (!response.ok)
+    throw new Error(result.error || "Failed to fetch project details");
+  return result.data;
+}
+
 export default function ProjectView({ projects, loading }: ProjectViewProps) {
   const [loadingProjectId, setLoadingProjectId] = useState<string | null>(null);
+  const router = useRouter();
+  const queryClient = useQueryClient();
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -68,7 +82,7 @@ export default function ProjectView({ projects, loading }: ProjectViewProps) {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "active":
-        return AlertTriangle;
+        return CheckCircle;
       case "upcoming":
         return Clock;
       case "completed":
@@ -84,6 +98,15 @@ export default function ProjectView({ projects, loading }: ProjectViewProps) {
     const diffTime = deadlineDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays;
+  };
+
+  const prefetchDetail = (projectId: string) => {
+    const key = ["pegawai", "projects", "detail", projectId];
+    queryClient.prefetchQuery({
+      queryKey: key,
+      queryFn: () => fetchProjectDetailRequest(projectId),
+      staleTime: 5 * 60 * 1000,
+    });
   };
 
   if (loading) {
@@ -133,17 +156,27 @@ export default function ProjectView({ projects, loading }: ProjectViewProps) {
         const daysUntilDeadline = getDaysUntilDeadline(project.deadline);
         const isOverdue = daysUntilDeadline < 0;
         const isUrgent = daysUntilDeadline <= 7 && daysUntilDeadline >= 0;
+        const showDeadlineFlags = project.status !== "completed";
+        const showOverdue = showDeadlineFlags && isOverdue;
+        const showUrgent = showDeadlineFlags && isUrgent;
+
+        const detailHref = `/pegawai/projects/${project.id}`;
+        const tasksHref = `/pegawai/tasks?project_id=${project.id}`;
 
         return (
           <div
             key={project.id}
             className={`border-0 shadow-xl rounded-xl overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 ${
-              isOverdue
+              showOverdue
                 ? "ring-2 ring-red-200"
-                : isUrgent
+                : showUrgent
                   ? "ring-2 ring-yellow-200"
                   : ""
             }`}
+            onMouseEnter={() => {
+              router.prefetch(detailHref);
+              prefetchDetail(project.id);
+            }}
           >
             <div className="p-6">
               <div className="flex items-start justify-between mb-6">
@@ -155,12 +188,12 @@ export default function ProjectView({ projects, loading }: ProjectViewProps) {
                       <StatusIcon className="w-3 h-3" />
                       <span>{project.status.toUpperCase()}</span>
                     </Badge>
-                    {isOverdue && (
+                    {showOverdue && (
                       <Badge className="bg-red-100 text-red-800 border-red-200">
                         OVERDUE
                       </Badge>
                     )}
-                    {isUrgent && (
+                    {showUrgent && (
                       <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">
                         URGENT
                       </Badge>
@@ -180,7 +213,7 @@ export default function ProjectView({ projects, loading }: ProjectViewProps) {
                           Deadline
                         </div>
                         <div
-                          className={`${isOverdue ? "text-red-600 font-semibold" : "text-gray-500"}`}
+                          className={`${showOverdue ? "text-red-600 font-semibold" : "text-gray-500"}`}
                         >
                           {new Date(project.deadline).toLocaleDateString(
                             "id-ID"
@@ -281,9 +314,13 @@ export default function ProjectView({ projects, loading }: ProjectViewProps) {
                     asChild
                     className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
                     disabled={loadingProjectId === project.id}
+                    onMouseEnter={() => {
+                      router.prefetch(detailHref);
+                      prefetchDetail(project.id);
+                    }}
                     onClick={() => setLoadingProjectId(project.id)}
                   >
-                    <Link href={`/pegawai/projects/${project.id}`}>
+                    <Link href={detailHref} prefetch>
                       {loadingProjectId === project.id ? (
                         <>
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -303,7 +340,7 @@ export default function ProjectView({ projects, loading }: ProjectViewProps) {
                     variant="outline"
                     className="border-2 border-blue-200 text-blue-600 hover:bg-blue-50 rounded-xl"
                   >
-                    <Link href={`/pegawai/tasks?project_id=${project.id}`}>
+                    <Link href={tasksHref} prefetch>
                       <ClipboardList className="w-4 h-4 mr-2" />
                       My Tasks
                     </Link>
@@ -314,11 +351,13 @@ export default function ProjectView({ projects, loading }: ProjectViewProps) {
               <div className="text-xs text-gray-400 border-t pt-4">
                 Started:{" "}
                 {new Date(project.tanggal_mulai).toLocaleDateString("id-ID")} •
-                {isOverdue
-                  ? ` Overdue by ${Math.abs(daysUntilDeadline)} days`
-                  : daysUntilDeadline === 0
-                    ? " Due today"
-                    : ` ${daysUntilDeadline} days remaining`}
+                {showDeadlineFlags
+                  ? isOverdue
+                    ? ` Overdue by ${Math.abs(daysUntilDeadline)} days`
+                    : daysUntilDeadline === 0
+                      ? " Due today"
+                      : ` ${daysUntilDeadline} days remaining`
+                  : " Completed"}
               </div>
             </div>
           </div>

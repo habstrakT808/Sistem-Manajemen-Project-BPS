@@ -31,8 +31,9 @@ export function KetuaTimLayout({ children }: KetuaTimLayoutProps) {
   const router = useRouter();
 
   const handleSignOut = async () => {
+    router.prefetch("/");
+    router.push("/");
     await signOut();
-    router.push("/auth/login");
   };
 
   const navigationItems = [
@@ -119,7 +120,12 @@ export function KetuaTimLayout({ children }: KetuaTimLayoutProps) {
           {navigationItems.map((item, index) => {
             const IconComponent = item.icon;
             return (
-              <Link key={index} href={item.href}>
+              <Link
+                key={index}
+                href={item.href}
+                prefetch
+                onMouseEnter={() => router.prefetch(item.href)}
+              >
                 <div className="group flex items-center p-3 rounded-xl hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-300 transform hover:scale-105 cursor-pointer border border-transparent hover:border-blue-200">
                   <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center mr-4 group-hover:scale-110 transition-transform duration-300">
                     <IconComponent className="w-5 h-5 text-white" />
@@ -148,7 +154,11 @@ export function KetuaTimLayout({ children }: KetuaTimLayoutProps) {
               asChild
               className="w-full bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
             >
-              <Link href="/ketua-tim/projects/new">
+              <Link
+                href="/ketua-tim/projects/new"
+                prefetch
+                onMouseEnter={() => router.prefetch("/ketua-tim/projects/new")}
+              >
                 <Plus className="w-4 h-4 mr-2" />
                 Create Project
               </Link>

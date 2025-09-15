@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Eye, EyeOff, LogIn, Shield, Users, User } from "lucide-react";
 import { Database } from "@/../database/types/database.types";
+import { useAuthContext } from "@/components/auth/AuthProvider";
 
 type UserRole = Database["public"]["Enums"]["user_role"];
 
@@ -57,9 +58,26 @@ export function LoginForm() {
   const searchParams = useSearchParams();
   const role = searchParams.get("role") as UserRole | null;
   const supabase = createClient();
+  const { refreshUser } = useAuthContext();
 
   const config = role ? roleConfig[role] : roleConfig.admin;
   const IconComponent = config.icon;
+
+  // Prefetch likely destinations to speed up redirect after login
+  useEffect(() => {
+    router.prefetch("/admin");
+    router.prefetch("/ketua-tim");
+    router.prefetch("/pegawai");
+    if (role) {
+      const path =
+        role === "admin"
+          ? "/admin"
+          : role === "ketua_tim"
+            ? "/ketua-tim"
+            : "/pegawai";
+      router.prefetch(path);
+    }
+  }, [router, role]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,14 +98,31 @@ export function LoginForm() {
       }
 
       if (data.user) {
-        // Get user profile to check role
+        // Optimistic fast navigation based on role hint (if provided)
+        if (role) {
+          const path =
+            role === "admin"
+              ? "/admin"
+              : role === "ketua_tim"
+                ? "/ketua-tim"
+                : "/pegawai";
+          router.prefetch(path);
+          router.push(path);
+        }
+
+        // Fetch minimal profile fields for speed
         const { data: userProfile, error: profileError } = await supabase
           .from("users")
-          .select("*")
+          .select("role,is_active")
           .eq("id", data.user.id)
-          .single<Database["public"]["Tables"]["users"]["Row"]>();
+          .single<
+            Pick<
+              Database["public"]["Tables"]["users"]["Row"],
+              "role" | "is_active"
+            >
+          >();
 
-        if (profileError) {
+        if (profileError || !userProfile) {
           setError("Error fetching user profile");
           return;
         }
@@ -98,27 +133,24 @@ export function LoginForm() {
           return;
         }
 
-        // Check if role matches (if specified)
-        if (role && userProfile.role !== role) {
-          setError(`Akun ini bukan untuk role ${config.title}`);
-          await supabase.auth.signOut();
-          return;
-        }
-
-        // Redirect based on role
+        // Redirect to role dashboard (authoritative)
+        let redirectPath = "/";
         switch (userProfile.role) {
           case "admin":
-            router.push("/admin");
+            redirectPath = "/admin";
             break;
           case "ketua_tim":
-            router.push("/ketua-tim");
+            redirectPath = "/ketua-tim";
             break;
           case "pegawai":
-            router.push("/pegawai");
+            redirectPath = "/pegawai";
             break;
           default:
-            router.push("/");
+            redirectPath = "/";
         }
+
+        router.prefetch(redirectPath);
+        router.push(redirectPath);
       }
     } catch (error) {
       console.error("Login error:", error);

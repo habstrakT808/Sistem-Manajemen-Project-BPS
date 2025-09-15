@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuthContext } from "./AuthProvider";
-import { LoadingSpinner } from "../common/LoadingSpinner";
+import { useEffect } from "react";
+import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { useAuthContext } from "@/components/auth/AuthProvider";
 import { Database } from "@/../database/types/database.types";
 
 type UserRole = Database["public"]["Enums"]["user_role"];
@@ -25,6 +25,7 @@ export function ProtectedRoute({
   useEffect(() => {
     if (!loading) {
       if (requireAuth && !user) {
+        router.prefetch("/auth/login");
         router.push("/auth/login");
         return;
       }
@@ -35,18 +36,21 @@ export function ProtectedRoute({
         allowedRoles &&
         !allowedRoles.includes(userProfile.role)
       ) {
-        // Redirect to appropriate dashboard based on role
         switch (userProfile.role) {
           case "admin":
+            router.prefetch("/admin");
             router.push("/admin");
             break;
           case "ketua_tim":
+            router.prefetch("/ketua-tim");
             router.push("/ketua-tim");
             break;
           case "pegawai":
+            router.prefetch("/pegawai");
             router.push("/pegawai");
             break;
           default:
+            router.prefetch("/");
             router.push("/");
         }
         return;

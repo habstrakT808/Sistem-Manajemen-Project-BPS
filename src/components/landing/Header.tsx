@@ -24,6 +24,11 @@ const Header = () => {
     { label: "Kontak", href: "#kontak" },
   ];
 
+  const prefetchAndPush = (href: string) => {
+    router.prefetch(href);
+    router.push(href);
+  };
+
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -67,19 +72,19 @@ const Header = () => {
                 <DropdownMenuLabel>Masuk sebagai</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onSelect={() => router.push("/auth/login?role=admin")}
+                  onSelect={() => prefetchAndPush("/auth/login?role=admin")}
                 >
                   <Shield className="w-4 h-4 text-red-600" />
                   <span>Admin</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onSelect={() => router.push("/auth/login?role=ketua_tim")}
+                  onSelect={() => prefetchAndPush("/auth/login?role=ketua_tim")}
                 >
                   <Users className="w-4 h-4 text-blue-600" />
                   <span>Ketua Tim</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onSelect={() => router.push("/auth/login?role=pegawai")}
+                  onSelect={() => prefetchAndPush("/auth/login?role=pegawai")}
                 >
                   <User className="w-4 h-4 text-green-600" />
                   <span>Pegawai</span>
@@ -127,7 +132,7 @@ const Header = () => {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onSelect={() => {
-                      router.push("/auth/login?role=admin");
+                      prefetchAndPush("/auth/login?role=admin");
                       setIsMenuOpen(false);
                     }}
                   >
@@ -136,7 +141,7 @@ const Header = () => {
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={() => {
-                      router.push("/auth/login?role=ketua_tim");
+                      prefetchAndPush("/auth/login?role=ketua_tim");
                       setIsMenuOpen(false);
                     }}
                   >
@@ -145,7 +150,7 @@ const Header = () => {
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={() => {
-                      router.push("/auth/login?role=pegawai");
+                      prefetchAndPush("/auth/login?role=pegawai");
                       setIsMenuOpen(false);
                     }}
                   >

@@ -3,6 +3,8 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -88,62 +90,90 @@ interface TeamAnalytics {
   }>;
 }
 
+async function fetchTeamData(): Promise<TeamMember[]> {
+  const response = await fetch("/api/ketua-tim/team?include_stats=true", {
+    cache: "no-store",
+  });
+  const result = await response.json();
+  if (!response.ok)
+    throw new Error(result.error || "Failed to fetch team data");
+  return result.data as TeamMember[];
+}
+
+async function fetchTeamAnalytics(
+  analyticsPeriod: string
+): Promise<TeamAnalytics> {
+  const response = await fetch(
+    `/api/ketua-tim/team/analytics?period=${analyticsPeriod}`,
+    { cache: "no-store" }
+  );
+  const result = await response.json();
+  if (!response.ok)
+    throw new Error(result.error || "Failed to fetch analytics");
+  return result.data as TeamAnalytics;
+}
+
 export default function TeamManagement() {
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [analytics, setAnalytics] = useState<TeamAnalytics | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [workloadFilter, setWorkloadFilter] = useState<string>("all");
   const [analyticsPeriod, setAnalyticsPeriod] = useState("30");
 
-  const fetchTeamData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await fetch("/api/ketua-tim/team?include_stats=true");
-      const result = await response.json();
+  const {
+    data: teamMembers,
+    isLoading,
+    refetch,
+  } = useQuery<TeamMember[], Error>({
+    queryKey: ["ketua", "team", "members"],
+    queryFn: fetchTeamData,
+    staleTime: 5 * 60 * 1000,
+  });
 
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to fetch team data");
-      }
+  // Aggressively prefetch top visible member details and routes to eliminate loading on navigation
+  useEffect(() => {
+    if (!teamMembers || teamMembers.length === 0) return;
+    const topMembers = teamMembers.slice(0, 10);
+    topMembers.forEach((m) => {
+      // Warm Next.js route cache
+      router.prefetch(`/ketua-tim/team/${m.id}`);
+      // Warm React Query cache
+      prefetchMemberDetail(m.id);
+    });
+  }, [teamMembers, router]);
 
-      setTeamMembers(result.data);
-    } catch (error) {
-      console.error("Error fetching team data:", error);
-      toast.error("Failed to load team data");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const prefetchMemberDetail = (memberId: string) => {
+    const key = ["ketua", "team", "member", memberId];
+    queryClient.prefetchQuery({
+      queryKey: key,
+      queryFn: async () => {
+        const res = await fetch(`/api/ketua-tim/team/${memberId}`, {
+          cache: "no-store",
+        });
+        const json = await res.json();
+        if (!res.ok)
+          throw new Error(json.error || "Failed to fetch member data");
+        return json.data;
+      },
+      staleTime: 5 * 60 * 1000,
+    });
+  };
 
-  const fetchAnalytics = useCallback(async () => {
-    setAnalyticsLoading(true);
-    try {
-      const response = await fetch(
-        `/api/ketua-tim/team/analytics?period=${analyticsPeriod}`
-      );
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to fetch analytics");
-      }
-
-      setAnalytics(result.data);
-    } catch (error) {
-      console.error("Error fetching analytics:", error);
-      toast.error("Failed to load analytics data");
-    } finally {
-      setAnalyticsLoading(false);
-    }
-  }, [analyticsPeriod]);
+  const {
+    data: analytics,
+    isFetching: analyticsLoading,
+    refetch: refetchAnalytics,
+  } = useQuery<TeamAnalytics, Error>({
+    queryKey: ["ketua", "team", "analytics", { analyticsPeriod }],
+    queryFn: () => fetchTeamAnalytics(analyticsPeriod),
+    staleTime: 5 * 60 * 1000,
+  });
 
   useEffect(() => {
-    fetchTeamData();
-  }, [fetchTeamData]);
-
-  useEffect(() => {
-    fetchAnalytics();
-  }, [fetchAnalytics]);
+    router.prefetch("/ketua-tim/team");
+    router.prefetch("/ketua-tim/projects");
+    router.prefetch("/ketua-tim/tasks");
+  }, [router]);
 
   const getWorkloadColor = (level: string) => {
     switch (level) {
@@ -184,7 +214,7 @@ export default function TeamManagement() {
     }
   };
 
-  const filteredMembers = teamMembers.filter((member) => {
+  const filteredMembers = (teamMembers || []).filter((member) => {
     const matchesSearch =
       member.nama_lengkap.toLowerCase().includes(searchTerm.toLowerCase()) ||
       member.email.toLowerCase().includes(searchTerm.toLowerCase());
@@ -197,12 +227,15 @@ export default function TeamManagement() {
   });
 
   const workloadCounts = {
-    all: teamMembers.length,
-    low: teamMembers.filter((m) => m.workload.workload_level === "low").length,
-    medium: teamMembers.filter((m) => m.workload.workload_level === "medium")
+    all: teamMembers?.length || 0,
+    low: (teamMembers || []).filter((m) => m.workload.workload_level === "low")
       .length,
-    high: teamMembers.filter((m) => m.workload.workload_level === "high")
-      .length,
+    medium: (teamMembers || []).filter(
+      (m) => m.workload.workload_level === "medium"
+    ).length,
+    high: (teamMembers || []).filter(
+      (m) => m.workload.workload_level === "high"
+    ).length,
   };
 
   // Prepare chart data
@@ -225,12 +258,12 @@ export default function TeamManagement() {
 
   const performanceChartData =
     analytics?.member_performance.map((perf) => ({
-      name: perf.nama_lengkap.split(" ")[0], // First name only
+      name: perf.nama_lengkap.split(" ")[0],
       completion_rate: perf.completion_rate,
       total_tasks: perf.total_tasks,
     })) || [];
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="space-y-8">
         <div className="text-center">
@@ -257,7 +290,7 @@ export default function TeamManagement() {
 
         <div className="flex space-x-4">
           <Button
-            onClick={fetchTeamData}
+            onClick={() => refetch()}
             variant="outline"
             className="border-2 border-blue-200 text-blue-600 hover:bg-blue-50"
           >
@@ -393,6 +426,10 @@ export default function TeamManagement() {
                   <div
                     key={member.id}
                     className="border-0 shadow-xl rounded-xl overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1"
+                    onMouseEnter={() => {
+                      router.prefetch(`/ketua-tim/team/${member.id}`);
+                      prefetchMemberDetail(member.id);
+                    }}
                   >
                     <div className="p-6">
                       {/* Member Header */}
@@ -432,7 +469,14 @@ export default function TeamManagement() {
                           size="sm"
                           className="border-blue-200 text-blue-600 hover:bg-blue-50"
                         >
-                          <Link href={`/ketua-tim/team/${member.id}`}>
+                          <Link
+                            href={`/ketua-tim/team/${member.id}`}
+                            prefetch
+                            onMouseEnter={() => {
+                              router.prefetch(`/ketua-tim/team/${member.id}`);
+                              prefetchMemberDetail(member.id);
+                            }}
+                          >
                             <Eye className="w-4 h-4 mr-1" />
                             View Details
                           </Link>
@@ -562,7 +606,7 @@ export default function TeamManagement() {
                 </SelectContent>
               </Select>
               <Button
-                onClick={fetchAnalytics}
+                onClick={() => refetchAnalytics()}
                 disabled={analyticsLoading}
                 variant="outline"
                 className="border-2 border-blue-200 text-blue-600 hover:bg-blue-50"

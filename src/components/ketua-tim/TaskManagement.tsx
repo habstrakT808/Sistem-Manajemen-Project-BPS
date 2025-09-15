@@ -3,6 +3,8 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -96,11 +98,72 @@ const initialFormData: TaskFormData = {
   deskripsi_tugas: "",
 };
 
+async function fetchTasksRequest(
+  selectedStatus: string,
+  selectedProject: string
+): Promise<TaskData[]> {
+  const params = new URLSearchParams();
+  if (selectedStatus !== "all") params.append("status", selectedStatus);
+  if (selectedProject !== "all") params.append("project_id", selectedProject);
+  const response = await fetch(`/api/ketua-tim/tasks?${params.toString()}`, {
+    cache: "no-store",
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || "Failed to fetch tasks");
+  return result.data as TaskData[];
+}
+
+async function fetchProjectsRequest(): Promise<ProjectOption[]> {
+  const response = await fetch("/api/ketua-tim/projects?limit=100", {
+    cache: "no-store",
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || "Failed to fetch projects");
+
+  // Enrich projects with pegawai assignments
+  const enriched = await Promise.all(
+    (result.data as ProjectOption[]).map(async (project: ProjectOption) => {
+      try {
+        const assignmentResponse = await fetch(
+          `/api/ketua-tim/projects/${project.id}`,
+          { cache: "no-store" }
+        );
+        const assignmentResult = await assignmentResponse.json();
+        if (assignmentResponse.ok && assignmentResult.data) {
+          const pegawaiAssignments =
+            assignmentResult.data.project_assignments
+              ?.filter(
+                (a: { assignee_type: string }) => a.assignee_type === "pegawai"
+              )
+              ?.map(
+                (a: {
+                  assignee_id: string;
+                  assignee_details?: { nama_lengkap: string };
+                }) => ({
+                  assignee_id: a.assignee_id,
+                  users: a.assignee_details
+                    ? { nama_lengkap: a.assignee_details.nama_lengkap }
+                    : undefined,
+                })
+              ) || [];
+          return {
+            ...project,
+            pegawai_assignments: pegawaiAssignments,
+          } as ProjectOption;
+        }
+        return { ...project, pegawai_assignments: [] } as ProjectOption;
+      } catch {
+        return { ...project, pegawai_assignments: [] } as ProjectOption;
+      }
+    })
+  );
+
+  return enriched;
+}
+
 export default function TaskManagement() {
-  const [tasks, setTasks] = useState<TaskData[]>([]);
-  const [projects, setProjects] = useState<ProjectOption[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const [formData, setFormData] = useState<TaskFormData>(initialFormData);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
@@ -114,119 +177,41 @@ export default function TaskManagement() {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const fetchTasks = useCallback(async () => {
-    try {
-      const params = new URLSearchParams();
+  const { data: tasks, isLoading } = useQuery<TaskData[], Error>({
+    queryKey: ["ketua", "tasks", { selectedStatus, selectedProject }],
+    queryFn: () => fetchTasksRequest(selectedStatus, selectedProject),
+    keepPreviousData: true,
+    staleTime: 5 * 60 * 1000,
+  });
 
-      if (selectedStatus !== "all") {
-        params.append("status", selectedStatus);
-      }
+  const { data: projects } = useQuery<ProjectOption[], Error>({
+    queryKey: ["ketua", "projects", "forTasks"],
+    queryFn: fetchProjectsRequest,
+    staleTime: 5 * 60 * 1000,
+  });
 
-      if (selectedProject !== "all") {
-        params.append("project_id", selectedProject);
-      }
-
-      const response = await fetch(`/api/ketua-tim/tasks?${params}`);
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to fetch tasks");
-      }
-
-      setTasks(result.data);
-    } catch (error) {
-      console.error("Error fetching tasks:", error);
-      toast.error("Failed to load tasks");
-    }
-  }, [selectedStatus, selectedProject]);
-
-  const fetchProjects = useCallback(async () => {
-    try {
-      const response = await fetch("/api/ketua-tim/projects?limit=100");
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to fetch projects");
-      }
-
-      // Enrich projects with pegawai assignments
-      const enrichedProjects = await Promise.all(
-        result.data.map(async (project: ProjectOption) => {
-          try {
-            const assignmentResponse = await fetch(
-              `/api/ketua-tim/projects/${project.id}`
-            );
-            const assignmentResult = await assignmentResponse.json();
-
-            if (assignmentResponse.ok && assignmentResult.data) {
-              const pegawaiAssignments =
-                assignmentResult.data.project_assignments
-                  ?.filter(
-                    (a: { assignee_type: string }) =>
-                      a.assignee_type === "pegawai"
-                  )
-                  ?.map(
-                    (a: {
-                      assignee_id: string;
-                      assignee_details?: { nama_lengkap: string };
-                    }) => ({
-                      assignee_id: a.assignee_id,
-                      users: a.assignee_details
-                        ? { nama_lengkap: a.assignee_details.nama_lengkap }
-                        : undefined,
-                    })
-                  ) || [];
-
-              return {
-                ...project,
-                pegawai_assignments: pegawaiAssignments,
-              };
-            }
-
-            return {
-              ...project,
-              pegawai_assignments: [],
-            };
-          } catch (error) {
-            console.error(
-              `Error fetching assignments for project ${project.id}:`,
-              error
-            );
-            return {
-              ...project,
-              pegawai_assignments: [],
-            };
-          }
-        })
-      );
-
-      setProjects(enrichedProjects);
-    } catch (error) {
-      console.error("Error fetching projects:", error);
-      toast.error("Failed to load projects");
-    }
-  }, []);
+  useEffect(() => {
+    router.prefetch("/ketua-tim/tasks");
+  }, [router]);
 
   const fetchProjectMembers = useCallback(async (projectId: string) => {
     if (!projectId) {
       setProjectMembers([]);
       return;
     }
-
     setLoadingMembers(true);
     try {
       const response = await fetch(
-        `/api/ketua-tim/projects/${projectId}/members`
+        `/api/ketua-tim/projects/${projectId}/members`,
+        { cache: "no-store" }
       );
       const result = await response.json();
-
-      if (!response.ok) {
+      if (!response.ok)
         throw new Error(result.error || "Failed to fetch project members");
-      }
-
       setProjectMembers(result.data || []);
     } catch (error) {
       console.error("Error fetching project members:", error);
@@ -236,16 +221,6 @@ export default function TaskManagement() {
       setLoadingMembers(false);
     }
   }, []);
-
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      await Promise.all([fetchTasks(), fetchProjects()]);
-      setLoading(false);
-    };
-
-    loadData();
-  }, [fetchTasks, fetchProjects]);
 
   const handleCreateTask = async () => {
     if (
@@ -257,27 +232,23 @@ export default function TaskManagement() {
       toast.error("Please fill in all required fields");
       return;
     }
-
     setCreating(true);
     try {
       const response = await fetch("/api/ketua-tim/tasks", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
-
       const result = await response.json();
-
-      if (!response.ok) {
+      if (!response.ok)
         throw new Error(result.error || "Failed to create task");
-      }
-
       toast.success("Task created successfully!");
       setFormData(initialFormData);
       setIsCreateDialogOpen(false);
-      fetchTasks();
+      // Invalidate related lists instantly
+      queryClient.invalidateQueries({ queryKey: ["ketua", "tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["ketua", "dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["ketua", "projects"] });
     } catch (error) {
       console.error("Error creating task:", error);
       toast.error(
@@ -301,14 +272,12 @@ export default function TaskManagement() {
       tanggal_tugas: task.tanggal_tugas,
       deskripsi_tugas: task.deskripsi_tugas,
     });
-    // Fetch members for the selected project
     await fetchProjectMembers(task.project_id);
     setIsEditDialogOpen(true);
   };
 
   const handleUpdateTask = async () => {
     if (!selectedTask) return;
-
     if (
       !formData.project_id ||
       !formData.pegawai_id ||
@@ -318,28 +287,24 @@ export default function TaskManagement() {
       toast.error("Please fill in all required fields");
       return;
     }
-
     setUpdating(true);
     try {
       const response = await fetch(`/api/ketua-tim/tasks/${selectedTask.id}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
-
       const result = await response.json();
-
-      if (!response.ok) {
+      if (!response.ok)
         throw new Error(result.error || "Failed to update task");
-      }
-
       toast.success("Task updated successfully!");
       setFormData(initialFormData);
       setSelectedTask(null);
       setIsEditDialogOpen(false);
-      fetchTasks();
+      // Invalidate lists
+      queryClient.invalidateQueries({ queryKey: ["ketua", "tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["ketua", "dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["ketua", "projects"] });
     } catch (error) {
       console.error("Error updating task:", error);
       toast.error(
@@ -352,23 +317,21 @@ export default function TaskManagement() {
 
   const handleDeleteTask = async () => {
     if (!selectedTask) return;
-
     setDeleting(true);
     try {
       const response = await fetch(`/api/ketua-tim/tasks/${selectedTask.id}`, {
         method: "DELETE",
       });
-
       const result = await response.json();
-
-      if (!response.ok) {
+      if (!response.ok)
         throw new Error(result.error || "Failed to delete task");
-      }
-
       toast.success("Task deleted successfully!");
       setSelectedTask(null);
       setIsDeleteDialogOpen(false);
-      fetchTasks();
+      // Invalidate lists
+      queryClient.invalidateQueries({ queryKey: ["ketua", "tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["ketua", "dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["ketua", "projects"] });
     } catch (error) {
       console.error("Error deleting task:", error);
       toast.error(
@@ -405,25 +368,24 @@ export default function TaskManagement() {
     }
   };
 
-  const filteredTasks = tasks.filter((task) => {
+  const filteredTasks = (tasks || []).filter((task) => {
     const matchesSearch =
       task.deskripsi_tugas.toLowerCase().includes(searchTerm.toLowerCase()) ||
       task.projects.nama_project
         .toLowerCase()
         .includes(searchTerm.toLowerCase()) ||
       task.users.nama_lengkap.toLowerCase().includes(searchTerm.toLowerCase());
-
     return matchesSearch;
   });
 
   const statusCounts = {
-    all: tasks.length,
-    pending: tasks.filter((t) => t.status === "pending").length,
-    in_progress: tasks.filter((t) => t.status === "in_progress").length,
-    completed: tasks.filter((t) => t.status === "completed").length,
+    all: tasks?.length || 0,
+    pending: (tasks || []).filter((t) => t.status === "pending").length,
+    in_progress: (tasks || []).filter((t) => t.status === "in_progress").length,
+    completed: (tasks || []).filter((t) => t.status === "completed").length,
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="space-y-8">
         <div className="text-center">
@@ -471,16 +433,16 @@ export default function TaskManagement() {
                     setFormData((prev) => ({
                       ...prev,
                       project_id: value,
-                      pegawai_id: "", // Reset pegawai selection
+                      pegawai_id: "",
                     }));
-                    fetchProjectMembers(value); // Fetch members untuk selected project
+                    fetchProjectMembers(value);
                   }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select project" />
                   </SelectTrigger>
                   <SelectContent>
-                    {projects.map((project) => (
+                    {(projects || []).map((project) => (
                       <SelectItem key={project.id} value={project.id}>
                         {project.nama_project}
                       </SelectItem>
@@ -743,16 +705,16 @@ export default function TaskManagement() {
                     setFormData((prev) => ({
                       ...prev,
                       project_id: value,
-                      pegawai_id: "", // Reset pegawai selection
+                      pegawai_id: "",
                     }));
-                    fetchProjectMembers(value); // Fetch members untuk selected project
+                    fetchProjectMembers(value);
                   }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select project" />
                   </SelectTrigger>
                   <SelectContent>
-                    {projects.map((project) => (
+                    {(projects || []).map((project) => (
                       <SelectItem key={project.id} value={project.id}>
                         {project.nama_project}
                       </SelectItem>
@@ -925,7 +887,7 @@ export default function TaskManagement() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Projects</SelectItem>
-            {projects.map((project) => (
+            {(projects || []).map((project) => (
               <SelectItem key={project.id} value={project.id}>
                 {project.nama_project}
               </SelectItem>
@@ -1006,7 +968,6 @@ export default function TaskManagement() {
             ) : (
               filteredTasks.map((task) => {
                 const StatusIcon = getStatusIcon(task.status);
-
                 return (
                   <div
                     key={task.id}
@@ -1030,11 +991,9 @@ export default function TaskManagement() {
                               )}
                             </span>
                           </div>
-
                           <h3 className="text-lg font-semibold text-gray-900 mb-2">
                             {task.deskripsi_tugas}
                           </h3>
-
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                             <div className="flex items-center space-x-2">
                               <Users className="w-4 h-4 text-blue-500" />
@@ -1047,7 +1006,6 @@ export default function TaskManagement() {
                                 </div>
                               </div>
                             </div>
-
                             <div className="flex items-center space-x-2">
                               <Calendar className="w-4 h-4 text-green-500" />
                               <div className="text-sm">
@@ -1060,7 +1018,6 @@ export default function TaskManagement() {
                               </div>
                             </div>
                           </div>
-
                           {task.response_pegawai && (
                             <div className="mt-4 p-3 bg-blue-50 rounded-lg">
                               <div className="text-sm font-medium text-blue-900 mb-1">
@@ -1072,7 +1029,6 @@ export default function TaskManagement() {
                             </div>
                           )}
                         </div>
-
                         <div className="flex items-center space-x-2">
                           <Button
                             variant="outline"
@@ -1106,7 +1062,6 @@ export default function TaskManagement() {
                           </Button>
                         </div>
                       </div>
-
                       <div className="text-xs text-gray-400">
                         Created:{" "}
                         {new Date(task.created_at).toLocaleDateString("id-ID")}{" "}

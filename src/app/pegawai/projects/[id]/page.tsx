@@ -2,8 +2,9 @@
 
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -67,55 +68,61 @@ interface ProjectDetail {
   }>;
 }
 
+async function fetchProjectDetailRequest(
+  projectId: string
+): Promise<ProjectDetail> {
+  const response = await fetch(`/api/pegawai/projects/${projectId}`, {
+    cache: "no-store",
+  });
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result.error || "Failed to fetch project details");
+  }
+  return result.data;
+}
+
 export default function ProjectDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const [project, setProject] = useState<ProjectDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const [refreshing, setRefreshing] = useState(false);
 
-  const fetchProjectDetail = useCallback(async (projectId: string) => {
-    try {
-      setError(null);
-      const response = await fetch(`/api/pegawai/projects/${projectId}`);
-      const result = await response.json();
+  const { id } = useMemo(() => ({ id: undefined as unknown as string }), []);
 
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to fetch project details");
-      }
+  // Resolve params with a small wrapper so component stays client-only
+  const [projectId, setProjectId] = useState<string | null>(null);
+  React.useEffect(() => {
+    let mounted = true;
+    params.then((p) => {
+      if (mounted) setProjectId(p.id);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [params]);
 
-      setProject(result.data);
-    } catch (error) {
-      console.error("Error fetching project details:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to load project";
-      setError(errorMessage);
-      toast.error(errorMessage);
-    }
-  }, []);
+  const {
+    data: project,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery<ProjectDetail, Error>({
+    queryKey: ["pegawai", "projects", "detail", projectId],
+    queryFn: () => fetchProjectDetailRequest(projectId as string),
+    enabled: !!projectId,
+    staleTime: 5 * 60 * 1000,
+  });
 
   const handleRefresh = async () => {
-    if (!project) return;
     setRefreshing(true);
-    await fetchProjectDetail(project.id);
+    const res = await refetch();
     setRefreshing(false);
-    toast.success("Project data refreshed");
+    if (res.error) toast.error(res.error.message);
+    else toast.success("Project data refreshed");
   };
-
-  useEffect(() => {
-    const loadProject = async () => {
-      setLoading(true);
-      const { id } = await params;
-      await fetchProjectDetail(id);
-      setLoading(false);
-    };
-
-    loadProject();
-  }, [params, fetchProjectDetail]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -157,7 +164,7 @@ export default function ProjectDetailPage({
   };
 
   // Loading state
-  if (loading) {
+  if (isLoading || !projectId) {
     return (
       <div className="space-y-8">
         <div className="flex items-center space-x-4">
@@ -203,17 +210,9 @@ export default function ProjectDetailPage({
             <h2 className="text-2xl font-bold text-gray-900">
               Failed to Load Project
             </h2>
-            <p className="text-gray-600 max-w-md">{error}</p>
+            <p className="text-gray-600 max-w-md">{error.message}</p>
             <Button
-              onClick={() => {
-                setError(null);
-                setLoading(true);
-                if (project) {
-                  fetchProjectDetail(project.id).finally(() =>
-                    setLoading(false)
-                  );
-                }
-              }}
+              onClick={handleRefresh}
               className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700"
             >
               <RefreshCw className="w-4 h-4 mr-2" />
@@ -638,11 +637,7 @@ export default function ProjectDetailPage({
                         {[1, 2, 3, 4, 5].map((star) => (
                           <div
                             key={star}
-                            className={`w-3 h-3 rounded-full ${
-                              star <= partner.rating_average
-                                ? "bg-yellow-400"
-                                : "bg-gray-200"
-                            }`}
+                            className={`w-3 h-3 rounded-full ${star <= partner.rating_average ? "bg-yellow-400" : "bg-gray-200"}`}
                           />
                         ))}
                         <span className="text-xs text-gray-500 ml-2">

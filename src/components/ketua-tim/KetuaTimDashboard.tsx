@@ -3,6 +3,8 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -65,42 +67,37 @@ interface DashboardData {
   period_days: number;
 }
 
+async function fetchKetuaDashboard(period: string): Promise<DashboardData> {
+  const response = await fetch(`/api/ketua-tim/dashboard?period=${period}`, {
+    cache: "no-store",
+  });
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result.error || "Failed to fetch dashboard data");
+  }
+  return result as DashboardData;
+}
+
 export default function KetuaTimDashboard() {
-  const [dashboardData, setDashboardData] = useState<DashboardData | null>(
-    null
-  );
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
   const [period, setPeriod] = useState("30");
 
-  const fetchDashboardData = useCallback(async () => {
-    try {
-      setError(null);
-      const response = await fetch(`/api/ketua-tim/dashboard?period=${period}`);
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to fetch dashboard data");
-      }
-
-      setDashboardData(result);
-    } catch (error) {
-      console.error("Error fetching dashboard data:", error);
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Failed to load dashboard data";
-      setError(errorMessage);
-      toast.error(errorMessage);
-    }
-  }, [period]);
+  const {
+    data: dashboardData,
+    isLoading,
+    error,
+    refetch,
+    isFetching,
+  } = useQuery<DashboardData, Error>({
+    queryKey: ["ketua", "dashboard", { period }],
+    queryFn: () => fetchKetuaDashboard(period),
+    staleTime: 5 * 60 * 1000,
+  });
 
   const handleRefresh = async () => {
-    setRefreshing(true);
-    await fetchDashboardData();
-    setRefreshing(false);
-    toast.success("Dashboard data refreshed");
+    const res = await refetch();
+    if (res.error) toast.error(res.error.message);
+    else toast.success("Dashboard data refreshed");
   };
 
   const handlePeriodChange = (newPeriod: string) => {
@@ -108,19 +105,16 @@ export default function KetuaTimDashboard() {
   };
 
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      await fetchDashboardData();
-      setLoading(false);
-    };
+    router.prefetch("/ketua-tim/projects");
+    router.prefetch("/ketua-tim/team");
+    router.prefetch("/ketua-tim/tasks");
+    router.prefetch("/ketua-tim/financial");
+  }, [router]);
 
-    loadData();
-  }, [fetchDashboardData]);
-
-  // Loading skeleton
-  if (loading) {
+  if (isLoading && !dashboardData) {
     return (
       <div className="space-y-8">
+        {/* keep existing skeleton */}
         <div className="flex items-center justify-between">
           <div className="space-y-2">
             <div className="h-8 bg-gray-200 rounded w-64 animate-pulse"></div>
@@ -131,7 +125,6 @@ export default function KetuaTimDashboard() {
             <div className="h-12 bg-gray-200 rounded-xl w-32 animate-pulse"></div>
           </div>
         </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {[1, 2, 3, 4].map((i) => (
             <div
@@ -146,27 +139,10 @@ export default function KetuaTimDashboard() {
             </div>
           ))}
         </div>
-
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-          {[1, 2].map((i) => (
-            <div
-              key={i}
-              className="animate-pulse border-0 shadow-xl rounded-xl"
-            >
-              <div className="h-20 bg-gray-200 rounded-t-xl"></div>
-              <div className="p-6 space-y-4">
-                {[1, 2, 3].map((j) => (
-                  <div key={j} className="h-16 bg-gray-200 rounded"></div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
       </div>
     );
   }
 
-  // Error state
   if (error && !dashboardData) {
     return (
       <div className="space-y-8">
@@ -176,16 +152,14 @@ export default function KetuaTimDashboard() {
             <h2 className="text-2xl font-bold text-gray-900">
               Failed to Load Dashboard
             </h2>
-            <p className="text-gray-600 max-w-md">{error}</p>
+            <p className="text-gray-600 max-w-md">{error.message}</p>
             <Button
-              onClick={() => {
-                setError(null);
-                setLoading(true);
-                fetchDashboardData().finally(() => setLoading(false));
-              }}
+              onClick={handleRefresh}
               className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
             >
-              <RefreshCw className="w-4 h-4 mr-2" />
+              <RefreshCw
+                className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`}
+              />
               Try Again
             </Button>
           </div>
@@ -272,12 +246,12 @@ export default function KetuaTimDashboard() {
 
           <Button
             onClick={handleRefresh}
-            disabled={refreshing}
+            disabled={isFetching}
             variant="outline"
             className="border-2 border-gray-200 hover:bg-gray-50"
           >
             <RefreshCw
-              className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`}
+              className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`}
             />
             Refresh
           </Button>
@@ -286,7 +260,11 @@ export default function KetuaTimDashboard() {
             asChild
             className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
           >
-            <Link href="/ketua-tim/projects/new">
+            <Link
+              href="/ketua-tim/projects/new"
+              prefetch
+              onMouseEnter={() => router.prefetch("/ketua-tim/projects/new")}
+            >
               <Plus className="w-4 h-4 mr-2" />
               New Project
             </Link>
@@ -297,7 +275,11 @@ export default function KetuaTimDashboard() {
             asChild
             className="border-2 border-green-200 text-green-600 hover:bg-green-50 font-semibold px-6 py-3 rounded-xl transition-all duration-300 hover:border-green-300"
           >
-            <Link href="/ketua-tim/team">
+            <Link
+              href="/ketua-tim/team"
+              prefetch
+              onMouseEnter={() => router.prefetch("/ketua-tim/team")}
+            >
               <Users className="w-4 h-4 mr-2" />
               Manage Team
             </Link>
@@ -308,9 +290,14 @@ export default function KetuaTimDashboard() {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {statsCards.map((stat, index) => {
-          const IconComponent = stat.icon;
+          const IconComponent = stat.icon as any;
           return (
-            <Link key={index} href={stat.href}>
+            <Link
+              key={index}
+              href={stat.href}
+              prefetch
+              onMouseEnter={() => router.prefetch(stat.href)}
+            >
               <div className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 cursor-pointer group overflow-hidden rounded-xl">
                 <div
                   className={`absolute inset-0 bg-gradient-to-br ${stat.bgColor} opacity-50`}
@@ -334,17 +321,10 @@ export default function KetuaTimDashboard() {
                       <IconComponent className="w-8 h-8 text-white" />
                     </div>
                   </div>
-
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
                       <span
-                        className={`text-sm font-semibold ${
-                          stat.changeType === "positive"
-                            ? "text-green-600"
-                            : stat.changeType === "negative"
-                              ? "text-red-600"
-                              : "text-blue-600"
-                        }`}
+                        className={`text-sm font-semibold ${stat.changeType === "positive" ? "text-green-600" : stat.changeType === "negative" ? "text-red-600" : "text-blue-600"}`}
                       >
                         {stat.change}
                       </span>
@@ -380,7 +360,14 @@ export default function KetuaTimDashboard() {
             {recent_projects.length > 0 ? (
               <>
                 {recent_projects.map((project, index) => (
-                  <Link key={index} href={`/ketua-tim/projects/${project.id}`}>
+                  <Link
+                    key={index}
+                    href={`/ketua-tim/projects/${project.id}`}
+                    prefetch
+                    onMouseEnter={() =>
+                      router.prefetch(`/ketua-tim/projects/${project.id}`)
+                    }
+                  >
                     <div className="group flex items-center p-4 rounded-2xl hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50 transition-all duration-300 transform hover:scale-105 cursor-pointer border border-gray-100 hover:border-blue-200 hover:shadow-lg">
                       <div className="flex-1">
                         <div className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
@@ -407,13 +394,7 @@ export default function KetuaTimDashboard() {
                       </div>
                       <div className="ml-4">
                         <Badge
-                          className={`${
-                            project.status === "active"
-                              ? "bg-green-100 text-green-800"
-                              : project.status === "upcoming"
-                                ? "bg-blue-100 text-blue-800"
-                                : "bg-gray-100 text-gray-800"
-                          }`}
+                          className={`${project.status === "active" ? "bg-green-100 text-green-800" : project.status === "upcoming" ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-800"}`}
                         >
                           {project.status.toUpperCase()}
                         </Badge>
@@ -427,7 +408,13 @@ export default function KetuaTimDashboard() {
                     variant="outline"
                     className="w-full border-2 border-blue-200 text-blue-600 hover:bg-blue-50"
                   >
-                    <Link href="/ketua-tim/projects">
+                    <Link
+                      href="/ketua-tim/projects"
+                      prefetch
+                      onMouseEnter={() =>
+                        router.prefetch("/ketua-tim/projects")
+                      }
+                    >
                       View All Projects
                       <ArrowRight className="w-4 h-4 ml-2" />
                     </Link>
@@ -439,7 +426,13 @@ export default function KetuaTimDashboard() {
                 <FolderOpen className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                 <p className="text-gray-500 mb-4">No recent projects</p>
                 <Button asChild size="sm">
-                  <Link href="/ketua-tim/projects/new">
+                  <Link
+                    href="/ketua-tim/projects/new"
+                    prefetch
+                    onMouseEnter={() =>
+                      router.prefetch("/ketua-tim/projects/new")
+                    }
+                  >
                     <Plus className="w-4 h-4 mr-2" />
                     Create Your First Project
                   </Link>
@@ -473,18 +466,10 @@ export default function KetuaTimDashboard() {
                   return (
                     <div
                       key={index}
-                      className={`group flex items-center p-4 rounded-2xl hover:bg-gradient-to-r transition-all duration-300 transform hover:scale-105 cursor-pointer border hover:shadow-lg ${
-                        isOverdue
-                          ? "border-red-200 hover:from-red-50 hover:to-red-100 hover:border-red-300"
-                          : "border-gray-100 hover:from-gray-50 hover:to-orange-50 hover:border-orange-200"
-                      }`}
+                      className={`group flex items-center p-4 rounded-2xl hover:bg-gradient-to-r transition-all duration-300 transform hover:scale-105 cursor-pointer border hover:shadow-lg ${isOverdue ? "border-red-200 hover:from-red-50 hover:to-red-100 hover:border-red-300" : "border-gray-100 hover:from-gray-50 hover:to-orange-50 hover:border-orange-200"}`}
                     >
                       <div
-                        className={`w-10 h-10 rounded-lg flex items-center justify-center mr-4 group-hover:scale-110 transition-transform duration-300 ${
-                          isOverdue
-                            ? "bg-gradient-to-r from-red-500 to-red-600"
-                            : "bg-gradient-to-r from-orange-500 to-red-500"
-                        }`}
+                        className={`w-10 h-10 rounded-lg flex items-center justify-center mr-4 group-hover:scale-110 transition-transform duration-300 ${isOverdue ? "bg-gradient-to-r from-red-500 to-red-600" : "bg-gradient-to-r from-orange-500 to-red-500"}`}
                       >
                         {isOverdue ? (
                           <AlertCircle className="w-5 h-5 text-white" />
@@ -494,27 +479,17 @@ export default function KetuaTimDashboard() {
                       </div>
                       <div className="flex-1">
                         <div
-                          className={`font-semibold transition-colors ${
-                            isOverdue
-                              ? "text-red-900 group-hover:text-red-700"
-                              : "text-gray-900 group-hover:text-orange-600"
-                          }`}
+                          className={`font-semibold transition-colors ${isOverdue ? "text-red-900 group-hover:text-red-700" : "text-gray-900 group-hover:text-orange-600"}`}
                         >
                           {task.deskripsi_tugas}
                         </div>
                         <div
-                          className={`text-sm mt-1 transition-colors ${
-                            isOverdue
-                              ? "text-red-600 group-hover:text-red-500"
-                              : "text-gray-500 group-hover:text-orange-500"
-                          }`}
+                          className={`text-sm mt-1 transition-colors ${isOverdue ? "text-red-600 group-hover:text-red-500" : "text-gray-500 group-hover:text-orange-500"}`}
                         >
                           {task.pegawai_name} • {task.project_name}
                         </div>
                         <div
-                          className={`text-sm mt-1 font-medium ${
-                            isOverdue ? "text-red-700" : "text-gray-400"
-                          }`}
+                          className={`text-sm mt-1 font-medium ${isOverdue ? "text-red-700" : "text-gray-400"}`}
                         >
                           {isOverdue ? "OVERDUE: " : "Due: "}
                           {new Date(task.tanggal_tugas).toLocaleDateString(
@@ -540,7 +515,11 @@ export default function KetuaTimDashboard() {
                     variant="outline"
                     className="w-full border-2 border-orange-200 text-orange-600 hover:bg-orange-50"
                   >
-                    <Link href="/ketua-tim/tasks">
+                    <Link
+                      href="/ketua-tim/tasks"
+                      prefetch
+                      onMouseEnter={() => router.prefetch("/ketua-tim/tasks")}
+                    >
                       View All Tasks
                       <ArrowRight className="w-4 h-4 ml-2" />
                     </Link>
@@ -558,7 +537,7 @@ export default function KetuaTimDashboard() {
         </div>
       </div>
 
-      {/* Performance Overview */}
+      {/* Performance Overview (unchanged) */}
       <div className="border-0 shadow-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white overflow-hidden rounded-xl">
         <div className="p-8">
           <div className="grid md:grid-cols-4 gap-8 text-center relative">

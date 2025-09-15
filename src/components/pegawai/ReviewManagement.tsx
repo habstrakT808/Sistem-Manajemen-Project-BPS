@@ -3,6 +3,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -94,11 +95,17 @@ interface ReviewsData {
 type ViewMode = "pending" | "completed" | "stats";
 type FilterType = "all" | "perusahaan" | "individu";
 
+async function fetchReviews(): Promise<ReviewsData> {
+  const response = await fetch("/api/pegawai/reviews", { cache: "no-store" });
+  if (!response.ok) {
+    const errorResult = await response.json();
+    throw new Error(errorResult.error || "Failed to fetch reviews data");
+  }
+  const result = await response.json();
+  return result as ReviewsData;
+}
+
 export function ReviewManagement() {
-  const [reviewsData, setReviewsData] = useState<ReviewsData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<ViewMode>("pending");
   const [filterType, setFilterType] = useState<FilterType>("all");
   const [selectedReview, setSelectedReview] = useState<
@@ -109,38 +116,24 @@ export function ReviewManagement() {
   const [submitting, setSubmitting] = useState(false);
 
   // Review form state
-  const [reviewForm, setReviewForm] = useState({
-    rating: 0,
-    komentar: "",
+  const [reviewForm, setReviewForm] = useState({ rating: 0, komentar: "" });
+
+  const {
+    data: reviewsData,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery<ReviewsData, Error>({
+    queryKey: ["pegawai", "reviews"],
+    queryFn: fetchReviews,
+    staleTime: 5 * 60 * 1000,
   });
 
-  const fetchReviewsData = useCallback(async () => {
-    try {
-      setError(null);
-      const response = await fetch("/api/pegawai/reviews");
-
-      if (!response.ok) {
-        const errorResult = await response.json();
-        throw new Error(errorResult.error || "Failed to fetch reviews data");
-      }
-
-      const result = await response.json();
-      setReviewsData(result);
-    } catch (error) {
-      console.error("Error fetching reviews data:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to load reviews data";
-      setError(errorMessage);
-      toast.error(errorMessage);
-    }
-  }, []);
-
   const handleRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await fetchReviewsData();
-    setRefreshing(false);
-    toast.success("Reviews data refreshed successfully");
-  }, [fetchReviewsData]);
+    const res = await refetch();
+    if (res.error) toast.error(res.error.message);
+    else toast.success("Reviews data refreshed successfully");
+  }, [refetch]);
 
   const handleSubmitReview = useCallback(async () => {
     if (
@@ -174,7 +167,7 @@ export function ReviewManagement() {
       setReviewDialog(false);
       setSelectedReview(null);
       setReviewForm({ rating: 0, komentar: "" });
-      await fetchReviewsData();
+      await refetch();
     } catch (error) {
       console.error("Error submitting review:", error);
       toast.error(
@@ -183,7 +176,7 @@ export function ReviewManagement() {
     } finally {
       setSubmitting(false);
     }
-  }, [selectedReview, reviewForm, fetchReviewsData]);
+  }, [selectedReview, reviewForm, refetch]);
 
   const handleEditReview = useCallback(async () => {
     if (
@@ -201,7 +194,7 @@ export function ReviewManagement() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          review_id: selectedReview.id,
+          review_id: (selectedReview as CompletedReview).id,
           rating: reviewForm.rating,
           komentar: reviewForm.komentar.trim() || null,
         }),
@@ -216,7 +209,7 @@ export function ReviewManagement() {
       setEditDialog(false);
       setSelectedReview(null);
       setReviewForm({ rating: 0, komentar: "" });
-      await fetchReviewsData();
+      await refetch();
     } catch (error) {
       console.error("Error updating review:", error);
       toast.error(
@@ -225,7 +218,7 @@ export function ReviewManagement() {
     } finally {
       setSubmitting(false);
     }
-  }, [selectedReview, reviewForm, fetchReviewsData]);
+  }, [selectedReview, reviewForm, refetch]);
 
   const openReviewDialog = useCallback((review: PendingReview) => {
     setSelectedReview(review);
@@ -256,16 +249,7 @@ export function ReviewManagement() {
     };
   }, [reviewsData, filterType]);
 
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      await fetchReviewsData();
-      setLoading(false);
-    };
-    loadData();
-  }, [fetchReviewsData]);
-
-  // Render star rating component
+  // Render star rating component (unchanged)
   const StarRating = ({
     rating,
     onRatingChange,
@@ -279,7 +263,6 @@ export function ReviewManagement() {
   }) => {
     const starSize =
       size === "sm" ? "w-4 h-4" : size === "lg" ? "w-8 h-8" : "w-6 h-6";
-
     return (
       <div className="flex items-center space-x-1">
         {[1, 2, 3, 4, 5].map((star) => (
@@ -304,8 +287,7 @@ export function ReviewManagement() {
     );
   };
 
-  // Loading skeleton
-  if (loading) {
+  if (isLoading && !reviewsData) {
     return (
       <div className="space-y-8 animate-pulse">
         <div className="flex items-center justify-between">
@@ -342,7 +324,6 @@ export function ReviewManagement() {
     );
   }
 
-  // Error state
   if (error && !reviewsData) {
     return (
       <div className="space-y-8">
@@ -352,13 +333,9 @@ export function ReviewManagement() {
             <h2 className="text-2xl font-bold text-gray-900">
               Failed to Load Reviews Data
             </h2>
-            <p className="text-gray-600 max-w-md">{error}</p>
+            <p className="text-gray-600 max-w-md">{error.message}</p>
             <Button
-              onClick={() => {
-                setError(null);
-                setLoading(true);
-                fetchReviewsData().finally(() => setLoading(false));
-              }}
+              onClick={handleRefresh}
               className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700"
             >
               <RefreshCw className="w-4 h-4 mr-2" />
@@ -434,12 +411,12 @@ export function ReviewManagement() {
 
             <Button
               onClick={handleRefresh}
-              disabled={refreshing}
+              disabled={isLoading}
               variant="outline"
               className="border-2 border-gray-200 hover:bg-gray-50"
             >
               <RefreshCw
-                className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`}
+                className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`}
               />
               Refresh
             </Button>

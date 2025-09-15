@@ -3,6 +3,8 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -58,42 +60,37 @@ interface DashboardData {
   assigned_projects: AssignedProject[];
 }
 
+async function fetchPegawaiDashboard(): Promise<DashboardData> {
+  const response = await fetch("/api/pegawai/dashboard", { cache: "no-store" });
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result.error || "Failed to fetch dashboard data");
+  }
+  return result as DashboardData;
+}
+
 export default function PegawaiDashboard() {
-  const [dashboardData, setDashboardData] = useState<DashboardData | null>(
-    null
-  );
-  const [loading, setLoading] = useState(true);
+  const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [updatingTask, setUpdatingTask] = useState<string | null>(null);
 
-  const fetchDashboardData = useCallback(async () => {
-    try {
-      setError(null);
-      const response = await fetch("/api/pegawai/dashboard");
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to fetch dashboard data");
-      }
-
-      setDashboardData(result);
-    } catch (error) {
-      console.error("Error fetching dashboard data:", error);
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Failed to load dashboard data";
-      setError(errorMessage);
-      toast.error(errorMessage);
-    }
-  }, []);
+  const {
+    data: dashboardData,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery<DashboardData, Error>({
+    queryKey: ["pegawai", "dashboard"],
+    queryFn: fetchPegawaiDashboard,
+    staleTime: 5 * 60 * 1000,
+  });
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await fetchDashboardData();
+    const res = await refetch();
     setRefreshing(false);
-    toast.success("Dashboard data refreshed");
+    if (res.error) toast.error(res.error.message);
+    else toast.success("Dashboard data refreshed");
   };
 
   const handleTaskStatusUpdate = async (
@@ -106,9 +103,7 @@ export default function PegawaiDashboard() {
       const updateData: { status: string; response_pegawai?: string } = {
         status: newStatus,
       };
-      if (response) {
-        updateData.response_pegawai = response;
-      }
+      if (response) updateData.response_pegawai = response;
 
       const response_api = await fetch(`/api/pegawai/tasks/${taskId}`, {
         method: "PUT",
@@ -124,7 +119,7 @@ export default function PegawaiDashboard() {
       toast.success(
         `Task ${newStatus === "completed" ? "completed" : "started"}!`
       );
-      await fetchDashboardData(); // Refresh data
+      await refetch();
     } catch (error) {
       console.error("Error updating task:", error);
       toast.error(
@@ -136,17 +131,14 @@ export default function PegawaiDashboard() {
   };
 
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      await fetchDashboardData();
-      setLoading(false);
-    };
+    // prefetch key routes from dashboard
+    router.prefetch("/pegawai/tasks");
+    router.prefetch("/pegawai/projects");
+    router.prefetch("/pegawai/earnings");
+    router.prefetch("/pegawai/reviews");
+  }, [router]);
 
-    loadData();
-  }, [fetchDashboardData]);
-
-  // Loading skeleton
-  if (loading) {
+  if (isLoading && !dashboardData) {
     return (
       <div className="space-y-8">
         <div className="flex items-center justify-between">
@@ -175,7 +167,6 @@ export default function PegawaiDashboard() {
     );
   }
 
-  // Error state
   if (error && !dashboardData) {
     return (
       <div className="space-y-8">
@@ -185,16 +176,14 @@ export default function PegawaiDashboard() {
             <h2 className="text-2xl font-bold text-gray-900">
               Failed to Load Dashboard
             </h2>
-            <p className="text-gray-600 max-w-md">{error}</p>
+            <p className="text-gray-600 max-w-md">{error.message}</p>
             <Button
-              onClick={() => {
-                setError(null);
-                setLoading(true);
-                fetchDashboardData().finally(() => setLoading(false));
-              }}
+              onClick={handleRefresh}
               className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700"
             >
-              <RefreshCw className="w-4 h-4 mr-2" />
+              <RefreshCw
+                className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`}
+              />
               Try Again
             </Button>
           </div>
@@ -325,7 +314,11 @@ export default function PegawaiDashboard() {
             asChild
             className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
           >
-            <Link href="/pegawai/tasks">
+            <Link
+              href="/pegawai/tasks"
+              prefetch
+              onMouseEnter={() => router.prefetch("/pegawai/tasks")}
+            >
               <ClipboardList className="w-4 h-4 mr-2" />
               View All Tasks
             </Link>
@@ -336,9 +329,14 @@ export default function PegawaiDashboard() {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         {statsCards.map((stat, index) => {
-          const IconComponent = stat.icon;
+          const IconComponent = stat.icon as any;
           return (
-            <Link key={index} href={stat.href}>
+            <Link
+              key={index}
+              href={stat.href}
+              prefetch
+              onMouseEnter={() => router.prefetch(stat.href)}
+            >
               <div className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 cursor-pointer group overflow-hidden rounded-xl">
                 <div
                   className={`absolute inset-0 bg-gradient-to-br ${stat.bgColor} opacity-50`}
@@ -516,7 +514,14 @@ export default function PegawaiDashboard() {
             {assigned_projects.length > 0 ? (
               <>
                 {assigned_projects.map((project, index) => (
-                  <Link key={index} href={`/pegawai/projects/${project.id}`}>
+                  <Link
+                    key={index}
+                    href={`/pegawai/projects/${project.id}`}
+                    prefetch
+                    onMouseEnter={() =>
+                      router.prefetch(`/pegawai/projects/${project.id}`)
+                    }
+                  >
                     <div className="group flex items-center p-4 rounded-2xl hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50 transition-all duration-300 transform hover:scale-105 cursor-pointer border border-gray-100 hover:border-blue-200 hover:shadow-lg">
                       <div className="flex-1">
                         <div className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
@@ -565,7 +570,11 @@ export default function PegawaiDashboard() {
                     variant="outline"
                     className="w-full border-2 border-blue-200 text-blue-600 hover:bg-blue-50"
                   >
-                    <Link href="/pegawai/projects">
+                    <Link
+                      href="/pegawai/projects"
+                      prefetch
+                      onMouseEnter={() => router.prefetch("/pegawai/projects")}
+                    >
                       View All My Projects
                       <ArrowRight className="w-4 h-4 ml-2" />
                     </Link>

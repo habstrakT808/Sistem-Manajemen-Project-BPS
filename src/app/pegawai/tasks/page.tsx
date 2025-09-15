@@ -2,8 +2,9 @@
 
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useMemo, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,72 +30,62 @@ interface Task {
   };
 }
 
+async function fetchTasksRequest(): Promise<Task[]> {
+  const response = await fetch("/api/pegawai/tasks", { cache: "no-store" });
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result.error || "Failed to fetch tasks");
+  }
+  return result.data || [];
+}
+
 export default function TasksPage() {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState(
     searchParams.get("status") || "all"
   );
 
-  const fetchTasks = useCallback(async () => {
-    try {
-      setError(null);
-      const response = await fetch("/api/pegawai/tasks");
-      const result = await response.json();
+  const {
+    data: tasks = [],
+    isLoading,
+    isFetching,
+    error,
+    refetch,
+  } = useQuery<Task[], Error>({
+    queryKey: ["pegawai", "tasks"],
+    queryFn: fetchTasksRequest,
+    staleTime: 5 * 60 * 1000,
+  });
 
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to fetch tasks");
-      }
-
-      setTasks(result.data || []);
-    } catch (error) {
-      console.error("Error fetching tasks:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to load tasks";
-      setError(errorMessage);
-      toast.error(errorMessage);
-    }
-  }, []);
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await fetchTasks();
-    setRefreshing(false);
-    toast.success("Tasks refreshed");
-  };
-
-  const handleTaskUpdate = useCallback(async () => {
-    // Refresh tasks after update
-    await fetchTasks();
-  }, [fetchTasks]);
-
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      await fetchTasks();
-      setLoading(false);
-    };
-
-    loadData();
-  }, [fetchTasks]);
-
-  const taskCounts = {
-    all: tasks.length,
-    pending: tasks.filter((t) => t.status === "pending").length,
-    in_progress: tasks.filter((t) => t.status === "in_progress").length,
-    completed: tasks.filter((t) => t.status === "completed").length,
-  };
+  const taskCounts = useMemo(
+    () => ({
+      all: tasks.length,
+      pending: tasks.filter((t) => t.status === "pending").length,
+      in_progress: tasks.filter((t) => t.status === "in_progress").length,
+      completed: tasks.filter((t) => t.status === "completed").length,
+    }),
+    [tasks]
+  );
 
   const getFilteredTasks = (status: string) => {
     if (status === "all") return tasks;
     return tasks.filter((task) => task.status === status);
   };
 
-  // Error state
-  if (error && !tasks.length) {
+  const handleRefresh = async () => {
+    const res = await refetch();
+    if (res.error) {
+      toast.error(res.error.message);
+    } else {
+      toast.success("Tasks refreshed");
+    }
+  };
+
+  const handleTaskUpdate = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
+
+  if (error && tasks.length === 0) {
     return (
       <div className="space-y-8">
         <div className="flex items-center justify-center min-h-[400px]">
@@ -103,16 +94,14 @@ export default function TasksPage() {
             <h2 className="text-2xl font-bold text-gray-900">
               Failed to Load Tasks
             </h2>
-            <p className="text-gray-600 max-w-md">{error}</p>
+            <p className="text-gray-600 max-w-md">{error.message}</p>
             <Button
-              onClick={() => {
-                setError(null);
-                setLoading(true);
-                fetchTasks().finally(() => setLoading(false));
-              }}
+              onClick={handleRefresh}
               className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700"
             >
-              <RefreshCw className="w-4 h-4 mr-2" />
+              <RefreshCw
+                className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`}
+              />
               Try Again
             </Button>
           </div>
@@ -137,12 +126,12 @@ export default function TasksPage() {
         <div className="flex items-center space-x-4">
           <Button
             onClick={handleRefresh}
-            disabled={refreshing}
+            disabled={isFetching}
             variant="outline"
             className="border-2 border-gray-200 hover:bg-gray-50"
           >
             <RefreshCw
-              className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`}
+              className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`}
             />
             Refresh
           </Button>
@@ -207,7 +196,7 @@ export default function TasksPage() {
             <TaskInterface
               tasks={getFilteredTasks(status)}
               onTaskUpdate={handleTaskUpdate}
-              loading={loading}
+              loading={isLoading && tasks.length === 0}
             />
           </TabsContent>
         ))}
