@@ -1,4 +1,5 @@
 // File: src/components/pegawai/TaskInterface.tsx
+// COMPLETELY UPDATED: Support new task structure with transport allocation
 
 "use client";
 
@@ -37,13 +38,21 @@ import {
   Save,
   Loader2,
   ClipboardList,
+  MapPin,
+  DollarSign,
 } from "lucide-react";
 import { toast } from "sonner";
+import { formatCurrency } from "@/lib/utils";
+import TransportCalendar from "./TransportCalendar";
 
 interface Task {
   id: string;
+  title: string;
   deskripsi_tugas: string;
-  tanggal_tugas: string;
+  start_date: string;
+  end_date: string;
+  tanggal_tugas: string; // Keep for backward compatibility
+  has_transport: boolean;
   status: "pending" | "in_progress" | "completed";
   response_pegawai?: string;
   created_at: string;
@@ -56,6 +65,12 @@ interface Task {
       nama_lengkap: string;
     };
   };
+  transport_allocation: {
+    id: string;
+    allocation_date: string | null;
+    allocated_at: string | null;
+    canceled_at: string | null;
+  } | null;
 }
 
 interface TaskInterfaceProps {
@@ -72,6 +87,7 @@ export default function TaskInterface({
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isExecuteDialogOpen, setIsExecuteDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isTransportDialogOpen, setIsTransportDialogOpen] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [response, setResponse] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
@@ -185,6 +201,11 @@ export default function TaskInterface({
     }
   };
 
+  const handleTransportAllocation = (task: Task) => {
+    setSelectedTask(task);
+    setIsTransportDialogOpen(true);
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "pending":
@@ -211,21 +232,9 @@ export default function TaskInterface({
     }
   };
 
-  const getProjectStatusColor = (status: string) => {
-    switch (status) {
-      case "active":
-        return "bg-green-100 text-green-800";
-      case "upcoming":
-        return "bg-blue-100 text-blue-800";
-      case "completed":
-        return "bg-gray-100 text-gray-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
   const filteredTasks = tasks.filter((task) => {
     const matchesSearch =
+      task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       task.deskripsi_tugas.toLowerCase().includes(searchTerm.toLowerCase()) ||
       task.projects.nama_project
         .toLowerCase()
@@ -315,8 +324,14 @@ export default function TaskInterface({
           filteredTasks.map((task) => {
             const StatusIcon = getStatusIcon(task.status);
             const isOverdue =
-              new Date(task.tanggal_tugas) < new Date() &&
+              new Date(task.end_date) < new Date() &&
               task.status !== "completed";
+            const hasTransport =
+              task.has_transport && !task.transport_allocation?.canceled_at;
+            const needsDateSelection =
+              hasTransport && !task.transport_allocation?.allocation_date;
+            const isTransportAllocated =
+              hasTransport && task.transport_allocation?.allocation_date;
 
             return (
               <div
@@ -337,35 +352,55 @@ export default function TaskInterface({
                             {task.status.replace("_", " ").toUpperCase()}
                           </span>
                         </Badge>
-                        <Badge
-                          className={getProjectStatusColor(
-                            task.projects.status
-                          )}
-                        >
-                          {task.projects.status.toUpperCase()}
-                        </Badge>
+
+                        {hasTransport && (
+                          <Badge className="bg-green-100 text-green-800 border-green-200 flex items-center space-x-1">
+                            <DollarSign className="w-3 h-3" />
+                            <span>Transport: {formatCurrency(150000)}</span>
+                          </Badge>
+                        )}
+
                         {isOverdue && (
                           <Badge className="bg-red-100 text-red-800 border-red-200">
                             OVERDUE
                           </Badge>
                         )}
+
+                        {needsDateSelection ? (
+                          <Badge className="bg-orange-100 text-orange-800 border-orange-200 animate-pulse">
+                            SELECT DATE
+                          </Badge>
+                        ) : (
+                          isTransportAllocated && (
+                            <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+                              DATE SELECTED
+                            </Badge>
+                          )
+                        )}
                       </div>
 
-                      <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                        {task.deskripsi_tugas}
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                        {task.title}
                       </h3>
+                      <p className="text-gray-600 mb-3">
+                        {task.deskripsi_tugas}
+                      </p>
 
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                         <div className="flex items-center space-x-2">
                           <Calendar className="w-4 h-4 text-blue-500" />
                           <div className="text-sm">
                             <div className="font-medium text-gray-900">
-                              Due Date
+                              Task Period
                             </div>
                             <div
                               className={`${isOverdue ? "text-red-600 font-semibold" : "text-gray-500"}`}
                             >
-                              {new Date(task.tanggal_tugas).toLocaleDateString(
+                              {new Date(task.start_date).toLocaleDateString(
+                                "id-ID"
+                              )}{" "}
+                              -{" "}
+                              {new Date(task.end_date).toLocaleDateString(
                                 "id-ID"
                               )}
                             </div>
@@ -388,7 +423,7 @@ export default function TaskInterface({
                           <User className="w-4 h-4 text-green-500" />
                           <div className="text-sm">
                             <div className="font-medium text-gray-900">
-                              Ketua Tim
+                              Team Leader
                             </div>
                             <div className="text-gray-500">
                               {task.projects.users.nama_lengkap}
@@ -396,6 +431,63 @@ export default function TaskInterface({
                           </div>
                         </div>
                       </div>
+
+                      {/* Transport Status */}
+                      {hasTransport && (
+                        <div
+                          className={`mt-4 p-3 rounded-lg border ${
+                            isTransportAllocated
+                              ? "bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200"
+                              : "bg-gradient-to-r from-green-50 to-teal-50 border-green-200"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <MapPin
+                                className={`w-4 h-4 ${isTransportAllocated ? "text-blue-600" : "text-green-600"}`}
+                              />
+                              <div>
+                                <div
+                                  className={`text-sm font-medium ${isTransportAllocated ? "text-blue-900" : "text-green-900"}`}
+                                >
+                                  Transport Allowance
+                                </div>
+                                <div
+                                  className={`text-sm ${isTransportAllocated ? "text-blue-700" : "text-green-700"}`}
+                                >
+                                  {task.transport_allocation?.allocation_date
+                                    ? `Allocated for: ${new Date(task.transport_allocation.allocation_date).toLocaleDateString("id-ID")}`
+                                    : "Date selection required"}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <div
+                                className={`text-sm font-semibold ${isTransportAllocated ? "text-blue-600" : "text-green-600"}`}
+                              >
+                                {formatCurrency(150000)}
+                              </div>
+                              {needsDateSelection && (
+                                <Button
+                                  size="sm"
+                                  onClick={() =>
+                                    handleTransportAllocation(task)
+                                  }
+                                  className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white"
+                                >
+                                  <Calendar className="w-3 h-3 mr-1" />
+                                  Select Date
+                                </Button>
+                              )}
+                              {isTransportAllocated && (
+                                <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+                                  Allocated
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       {task.response_pegawai && (
                         <div className="mt-4 p-4 bg-gradient-to-r from-green-50 to-teal-50 rounded-xl border border-green-200">
@@ -459,6 +551,30 @@ export default function TaskInterface({
                           </div>
                         </div>
                       )}
+
+                      {needsDateSelection && (
+                        <Button
+                          onClick={() => handleTransportAllocation(task)}
+                          className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 animate-pulse"
+                        >
+                          <MapPin className="w-4 h-4 mr-2" />
+                          Select Transport Date
+                        </Button>
+                      )}
+
+                      {isTransportAllocated && (
+                        <div className="text-center">
+                          <MapPin className="w-8 h-8 text-blue-500 mx-auto mb-2" />
+                          <div className="text-sm font-semibold text-blue-600">
+                            Transport Allocated
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {new Date(
+                              task.transport_allocation!.allocation_date!
+                            ).toLocaleDateString("id-ID")}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -488,7 +604,19 @@ export default function TaskInterface({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="space-y-6">
+            <div>
+              <Label
+                htmlFor="task-title"
+                className="text-sm font-medium text-gray-700"
+              >
+                Task Title
+              </Label>
+              <div className="mt-2 p-3 bg-gray-50 rounded-lg text-sm font-semibold text-gray-900">
+                {selectedTask?.title}
+              </div>
+            </div>
+
             <div>
               <Label
                 htmlFor="task-description"
@@ -496,7 +624,7 @@ export default function TaskInterface({
               >
                 Task Description
               </Label>
-              <div className="mt-3 p-3 bg-gray-50 rounded-lg text-sm text-gray-700">
+              <div className="mt-2 p-3 bg-gray-50 rounded-lg text-sm text-gray-700">
                 {selectedTask?.deskripsi_tugas}
               </div>
             </div>
@@ -514,7 +642,7 @@ export default function TaskInterface({
                 onChange={(e) => setResponse(e.target.value)}
                 placeholder="Describe what you accomplished, any issues encountered, or additional notes..."
                 rows={4}
-                className="mt-3"
+                className="mt-2"
               />
             </div>
           </div>
@@ -609,6 +737,35 @@ export default function TaskInterface({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Transport Calendar Dialog */}
+      {selectedTask && isTransportDialogOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">
+                Transport Date Selection
+              </h2>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsTransportDialogOpen(false);
+                  setSelectedTask(null);
+                }}
+              >
+                Close
+              </Button>
+            </div>
+            <TransportCalendar
+              onAllocationUpdate={() => {
+                onTaskUpdate(selectedTask.id);
+                setIsTransportDialogOpen(false);
+                setSelectedTask(null);
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

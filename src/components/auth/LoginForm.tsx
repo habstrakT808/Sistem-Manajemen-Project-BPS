@@ -14,7 +14,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Eye, EyeOff, LogIn, Shield, Users, User } from "lucide-react";
+import { Eye, EyeOff, LogIn, Shield, User } from "lucide-react";
 import { Database } from "@/../database/types/database.types";
 import { useAuthContext } from "@/components/auth/AuthProvider";
 
@@ -29,14 +29,6 @@ const roleConfig = {
     bgColor: "bg-red-50",
     borderColor: "border-red-200",
   },
-  ketua_tim: {
-    title: "Ketua Tim",
-    description: "Kelola project dan tim",
-    icon: Users,
-    color: "text-blue-600",
-    bgColor: "bg-blue-50",
-    borderColor: "border-blue-200",
-  },
   pegawai: {
     title: "Pegawai",
     description: "Kelola tugas dan project",
@@ -44,6 +36,14 @@ const roleConfig = {
     color: "text-green-600",
     bgColor: "bg-green-50",
     borderColor: "border-green-200",
+  },
+  ketua_tim: {
+    title: "Ketua Tim",
+    description: "Kelola tim dan project",
+    icon: User,
+    color: "text-indigo-600",
+    bgColor: "bg-indigo-50",
+    borderColor: "border-indigo-200",
   },
 };
 
@@ -53,12 +53,13 @@ export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [formKey, setFormKey] = useState(0);
 
   const router = useRouter();
   const searchParams = useSearchParams();
   const role = searchParams.get("role") as UserRole | null;
   const supabase = createClient();
-  const { refreshUser } = useAuthContext();
+  const { refreshUser, user } = useAuthContext();
 
   const config = role ? roleConfig[role] : roleConfig.admin;
   const IconComponent = config.icon;
@@ -66,25 +67,74 @@ export function LoginForm() {
   // Prefetch likely destinations to speed up redirect after login
   useEffect(() => {
     router.prefetch("/admin");
-    router.prefetch("/ketua-tim");
     router.prefetch("/pegawai");
     if (role) {
-      const path =
-        role === "admin"
-          ? "/admin"
-          : role === "ketua_tim"
-            ? "/ketua-tim"
-            : "/pegawai";
+      const path = role === "admin" ? "/admin" : "/pegawai";
       router.prefetch(path);
     }
   }, [router, role]);
 
+  // Reset form state when user logs out or when component mounts
+  useEffect(() => {
+    console.log(
+      "LoginForm useEffect - user changed:",
+      user?.id,
+      "loading:",
+      loading
+    );
+    if (!user) {
+      console.log("Resetting form state - user is null");
+      setLoading(false);
+      setError("");
+      setEmail("");
+      setPassword("");
+      setShowPassword(false);
+      setFormKey((prev) => prev + 1); // Force form re-render
+    }
+  }, [user, loading]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      setLoading(false);
+      setError("");
+    };
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("LoginForm handleSubmit - starting login");
     setLoading(true);
     setError("");
 
     try {
+      // Clear stale client-side caches before logging in with a different user
+      if (typeof window !== "undefined") {
+        try {
+          window.localStorage.removeItem("ACTIVE_PROJECT");
+          window.localStorage.removeItem("ACTIVE_TEAM");
+          window.localStorage.removeItem("REACT_QUERY_OFFLINE_CACHE");
+          const keysToRemove: string[] = [];
+          for (let i = 0; i < window.localStorage.length; i++) {
+            const key = window.localStorage.key(i);
+            if (
+              key &&
+              (key.startsWith("REACT_QUERY_") || key.startsWith("ACTIVE_"))
+            ) {
+              keysToRemove.push(key);
+            }
+          }
+          keysToRemove.forEach((k) => window.localStorage.removeItem(k));
+        } catch (err) {
+          console.warn("LoginForm: failed clearing localStorage keys", err);
+        }
+      }
+
+      // Ensure any residual session is cleared (handles rapid relogin same account)
+      try {
+        await supabase.auth.signOut();
+      } catch {}
+
       const { data, error: authError } = await supabase.auth.signInWithPassword(
         {
           email,
@@ -94,27 +144,21 @@ export function LoginForm() {
 
       if (authError) {
         setError(authError.message);
+        setLoading(false);
         return;
       }
 
-      if (data.user) {
-        // Optimistic fast navigation based on role hint (if provided)
-        if (role) {
-          const path =
-            role === "admin"
-              ? "/admin"
-              : role === "ketua_tim"
-                ? "/ketua-tim"
-                : "/pegawai";
-          router.prefetch(path);
-          router.push(path);
-        }
+      const signedInUser = data.user ?? (data.session as any)?.user;
+
+      if (signedInUser) {
+        // Make sure context is in sync before navigating
+        await refreshUser();
 
         // Fetch minimal profile fields for speed
         const { data: userProfile, error: profileError } = await supabase
           .from("users")
           .select("role,is_active")
-          .eq("id", data.user.id)
+          .eq("id", signedInUser.id)
           .single<
             Pick<
               Database["public"]["Tables"]["users"]["Row"],
@@ -124,38 +168,41 @@ export function LoginForm() {
 
         if (profileError || !userProfile) {
           setError("Error fetching user profile");
+          setLoading(false);
           return;
         }
 
         if (!userProfile.is_active) {
           setError("Akun Anda tidak aktif. Hubungi administrator.");
           await supabase.auth.signOut();
+          setLoading(false);
           return;
         }
 
-        // Redirect to role dashboard (authoritative)
-        let redirectPath = "/";
-        switch (userProfile.role) {
-          case "admin":
-            redirectPath = "/admin";
-            break;
-          case "ketua_tim":
-            redirectPath = "/ketua-tim";
-            break;
-          case "pegawai":
-            redirectPath = "/pegawai";
-            break;
-          default:
-            redirectPath = "/";
-        }
+        // Decide destination: prefer explicit role param, else profile role
+        const redirectPath = role
+          ? role === "admin"
+            ? "/admin"
+            : role === "ketua_tim"
+              ? "/ketua-tim"
+              : "/pegawai"
+          : userProfile.role === "admin"
+            ? "/admin"
+            : "/pegawai";
 
+        console.log("LoginForm - redirecting to:", redirectPath);
+        setLoading(false); // release button BEFORE navigating to avoid stuck spinner if redirected back
         router.prefetch(redirectPath);
         router.push(redirectPath);
+      } else {
+        // Safety: handle edge case where user is null without explicit error
+        setError("Login gagal. Silakan coba lagi.");
+        setLoading(false);
+        return;
       }
     } catch (error) {
       console.error("Login error:", error);
       setError("Terjadi kesalahan saat login");
-    } finally {
       setLoading(false);
     }
   };
@@ -176,7 +223,7 @@ export function LoginForm() {
         </CardHeader>
 
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form key={formKey} onSubmit={handleSubmit} className="space-y-6">
             {error && (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>

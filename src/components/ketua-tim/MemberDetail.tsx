@@ -125,7 +125,8 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
   );
 
   const fetchMemberDetailRequest = async (): Promise<MemberDetailData> => {
-    const response = await fetch(`/api/ketua-tim/team/${memberId}`, {
+    // Use debug endpoint for now
+    const response = await fetch(`/api/debug-member-detail/${memberId}`, {
       cache: "no-store",
     });
     const result = await response.json();
@@ -251,6 +252,8 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
 
   // Error state
   if (error && !memberData) {
+    const message = error instanceof Error ? error.message : String(error);
+    const isNotFound = /not\s*found/i.test(message);
     return (
       <div className="space-y-8">
         <div className="flex items-center space-x-4">
@@ -266,18 +269,28 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
 
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center space-y-4">
-            <AlertCircle className="w-16 h-16 text-red-500 mx-auto" />
+            <AlertCircle
+              className={`w-16 h-16 mx-auto ${isNotFound ? "text-gray-400" : "text-red-500"}`}
+            />
             <h2 className="text-2xl font-bold text-gray-900">
-              Failed to Load Member Data
+              {isNotFound
+                ? "Member Tidak Ditemukan"
+                : "Failed to Load Member Data"}
             </h2>
-            <p className="text-gray-600 max-w-md">{error}</p>
-            <Button
-              onClick={handleRefresh}
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Try Again
-            </Button>
+            <p className="text-gray-600 max-w-md">
+              {isNotFound
+                ? "Anggota yang Anda cari tidak ditemukan. Pastikan ID valid atau pilih dari daftar tim."
+                : message}
+            </p>
+            {!isNotFound && (
+              <Button
+                onClick={handleRefresh}
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Try Again
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -340,7 +353,7 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
 
   const earningsHistoryData = monthly_earnings.historical.map((history) => ({
     month: history.month,
-    earnings: history.total / 1000000, // Convert to millions
+    earnings: history.total, // Keep original values for better chart display
   }));
 
   return (
@@ -1018,7 +1031,7 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
                     {
                       dataKey: "earnings",
                       stroke: "#8B5CF6",
-                      name: "Earnings (Millions)",
+                      name: "Earnings (Rp)",
                     },
                   ]}
                 />

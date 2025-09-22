@@ -3,7 +3,7 @@
 "use client";
 
 import React, { useMemo, useState, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +41,7 @@ async function fetchTasksRequest(): Promise<Task[]> {
 
 export default function TasksPage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState(
     searchParams.get("status") || "all"
   );
@@ -84,6 +85,10 @@ export default function TasksPage() {
   const handleTaskUpdate = useCallback(async () => {
     await refetch();
   }, [refetch]);
+
+  const handleCalendarView = () => {
+    router.push("/pegawai/schedule");
+  };
 
   if (error && tasks.length === 0) {
     return (
@@ -137,6 +142,7 @@ export default function TasksPage() {
           </Button>
 
           <Button
+            onClick={handleCalendarView}
             variant="outline"
             className="border-2 border-green-200 text-green-600 hover:bg-green-50"
           >
@@ -194,7 +200,7 @@ export default function TasksPage() {
         {["all", "pending", "in_progress", "completed"].map((status) => (
           <TabsContent key={status} value={status}>
             <TaskInterface
-              tasks={getFilteredTasks(status)}
+              tasks={getFilteredTasks(status) as any}
               onTaskUpdate={handleTaskUpdate}
               loading={isLoading && tasks.length === 0}
             />

@@ -114,8 +114,8 @@ export default function SystemAnalytics() {
   const kpiCards = [
     {
       title: "Total Users",
-      value: data.systemMetrics.total_users,
-      description: `${data.systemMetrics.active_users} active users`,
+      value: (data.systemMetrics as any).total_users ?? 0,
+      description: `${(data.systemMetrics as any).active_users ?? 0} active users`,
       icon: Users,
       color: "from-blue-500 to-blue-600",
       bgColor: "from-blue-50 to-blue-100",
@@ -124,8 +124,8 @@ export default function SystemAnalytics() {
     },
     {
       title: "Active Projects",
-      value: data.systemMetrics.active_projects,
-      description: `${data.systemMetrics.completed_projects} completed`,
+      value: (data.systemMetrics as any).active_projects ?? 0,
+      description: `${(data.systemMetrics as any).completed_projects ?? 0} completed`,
       icon: FolderOpen,
       color: "from-green-500 to-green-600",
       bgColor: "from-green-50 to-green-100",
@@ -134,7 +134,9 @@ export default function SystemAnalytics() {
     },
     {
       title: "This Month Spending",
-      value: formatCurrency(data.systemMetrics.this_month_spending),
+      value: formatCurrency(
+        (data.systemMetrics as any).this_month_spending ?? 0
+      ),
       description: "Monthly expenses",
       icon: DollarSign,
       color: "from-orange-500 to-orange-600",
@@ -144,8 +146,8 @@ export default function SystemAnalytics() {
     },
     {
       title: "Database Size",
-      value: data.systemMetrics.database_size,
-      description: `${data.systemMetrics.total_tables} tables`,
+      value: (data.systemMetrics as any).database_size ?? 0,
+      description: `${(data.systemMetrics as any).total_tables ?? 0} tables`,
       icon: Database,
       color: "from-purple-500 to-purple-600",
       bgColor: "from-purple-50 to-purple-100",
@@ -155,14 +157,20 @@ export default function SystemAnalytics() {
   ];
 
   const userRoleData = Object.entries(
-    data.systemMetrics.user_roles_distribution || {}
+    ((data.systemMetrics as any).user_roles_distribution as Record<
+      string,
+      number
+    >) || {}
   ).map(([role, count]) => ({
     name: role.replace("_", " ").toUpperCase(),
     value: count,
   }));
 
   const projectStatusData = Object.entries(
-    data.systemMetrics.project_status_distribution || {}
+    ((data.systemMetrics as any).project_status_distribution as Record<
+      string,
+      number
+    >) || {}
   ).map(([status, count]) => ({
     name: status.replace("_", " ").toUpperCase(),
     value: count,
@@ -214,7 +222,7 @@ export default function SystemAnalytics() {
           return (
             <Card
               key={index}
-              className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 overflow-hidden"
+              className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 overflow-hidden bg-white"
             >
               <div
                 className={`absolute inset-0 bg-gradient-to-br ${kpi.bgColor} opacity-50`}
@@ -291,7 +299,7 @@ export default function SystemAnalytics() {
         <TabsContent value="overview" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* User Roles Distribution */}
-            <div className="border-0 shadow-xl rounded-xl overflow-hidden">
+            <div className="border-0 shadow-xl rounded-xl overflow-hidden bg-white">
               <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6">
                 <div className="font-semibold flex items-center text-white text-xl">
                   <PieChartIcon className="w-6 h-6 mr-3" />
@@ -313,7 +321,7 @@ export default function SystemAnalytics() {
             </div>
 
             {/* Project Status Distribution */}
-            <div className="border-0 shadow-xl rounded-xl overflow-hidden">
+            <div className="border-0 shadow-xl rounded-xl overflow-hidden bg-white">
               <div className="bg-gradient-to-r from-green-600 to-teal-600 p-6">
                 <div className="font-semibold flex items-center text-white text-xl">
                   <BarChart3 className="w-6 h-6 mr-3" />
@@ -336,7 +344,7 @@ export default function SystemAnalytics() {
           </div>
 
           {/* System Health Metrics */}
-          <div className="border-0 shadow-xl rounded-xl overflow-hidden">
+          <div className="border-0 shadow-xl rounded-xl overflow-hidden bg-white">
             <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-6">
               <div className="font-semibold flex items-center text-white text-xl">
                 <Activity className="w-6 h-6 mr-3" />
@@ -350,7 +358,7 @@ export default function SystemAnalytics() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-gray-900 mb-1">
-                    {data.systemMetrics.pending_tasks}
+                    {(data.systemMetrics as any).pending_tasks ?? 0}
                   </div>
                   <div className="text-sm text-gray-500">Pending Tasks</div>
                   <Badge
@@ -362,7 +370,7 @@ export default function SystemAnalytics() {
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-gray-900 mb-1">
-                    {data.systemMetrics.unread_notifications}
+                    {(data.systemMetrics as any).unread_notifications ?? 0}
                   </div>
                   <div className="text-sm text-gray-500">
                     Unread Notifications
@@ -376,7 +384,10 @@ export default function SystemAnalytics() {
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-gray-900 mb-1">
-                    {Math.round(data.systemMetrics.avg_project_duration)}
+                    {Math.round(
+                      ((data.systemMetrics as any).avg_project_duration ??
+                        0) as number
+                    )}
                   </div>
                   <div className="text-sm text-gray-500">Avg Project Days</div>
                   <Badge
@@ -388,7 +399,7 @@ export default function SystemAnalytics() {
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-gray-900 mb-1">
-                    {data.systemMetrics.active_mitra}
+                    {(data.systemMetrics as any).active_mitra ?? 0}
                   </div>
                   <div className="text-sm text-gray-500">Active Partners</div>
                   <Badge
@@ -404,7 +415,7 @@ export default function SystemAnalytics() {
         </TabsContent>
 
         <TabsContent value="users" className="space-y-6">
-          <div className="border-0 shadow-xl rounded-xl overflow-hidden">
+          <div className="border-0 shadow-xl rounded-xl overflow-hidden bg-white">
             <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6">
               <div className="font-semibold flex items-center text-white text-xl">
                 <Users className="w-6 h-6 mr-3" />
@@ -443,7 +454,7 @@ export default function SystemAnalytics() {
         </TabsContent>
 
         <TabsContent value="projects" className="space-y-6">
-          <div className="border-0 shadow-xl rounded-xl overflow-hidden">
+          <div className="border-0 shadow-xl rounded-xl overflow-hidden bg-white">
             <div className="bg-gradient-to-r from-green-600 to-teal-600 p-6">
               <div className="font-semibold flex items-center text-white text-xl">
                 <FolderOpen className="w-6 h-6 mr-3" />
@@ -484,7 +495,7 @@ export default function SystemAnalytics() {
         </TabsContent>
 
         <TabsContent value="financial" className="space-y-6">
-          <div className="border-0 shadow-xl rounded-xl overflow-hidden">
+          <div className="border-0 shadow-xl rounded-xl overflow-hidden bg-white">
             <div className="bg-gradient-to-r from-orange-600 to-red-600 p-6">
               <div className="font-semibold flex items-center text-white text-xl">
                 <DollarSign className="w-6 h-6 mr-3" />

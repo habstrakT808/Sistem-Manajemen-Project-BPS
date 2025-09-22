@@ -34,7 +34,7 @@ interface ProjectDetailData {
   deadline: string;
   status: "upcoming" | "active" | "completed";
   created_at: string;
-  project_assignments: Array<{
+  project_assignments?: Array<{
     id: string;
     assignee_type: "pegawai" | "mitra";
     assignee_id: string;
@@ -42,6 +42,12 @@ interface ProjectDetailData {
     honor: number | null;
     users?: { nama_lengkap: string; email: string };
     mitra?: { nama_mitra: string; jenis: string; rating_average: number };
+  }>;
+  project_members?: Array<{
+    id: string;
+    user_id: string;
+    role: "leader" | "member";
+    user?: { nama_lengkap: string; email: string } | null;
   }>;
 }
 
@@ -104,24 +110,62 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
 
   const calculateTotalBudget = () => {
     if (!project) return 0;
-    return project.project_assignments.reduce((total, assignment) => {
-      return total + (assignment.uang_transport || 0) + (assignment.honor || 0);
+    const assignments = project.project_assignments || [];
+    return assignments.reduce((total, a) => {
+      return total + (a.uang_transport || 0) + (a.honor || 0);
     }, 0);
   };
 
   const getPegawaiAssignments = () => {
-    return (
-      project?.project_assignments.filter(
+    if (
+      project?.project_assignments &&
+      project.project_assignments.length > 0
+    ) {
+      return project.project_assignments.filter(
         (a) => a.assignee_type === "pegawai"
-      ) || []
-    );
+      );
+    }
+    // Fallback to project_members (new schema)
+    if (project?.project_members && project.project_members.length > 0) {
+      return project.project_members
+        .filter((m) => m.role === "member" || m.role === "leader")
+        .map((m) => ({
+          id: m.id,
+          assignee_type: "pegawai" as const,
+          assignee_id: m.user_id,
+          uang_transport: 0,
+          honor: null,
+          users: m.user || undefined,
+        }));
+    }
+    return [] as Array<{
+      id: string;
+      assignee_type: "pegawai";
+      assignee_id: string;
+      uang_transport: number | null;
+      honor: number | null;
+      users?: { nama_lengkap: string; email: string };
+    }>;
   };
 
   const getMitraAssignments = () => {
-    return (
-      project?.project_assignments.filter((a) => a.assignee_type === "mitra") ||
-      []
-    );
+    if (
+      project?.project_assignments &&
+      project.project_assignments.length > 0
+    ) {
+      return project.project_assignments.filter(
+        (a) => a.assignee_type === "mitra"
+      );
+    }
+    // No direct mapping in new schema; return empty gracefully
+    return [] as Array<{
+      id: string;
+      assignee_type: "mitra";
+      assignee_id: string;
+      uang_transport: number | null;
+      honor: number | null;
+      mitra?: { nama_mitra: string; jenis: string; rating_average: number };
+    }>;
   };
 
   if (isLoading) {

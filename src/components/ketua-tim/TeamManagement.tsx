@@ -91,7 +91,8 @@ interface TeamAnalytics {
 }
 
 async function fetchTeamData(): Promise<TeamMember[]> {
-  const response = await fetch("/api/ketua-tim/team?include_stats=true", {
+  // Try the working endpoint first
+  const response = await fetch("/api/team-data-direct", {
     cache: "no-store",
   });
   const result = await response.json();
@@ -166,7 +167,7 @@ export default function TeamManagement() {
   } = useQuery<TeamAnalytics, Error>({
     queryKey: ["ketua", "team", "analytics", { analyticsPeriod }],
     queryFn: () => fetchTeamAnalytics(analyticsPeriod),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
   });
 
   useEffect(() => {
@@ -214,6 +215,19 @@ export default function TeamManagement() {
     }
   };
 
+  const getWorkloadGradient = (level: string) => {
+    switch (level) {
+      case "low":
+        return "from-emerald-500 to-teal-500";
+      case "medium":
+        return "from-amber-500 to-orange-500";
+      case "high":
+        return "from-rose-600 to-red-600";
+      default:
+        return "from-blue-500 to-indigo-500";
+    }
+  };
+
   const filteredMembers = (teamMembers || []).filter((member) => {
     const matchesSearch =
       member.nama_lengkap.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -225,6 +239,16 @@ export default function TeamManagement() {
 
     return matchesSearch && matchesWorkload;
   });
+
+  // Ensure unique members by id to avoid duplicate React keys
+  const uniqueFilteredMembers = React.useMemo(() => {
+    const seen = new Set<string>();
+    return filteredMembers.filter((m) => {
+      if (seen.has(m.id)) return false;
+      seen.add(m.id);
+      return true;
+    });
+  }, [filteredMembers]);
 
   const workloadCounts = {
     all: teamMembers?.length || 0,
@@ -409,7 +433,7 @@ export default function TeamManagement() {
                 </p>
               </div>
             ) : (
-              filteredMembers.map((member) => {
+              uniqueFilteredMembers.map((member) => {
                 const WorkloadIcon = getWorkloadIcon(
                   member.workload.workload_level
                 );
@@ -425,17 +449,23 @@ export default function TeamManagement() {
                 return (
                   <div
                     key={member.id}
-                    className="border-0 shadow-xl rounded-xl overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1"
+                    className="border-0 shadow-xl rounded-xl overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 bg-white"
                     onMouseEnter={() => {
                       router.prefetch(`/ketua-tim/team/${member.id}`);
                       prefetchMemberDetail(member.id);
                     }}
                   >
+                    {/* Colorful accent matching workload */}
+                    <div
+                      className={`h-1 bg-gradient-to-r ${getWorkloadGradient(member.workload.workload_level)}`}
+                    />
                     <div className="p-6">
                       {/* Member Header */}
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex items-center space-x-4">
-                          <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center">
+                          <div
+                            className={`w-16 h-16 bg-gradient-to-r ${getWorkloadGradient(member.workload.workload_level)} rounded-full flex items-center justify-center shadow-md`}
+                          >
                             <span className="text-white font-bold text-xl">
                               {member.nama_lengkap.charAt(0).toUpperCase()}
                             </span>
@@ -447,7 +477,7 @@ export default function TeamManagement() {
                             <p className="text-gray-500">{member.email}</p>
                             <div className="flex items-center space-x-2 mt-2">
                               <Badge
-                                className={`${getWorkloadColor(member.workload.workload_level)} border flex items-center space-x-1`}
+                                className={`${getWorkloadColor(member.workload.workload_level)} border flex items-center space-x-1 shadow-sm`}
                               >
                                 <WorkloadIcon className="w-3 h-3" />
                                 <span>
@@ -456,7 +486,7 @@ export default function TeamManagement() {
                                   )}
                                 </span>
                               </Badge>
-                              <Badge className="bg-blue-100 text-blue-800">
+                              <Badge className="bg-blue-100 text-blue-800 shadow-sm">
                                 {member.workload.project_count} Projects
                               </Badge>
                             </div>
@@ -485,19 +515,19 @@ export default function TeamManagement() {
 
                       {/* Stats Grid */}
                       <div className="grid grid-cols-2 gap-4 mb-4">
-                        <div className="text-center p-3 bg-green-50 rounded-lg">
-                          <div className="text-2xl font-bold text-green-600">
+                        <div className="text-center p-3 bg-emerald-50 rounded-lg">
+                          <div className="text-2xl font-bold text-emerald-600">
                             {completionRate}%
                           </div>
-                          <div className="text-sm text-green-700">
+                          <div className="text-sm text-emerald-700">
                             Task Completion
                           </div>
                         </div>
-                        <div className="text-center p-3 bg-blue-50 rounded-lg">
-                          <div className="text-2xl font-bold text-blue-600">
+                        <div className="text-center p-3 bg-indigo-50 rounded-lg">
+                          <div className="text-2xl font-bold text-indigo-600">
                             {member.task_stats.total}
                           </div>
-                          <div className="text-sm text-blue-700">
+                          <div className="text-sm text-indigo-700">
                             Total Tasks
                           </div>
                         </div>
@@ -515,7 +545,7 @@ export default function TeamManagement() {
                         <div className="flex space-x-1">
                           <div className="flex-1 bg-gray-200 rounded-full h-2">
                             <div
-                              className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                              className="bg-gradient-to-r from-emerald-500 via-blue-500 to-indigo-500 h-2 rounded-full transition-all duration-300"
                               style={{ width: `${completionRate}%` }}
                             ></div>
                           </div>
@@ -568,12 +598,12 @@ export default function TeamManagement() {
                       {/* Monthly Earnings */}
                       <div className="flex items-center justify-between pt-4 border-t border-gray-100">
                         <div className="flex items-center space-x-2">
-                          <DollarSign className="w-4 h-4 text-green-500" />
+                          <DollarSign className="w-4 h-4 text-emerald-600" />
                           <span className="text-sm text-gray-600">
                             Monthly Earnings
                           </span>
                         </div>
-                        <span className="font-semibold text-green-600">
+                        <span className="font-semibold text-emerald-600">
                           {formatCurrency(member.monthly_earnings)}
                         </span>
                       </div>

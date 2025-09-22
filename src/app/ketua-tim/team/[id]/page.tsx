@@ -1,16 +1,12 @@
 // File: src/app/ketua-tim/team/[id]/page.tsx
 
+"use client";
+
 import { MemberDetail } from "@/components/ketua-tim";
+import { useParams } from "next/navigation";
 
-interface MemberDetailPageProps {
-  params: Promise<{
-    id: string;
-  }>;
-}
-
-export default async function MemberDetailPage({
-  params,
-}: MemberDetailPageProps) {
-  const { id } = await params;
+export default function MemberDetailPage() {
+  const params = useParams<{ id: string }>();
+  const id = params?.id || "";
   return <MemberDetail memberId={id} />;
 }

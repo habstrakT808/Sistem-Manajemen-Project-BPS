@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Menu, X, User, LogIn, Shield, Users } from "lucide-react";
+import { Menu, X, User, LogIn, Shield } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -78,12 +78,6 @@ const Header = () => {
                   <span>Admin</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onSelect={() => prefetchAndPush("/auth/login?role=ketua_tim")}
-                >
-                  <Users className="w-4 h-4 text-blue-600" />
-                  <span>Ketua Tim</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
                   onSelect={() => prefetchAndPush("/auth/login?role=pegawai")}
                 >
                   <User className="w-4 h-4 text-green-600" />
@@ -138,15 +132,6 @@ const Header = () => {
                   >
                     <Shield className="w-4 h-4 text-red-600" />
                     <span>Admin</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={() => {
-                      prefetchAndPush("/auth/login?role=ketua_tim");
-                      setIsMenuOpen(false);
-                    }}
-                  >
-                    <Users className="w-4 h-4 text-blue-600" />
-                    <span>Ketua Tim</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={() => {

@@ -153,7 +153,7 @@ export default function ProjectWizard() {
         ...prev,
         pegawai_assignments: [
           ...prev.pegawai_assignments,
-          { pegawai_id: pegawaiId, uang_transport: 50000 },
+          { pegawai_id: pegawaiId, uang_transport: 0 },
         ],
       }));
     } else {
@@ -188,14 +188,7 @@ export default function ProjectWizard() {
     }
   };
 
-  const updatePegawaiTransport = (pegawaiId: string, amount: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      pegawai_assignments: prev.pegawai_assignments.map((a) =>
-        a.pegawai_id === pegawaiId ? { ...a, uang_transport: amount } : a
-      ),
-    }));
-  };
+  // Transport allowance removed - will be handled in task creation
 
   const updateMitraHonor = (mitraId: string, amount: number) => {
     setFormData((prev) => ({
@@ -218,8 +211,6 @@ export default function ProjectWizard() {
       case 2:
         return selectedPegawai.length > 0 || selectedMitra.length > 0;
       case 3:
-        return true; // Financial step always valid (amounts can be 0)
-      case 4:
         // Review & Create step - validate all previous steps
         return !!(
           formData.nama_project.trim() &&
@@ -292,22 +283,17 @@ export default function ProjectWizard() {
   };
 
   const calculateTotalBudget = () => {
-    const totalTransport = formData.pegawai_assignments.reduce(
-      (sum, assignment) => sum + assignment.uang_transport,
-      0
-    );
     const totalHonor = formData.mitra_assignments.reduce(
       (sum, assignment) => sum + assignment.honor,
       0
     );
-    return totalTransport + totalHonor;
+    return totalHonor;
   };
 
   const steps = [
     { number: 1, title: "Project Details", icon: Calendar },
     { number: 2, title: "Team Selection", icon: Users },
-    { number: 3, title: "Financial Setup", icon: DollarSign },
-    { number: 4, title: "Review & Create", icon: CheckCircle },
+    { number: 3, title: "Review & Create", icon: CheckCircle },
   ];
 
   if (loading) {
@@ -559,174 +545,8 @@ export default function ProjectWizard() {
           </div>
         )}
 
-        {/* Step 3: Financial Setup */}
+        {/* Step 3: Review & Create */}
         {currentStep === 3 && (
-          <div>
-            <div className="bg-gradient-to-r from-orange-600 to-red-600 p-6">
-              <div className="flex items-center text-white text-xl font-semibold">
-                <DollarSign className="w-6 h-6 mr-3" />
-                Financial Setup
-              </div>
-              <div className="text-orange-100 mt-2 text-sm">
-                Configure transport allowances and partner fees
-              </div>
-            </div>
-            <div className="p-6 space-y-8">
-              {/* Pegawai Transport */}
-              {formData.pegawai_assignments.length > 0 && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Transport Allowances
-                  </h3>
-                  <div className="grid grid-cols-1 gap-4">
-                    {formData.pegawai_assignments.map((assignment) => {
-                      const pegawai = pegawaiData.find(
-                        (p) => p.id === assignment.pegawai_id
-                      );
-                      return (
-                        <div
-                          key={assignment.pegawai_id}
-                          className="flex items-center p-4 border border-gray-200 rounded-xl"
-                        >
-                          <div className="flex-1">
-                            <div className="font-semibold text-gray-900">
-                              {pegawai?.nama_lengkap}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              Transport allowance
-                            </div>
-                          </div>
-                          <div className="w-48">
-                            <Input
-                              type="number"
-                              value={assignment.uang_transport}
-                              onChange={(e) =>
-                                updatePegawaiTransport(
-                                  assignment.pegawai_id,
-                                  parseInt(e.target.value) || 0
-                                )
-                              }
-                              placeholder="Amount"
-                              className="text-right"
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Mitra Honor */}
-              {formData.mitra_assignments.length > 0 && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Partner Fees
-                  </h3>
-                  <div className="grid grid-cols-1 gap-4">
-                    {formData.mitra_assignments.map((assignment) => {
-                      const mitra = mitraData.find(
-                        (m) => m.id === assignment.mitra_id
-                      );
-                      const wouldExceedLimit =
-                        mitra &&
-                        mitra.monthly_usage.current_total + assignment.honor >
-                          3300000;
-
-                      return (
-                        <div
-                          key={assignment.mitra_id}
-                          className={`flex items-center p-4 border rounded-xl ${
-                            wouldExceedLimit
-                              ? "border-red-300 bg-red-50"
-                              : "border-gray-200"
-                          }`}
-                        >
-                          <div className="flex-1">
-                            <div className="font-semibold text-gray-900">
-                              {mitra?.nama_mitra}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              Partner fee • Remaining:{" "}
-                              {formatCurrency(
-                                mitra?.monthly_usage.remaining_limit || 0
-                              )}
-                            </div>
-                            {wouldExceedLimit && (
-                              <div className="flex items-center mt-2 text-red-600">
-                                <AlertTriangle className="w-4 h-4 mr-1" />
-                                <span className="text-sm">
-                                  Would exceed monthly limit!
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                          <div className="w-48">
-                            <Input
-                              type="number"
-                              value={assignment.honor}
-                              onChange={(e) =>
-                                updateMitraHonor(
-                                  assignment.mitra_id,
-                                  parseInt(e.target.value) || 0
-                                )
-                              }
-                              placeholder="Amount"
-                              className={`text-right ${wouldExceedLimit ? "border-red-300" : ""}`}
-                              max={mitra?.monthly_usage.remaining_limit}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Budget Summary */}
-              <div className="border-t pt-6">
-                <div className="bg-gray-50 rounded-xl p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Budget Summary
-                  </h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span>Total Transport Allowances:</span>
-                      <span className="font-semibold">
-                        {formatCurrency(
-                          formData.pegawai_assignments.reduce(
-                            (sum, a) => sum + a.uang_transport,
-                            0
-                          )
-                        )}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Total Partner Fees:</span>
-                      <span className="font-semibold">
-                        {formatCurrency(
-                          formData.mitra_assignments.reduce(
-                            (sum, a) => sum + a.honor,
-                            0
-                          )
-                        )}
-                      </span>
-                    </div>
-                    <div className="border-t pt-2 flex justify-between text-lg font-bold">
-                      <span>Total Project Budget:</span>
-                      <span className="text-blue-600">
-                        {formatCurrency(calculateTotalBudget())}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Step 4: Review & Create */}
-        {currentStep === 4 && (
           <div>
             <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-6">
               <div className="flex items-center text-white text-xl font-semibold">
@@ -781,8 +601,7 @@ export default function ProjectWizard() {
                           );
                           return (
                             <li key={assignment.pegawai_id} className="text-sm">
-                              {pegawai?.nama_lengkap} -{" "}
-                              {formatCurrency(assignment.uang_transport)}
+                              {pegawai?.nama_lengkap}
                             </li>
                           );
                         })}
@@ -848,7 +667,7 @@ export default function ProjectWizard() {
             Cancel
           </Button>
 
-          {currentStep < 4 ? (
+          {currentStep < 3 ? (
             <Button
               onClick={handleNext}
               disabled={!validateStep(currentStep)}

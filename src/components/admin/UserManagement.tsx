@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { Database } from "@/../database/types/database.types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -84,38 +83,17 @@ export function UserManagement() {
   const [deletingUser, setDeletingUser] = useState<UserRow | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const supabase = createClient();
-
   const fetchUsers = useCallback(async () => {
-    const query = supabase
-      .from("users")
-      .select(
-        `
-          *,
-          projects(count)
-        `
-      )
-      .order("created_at", { ascending: false });
-
-    const { data, error } = await query;
-
-    if (error) {
-      throw new Error("Failed to fetch users");
-    }
-
-    const usersWithMeta: UserWithMeta[] =
-      data?.map((user) => {
-        const userWithProjects = user as UserRow & {
-          projects?: { count: number }[];
-        };
-        return {
-          ...userWithProjects,
-          project_count: userWithProjects.projects?.[0]?.count || 0,
-        };
-      }) || [];
-
+    const res = await fetch("/api/admin/users", { cache: "no-store" });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || "Failed to fetch users");
+    const data = (result.data || []) as UserRow[];
+    const usersWithMeta: UserWithMeta[] = data.map((u) => ({
+      ...u,
+      project_count: 0,
+    }));
     return usersWithMeta;
-  }, [supabase]);
+  }, []);
 
   const {
     data: users = [],
@@ -225,11 +203,11 @@ export function UserManagement() {
       </div>
 
       {/* Users Table */}
-      <div className="border-0 shadow-xl rounded-xl overflow-hidden">
+      <div className="border-0 shadow-xl rounded-xl overflow-hidden bg-white">
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6">
           <div className="text-white text-xl font-semibold">Users</div>
         </div>
-        <div className="p-6">
+        <div className="p-6 bg-white">
           <Table>
             <TableHeader>
               <TableRow>

@@ -1,85 +1,268 @@
-import { NextRequest, NextResponse } from "next/server";
+// File: src/app/api/pegawai/tasks/route.ts
+// UPDATED: Support new task structure and transport allocations
+
+import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
-import { Task, Project } from "@/types";
+import type { Database } from "@/../database/types/database.types";
 
-interface TaskWithProject {
+interface TaskData {
   id: string;
+  project_id: string;
+  assignee_user_id: string | null;
+  pegawai_id: string | null;
+  title: string;
   deskripsi_tugas: string;
+  start_date: string;
+  end_date: string;
   tanggal_tugas: string;
+  has_transport: boolean;
   status: string;
-  response_pegawai: string | null;
+  response_pegawai: string;
   created_at: string;
   updated_at: string;
-  projects: {
+  task_transport_allocations?: Array<{
     id: string;
-    nama_project: string;
-    status: string;
-    users: {
-      nama_lengkap: string;
-    };
-  };
+    amount: number;
+    allocation_date: string;
+    allocated_at: string;
+    canceled_at: string;
+    task_id?: string;
+    user_id?: string;
+  }>;
 }
 
-interface QueryParams {
-  status?: string;
-  projectId?: string;
-  dateFrom?: string;
-  dateTo?: string;
+interface ProjectData {
+  id: string;
+  nama_project: string;
+  status: string;
+  leader_user_id: string;
 }
 
-export async function GET(request: NextRequest) {
+interface UserData {
+  id: string;
+  nama_lengkap: string;
+}
+
+export async function GET(request: Request) {
   try {
     const supabase = await createClient();
     const { searchParams } = new URL(request.url);
+    const projectId = searchParams.get("project_id");
 
-    const queryParams: QueryParams = {
-      status: searchParams.get("status") || undefined,
-      projectId: searchParams.get("project_id") || undefined,
-      dateFrom: searchParams.get("date_from") || undefined,
-      dateTo: searchParams.get("date_to") || undefined,
-    };
-
-    // Authentication check
+    // Auth check
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser();
-
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Role validation
-    const { data: userProfile, error: profileError } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (
-      profileError ||
-      !userProfile ||
-      (userProfile as { role: string }).role !== "pegawai"
-    ) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
-    // Get tasks with filters
-    const tasks = await getTasksWithFilters(
-      await supabase,
-      user.id,
-      queryParams
+    // Service client to avoid RLS issues
+    const svc = createServiceClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    if (!tasks || tasks.length === 0) {
-      return NextResponse.json({ data: [] });
+    // Build query for tasks assigned to this user
+    // Check both assignee_user_id (new) and pegawai_id (legacy) fields
+    let query = svc
+      .from("tasks")
+      .select(
+        `
+        id,
+        project_id,
+        assignee_user_id,
+        pegawai_id,
+        title,
+        deskripsi_tugas,
+        start_date,
+        end_date,
+        tanggal_tugas,
+        has_transport,
+        status,
+        response_pegawai,
+        created_at,
+        updated_at,
+        task_transport_allocations (
+          id,
+          amount,
+          allocation_date,
+          allocated_at,
+          canceled_at
+        )
+      `
+      )
+      .or(`assignee_user_id.eq.${user.id},pegawai_id.eq.${user.id}`);
+
+    // Add project filter if project_id is provided
+    if (projectId) {
+      query = query.eq("project_id", projectId);
     }
 
-    // Get project and team lead data
-    const enrichedTasks = await enrichTasksWithProjectData(tasks);
+    const { data: tasks, error: tasksError } = await query
+      .order("start_date", { ascending: false })
+      .order("created_at", { ascending: false });
 
-    return NextResponse.json({ data: enrichedTasks });
+    if (tasksError) {
+      throw tasksError;
+    }
+
+    // Get project details separately to avoid FK relationship issues
+    const projectIds = Array.from(
+      new Set(
+        ((tasks as TaskData[]) || []).map((t) => t.project_id).filter(Boolean)
+      )
+    );
+
+    const projectDetails: Record<
+      string,
+      {
+        id: string;
+        nama_project: string;
+        status: string;
+        users: { nama_lengkap: string };
+      }
+    > = {};
+
+    if (projectIds.length > 0) {
+      const { data: projects } = await svc
+        .from("projects")
+        .select("id, nama_project, status, leader_user_id")
+        .in("id", projectIds);
+
+      // Get leader names
+      const leaderIds = Array.from(
+        new Set(
+          ((projects as ProjectData[]) || [])
+            .map((p) => p.leader_user_id)
+            .filter(Boolean)
+        )
+      );
+
+      const leaderNames: Record<string, string> = {};
+      if (leaderIds.length > 0) {
+        const { data: leaders } = await svc
+          .from("users")
+          .select("id, nama_lengkap")
+          .in("id", leaderIds);
+
+        ((leaders as UserData[]) || []).forEach((l) => {
+          leaderNames[l.id] = l.nama_lengkap;
+        });
+      }
+
+      // Build project details map
+      ((projects as ProjectData[]) || []).forEach((p) => {
+        projectDetails[p.id] = {
+          id: p.id,
+          nama_project: p.nama_project,
+          status: p.status,
+          users: {
+            nama_lengkap: leaderNames[p.leader_user_id] || "Unknown Leader",
+          },
+        };
+      });
+    }
+
+    // Fetch transport allocations for these tasks for the current user only
+    const taskIds = Array.from(
+      new Set(((tasks as TaskData[]) || []).map((t) => t.id))
+    );
+
+    const allocationByTaskId: Record<
+      string,
+      {
+        id: string;
+        amount: number;
+        allocation_date: string | null;
+        allocated_at: string | null;
+        canceled_at: string | null;
+      } | null
+    > = {};
+
+    if (taskIds.length > 0) {
+      type Alloc = {
+        id: string;
+        task_id: string;
+        user_id: string;
+        amount: number;
+        allocation_date: string | null;
+        allocated_at: string | null;
+        canceled_at: string | null;
+      };
+
+      const { data: allocations, error: allocError } = await svc
+        .from("task_transport_allocations")
+        .select(
+          "id, task_id, user_id, amount, allocation_date, allocated_at, canceled_at"
+        )
+        .in("task_id", taskIds)
+        .eq("user_id", user.id)
+        .is("canceled_at", null);
+
+      if (allocError) {
+        throw allocError;
+      }
+
+      (allocations as Alloc[] | null)?.forEach((a) => {
+        allocationByTaskId[a.task_id] = {
+          id: a.id,
+          amount: a.amount,
+          allocation_date: a.allocation_date,
+          allocated_at: a.allocated_at,
+          canceled_at: a.canceled_at,
+        };
+      });
+    }
+
+    // Format response
+    const formattedTasks = ((tasks as TaskData[]) || []).map((task) => ({
+      id: task.id,
+      project_id: task.project_id,
+      title: task.title,
+      deskripsi_tugas: task.deskripsi_tugas,
+      start_date: task.start_date,
+      end_date: task.end_date,
+      tanggal_tugas: task.tanggal_tugas, // Keep for backward compatibility
+      has_transport: task.has_transport,
+      status: task.status,
+      response_pegawai: task.response_pegawai,
+      created_at: task.created_at,
+      updated_at: task.updated_at,
+      projects: projectDetails[task.project_id] || {
+        id: task.project_id,
+        nama_project: "Unknown Project",
+        status: "unknown",
+        users: { nama_lengkap: "Unknown Leader" },
+      },
+      transport_allocation:
+        allocationByTaskId[task.id] ??
+        (task.task_transport_allocations?.[0]
+          ? {
+              id: task.task_transport_allocations[0].id,
+              amount: task.task_transport_allocations[0].amount,
+              allocation_date:
+                (task.task_transport_allocations[0]
+                  .allocation_date as string) || null,
+              allocated_at:
+                (task.task_transport_allocations[0].allocated_at as string) ||
+                null,
+              canceled_at:
+                (task.task_transport_allocations[0].canceled_at as string) ||
+                null,
+            }
+          : null),
+    }));
+
+    return NextResponse.json({
+      data: formattedTasks,
+      meta: {
+        timestamp: new Date().toISOString(),
+        total: formattedTasks.length,
+      },
+    });
   } catch (error) {
     console.error("Pegawai Tasks API Error:", error);
     return NextResponse.json(
@@ -87,149 +270,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-async function getTasksWithFilters(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string,
-  params: QueryParams
-): Promise<Task[]> {
-  let query = supabase
-    .from("tasks")
-    .select(
-      "id, project_id, pegawai_id, tanggal_tugas, deskripsi_tugas, status, response_pegawai, created_at, updated_at"
-    )
-    .eq("pegawai_id", userId);
-
-  // Apply filters
-  if (params.status) {
-    query = query.eq("status", params.status);
-  }
-  if (params.projectId) {
-    query = query.eq("project_id", params.projectId);
-  }
-  if (params.dateFrom) {
-    query = query.gte("tanggal_tugas", params.dateFrom);
-  }
-  if (params.dateTo) {
-    query = query.lte("tanggal_tugas", params.dateTo);
-  }
-
-  const { data: tasks, error } = await query
-    .order("tanggal_tugas", { ascending: false })
-    .limit(50);
-
-  if (error) {
-    throw new Error(`Failed to fetch tasks: ${error.message}`);
-  }
-
-  return tasks || [];
-}
-
-async function enrichTasksWithProjectData(
-  tasks: Task[]
-): Promise<TaskWithProject[]> {
-  const serviceClient = createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-
-  const projectIds = [...new Set(tasks.map((task) => task.project_id))];
-
-  // Get projects data
-  const { data: projects, error: projectsError } = await serviceClient
-    .from("projects")
-    .select("*")
-    .in("id", projectIds);
-
-  if (projectsError) {
-    // Fallback: Get projects individually
-    const projectsData = await getProjectsIndividually(
-      serviceClient,
-      projectIds
-    );
-    return createEnrichedTasks(tasks, projectsData, []);
-  }
-
-  // Get team leads data
-  const ketuaTimIds = [
-    ...new Set((projects || []).map((p: Project) => p.ketua_tim_id)),
-  ];
-
-  const { data: ketuaTims, error: ketuaTimsError } = await serviceClient
-    .from("users")
-    .select("id, nama_lengkap")
-    .in("id", ketuaTimIds);
-
-  const ketuaTimsData = ketuaTimsError ? [] : ketuaTims || [];
-
-  return createEnrichedTasks(tasks, projects || [], ketuaTimsData);
-}
-
-async function getProjectsIndividually(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  serviceClient: any,
-  projectIds: string[]
-): Promise<Project[]> {
-  const projectsData: Project[] = [];
-
-  for (const projectId of projectIds) {
-    try {
-      const { data: project, error } = await serviceClient
-        .from("projects")
-        .select("*")
-        .eq("id", projectId)
-        .single();
-
-      if (!error && project) {
-        projectsData.push(project);
-      }
-    } catch {
-      // Continue with next project if one fails
-      continue;
-    }
-  }
-
-  return projectsData;
-}
-
-function createEnrichedTasks(
-  tasks: Task[],
-  projects: Project[],
-  ketuaTims: { id: string; nama_lengkap: string }[]
-): TaskWithProject[] {
-  // Create lookup maps for better performance
-  const projectMap = new Map<string, Project>();
-  projects.forEach((project) => {
-    projectMap.set(project.id, project);
-  });
-
-  const ketuaTimMap = new Map<string, { id: string; nama_lengkap: string }>();
-  ketuaTims.forEach((ketuaTim) => {
-    ketuaTimMap.set(ketuaTim.id, ketuaTim);
-  });
-
-  // Enrich tasks with project and team lead data
-  return tasks.map((task) => {
-    const project = projectMap.get(task.project_id);
-    const ketuaTim = project ? ketuaTimMap.get(project.ketua_tim_id) : null;
-
-    return {
-      id: task.id,
-      deskripsi_tugas: task.deskripsi_tugas,
-      tanggal_tugas: task.tanggal_tugas,
-      status: task.status,
-      response_pegawai: task.response_pegawai || null,
-      created_at: task.created_at,
-      updated_at: task.updated_at,
-      projects: {
-        id: project?.id || task.project_id,
-        nama_project: project?.nama_project || "Unknown Project",
-        status: project?.status || "unknown",
-        users: {
-          nama_lengkap: ketuaTim?.nama_lengkap || "Unknown Team Lead",
-        },
-      },
-    };
-  });
 }

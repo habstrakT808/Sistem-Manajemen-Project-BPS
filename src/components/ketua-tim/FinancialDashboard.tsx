@@ -69,12 +69,22 @@ interface FinancialData {
   spending_trends: SpendingTrend[];
   top_spenders: {
     pegawai: Array<{ name: string; amount: number; projects: number }>;
-    mitra: Array<{ name: string; amount: number; projects: number; remaining_limit: number }>;
+    mitra: Array<{
+      name: string;
+      amount: number;
+      projects: number;
+      remaining_limit: number;
+    }>;
   };
 }
 
-async function fetchFinancialData(selectedPeriod: string): Promise<FinancialData> {
-  const response = await fetch(`/api/ketua-tim/financial?period=${selectedPeriod}`, { cache: "no-store" });
+async function fetchFinancialData(
+  selectedPeriod: string
+): Promise<FinancialData> {
+  const response = await fetch(
+    `/api/ketua-tim/financial?period=${selectedPeriod}`,
+    { cache: "no-store" }
+  );
   if (!response.ok) {
     const errorResult = await response.json();
     throw new Error(errorResult.error || "Failed to fetch financial data");
@@ -84,27 +94,58 @@ async function fetchFinancialData(selectedPeriod: string): Promise<FinancialData
 }
 
 async function fetchDaily(month: number, year: number) {
-  const res = await fetch(`/api/ketua-tim/financial/daily?month=${month}&year=${year}`, { cache: "no-store" });
+  const res = await fetch(
+    `/api/ketua-tim/financial/daily?month=${month}&year=${year}`,
+    { cache: "no-store" }
+  );
   const json = await res.json();
   if (!res.ok) throw new Error(json.error || "Failed to fetch daily data");
-  return json as { month: number; year: number; days: Array<{ date: string; total: number; transport: number; honor: number }> };
+  return json as {
+    month: number;
+    year: number;
+    days: Array<{
+      date: string;
+      total: number;
+      transport: number;
+      honor: number;
+    }>;
+  };
 }
 
 async function fetchDailyDetails(ymd: string) {
-  const res = await fetch(`/api/ketua-tim/financial/daily?day=${ymd}`, { cache: "no-store" });
+  const res = await fetch(`/api/ketua-tim/financial/daily?day=${ymd}`, {
+    cache: "no-store",
+  });
   const json = await res.json();
   if (!res.ok) throw new Error(json.error || "Failed to fetch details");
-  return json as { date: string; details: Array<{ recipient_type: string; recipient_id: string; recipient_name: string; amount: number; project_id: string; project_name: string | null }> };
+  return json as {
+    date: string;
+    details: Array<{
+      recipient_type: string;
+      recipient_id: string;
+      recipient_name: string;
+      amount: number;
+      project_id: string;
+      project_name: string | null;
+    }>;
+  };
 }
 
 export default function FinancialDashboard() {
   const router = useRouter();
   const [selectedPeriod, setSelectedPeriod] = useState("current_month");
-  const [activeTab, setActiveTab] = useState<"overview" | "spending">("overview");
+  const [activeTab, setActiveTab] = useState<
+    "overview" | "spending" | "transport"
+  >("overview");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
-  const { data: financialData, isLoading, isFetching, refetch } = useQuery<FinancialData, Error>({
-    queryKey: ["ketua","financial", { selectedPeriod }],
+  const {
+    data: financialData,
+    isLoading,
+    isFetching,
+    refetch,
+  } = useQuery<FinancialData, Error>({
+    queryKey: ["ketua", "financial", { selectedPeriod }],
     queryFn: () => fetchFinancialData(selectedPeriod),
     staleTime: 5 * 60 * 1000,
   });
@@ -114,16 +155,75 @@ export default function FinancialDashboard() {
   const ymd = format(selectedDate, "yyyy-MM-dd");
 
   const { data: daily } = useQuery({
-    queryKey: ["ketua","financial","daily", { month, year }],
+    queryKey: ["ketua", "financial", "daily", { month, year }],
     queryFn: () => fetchDaily(month, year),
     enabled: activeTab === "spending",
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: dailyDetails, refetch: refetchDailyDetails, isFetching: fetchingDay } = useQuery({
-    queryKey: ["ketua","financial","day", { ymd }],
+  const {
+    data: dailyDetails,
+    refetch: refetchDailyDetails,
+    isFetching: fetchingDay,
+  } = useQuery({
+    queryKey: ["ketua", "financial", "day", { ymd }],
     queryFn: () => fetchDailyDetails(ymd),
     enabled: activeTab === "spending",
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Transport allocations calendar
+  async function fetchTransportDaily(m: number, y: number) {
+    const res = await fetch(
+      `/api/ketua-tim/financial/transport/daily?month=${m}&year=${y}`,
+      { cache: "no-store" }
+    );
+    const json = await res.json();
+    if (!res.ok)
+      throw new Error(json.error || "Failed to fetch transport daily");
+    return json as {
+      month: number;
+      year: number;
+      days: Array<{ date: string; count: number }>;
+    };
+  }
+
+  async function fetchTransportDayDetails(dateYmd: string) {
+    const res = await fetch(
+      `/api/ketua-tim/financial/transport/daily?day=${dateYmd}`,
+      { cache: "no-store" }
+    );
+    const json = await res.json();
+    if (!res.ok)
+      throw new Error(json.error || "Failed to fetch transport details");
+    return json as {
+      date: string;
+      details: Array<{
+        allocation_id: string;
+        allocation_date: string;
+        employee_name: string;
+        project_name: string;
+        task_title: string;
+        task_description: string;
+      }>;
+    };
+  }
+
+  const { data: transportDaily } = useQuery({
+    queryKey: ["ketua", "financial", "transport", { month, year }],
+    queryFn: () => fetchTransportDaily(month, year),
+    enabled: activeTab === "transport",
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const {
+    data: transportDetails,
+    refetch: refetchTransportDetails,
+    isFetching: fetchingTransportDay,
+  } = useQuery({
+    queryKey: ["ketua", "financial", "transport", "day", { ymd }],
+    queryFn: () => fetchTransportDayDetails(ymd),
+    enabled: activeTab === "transport",
     staleTime: 5 * 60 * 1000,
   });
 
@@ -150,7 +250,10 @@ export default function FinancialDashboard() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="animate-pulse border-0 shadow-xl rounded-xl">
+            <div
+              key={i}
+              className="animate-pulse border-0 shadow-xl rounded-xl"
+            >
               <div className="p-6">
                 <div className="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
                 <div className="h-8 bg-gray-200 rounded w-1/2 mb-4"></div>
@@ -168,10 +271,37 @@ export default function FinancialDashboard() {
   const { stats, project_budgets, top_spenders } = financialData;
 
   const statsCards = [
-    { title: "Monthly Spending", value: formatCurrency(stats.total_monthly_spending), description: "Total this month", icon: DollarSign, color: "from-purple-500 to-purple-600", bgColor: "from-purple-50 to-purple-100", trend: "+12%", trendUp: true },
-    { title: "Transport Budget", value: formatCurrency(stats.transport_spending), description: "Pegawai allowances", icon: Users, color: "from-blue-500 to-blue-600", bgColor: "from-blue-50 to-blue-100", trend: "+8%", trendUp: true },
-    { title: "Partner Fees", value: formatCurrency(stats.honor_spending), description: "Mitra payments", icon: TrendingUp, color: "from-green-500 to-green-600", bgColor: "from-green-50 to-green-100", trend: "+15%", trendUp: true },
-    { title: "Budget Utilization", value: `${stats.budget_utilization}%`, description: "Of allocated budget", icon: PieChart, color: "from-orange-500 to-orange-600", bgColor: "from-orange-50 to-orange-100", trend: "5%", trendUp: false },
+    {
+      title: "Monthly Spending",
+      value: formatCurrency(stats.total_monthly_spending),
+      description: "Total this month",
+      icon: DollarSign,
+      color: "from-purple-500 to-purple-600",
+      bgColor: "from-purple-50 to-purple-100",
+      trend: "+12%",
+      trendUp: true,
+    },
+    {
+      title: "Transport Budget",
+      value: formatCurrency(stats.transport_spending),
+      description: "Pegawai allowances",
+      icon: Users,
+      color: "from-blue-500 to-blue-600",
+      bgColor: "from-blue-50 to-blue-100",
+      trend: "+8%",
+      trendUp: true,
+    },
+    {
+      title: "Partner Fees",
+      value: formatCurrency(stats.honor_spending),
+      description: "Mitra payments",
+      icon: TrendingUp,
+      color: "from-green-500 to-green-600",
+      bgColor: "from-green-50 to-green-100",
+      trend: "+15%",
+      trendUp: true,
+    },
+    // Removed: Budget Utilization card
   ];
 
   return (
@@ -179,14 +309,34 @@ export default function FinancialDashboard() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">Financial Dashboard</h1>
-          <p className="text-gray-600 text-lg mt-2">Monitor project budgets, spending trends, and financial performance.</p>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+            Financial Dashboard
+          </h1>
+          <p className="text-gray-600 text-lg mt-2">
+            Monitor project budgets, spending trends, and financial performance.
+          </p>
         </div>
 
         <div className="flex items-center space-x-4">
           <div className="hidden md:flex items-center rounded-lg border border-gray-200 overflow-hidden">
-            <button onClick={() => setActiveTab("overview")} className={`px-4 py-2 text-sm font-medium ${activeTab === "overview" ? "bg-gray-100 text-gray-900" : "text-gray-600 hover:bg-gray-50"}`}>Overview</button>
-            <button onClick={() => setActiveTab("spending")} className={`px-4 py-2 text-sm font-medium ${activeTab === "spending" ? "bg-gray-100 text-gray-900" : "text-gray-600 hover:bg-gray-50"}`}>Spending Detail</button>
+            <button
+              onClick={() => setActiveTab("overview")}
+              className={`px-4 py-2 text-sm font-medium ${activeTab === "overview" ? "bg-gray-100 text-gray-900" : "text-gray-600 hover:bg-gray-50"}`}
+            >
+              Overview
+            </button>
+            <button
+              onClick={() => setActiveTab("spending")}
+              className={`px-4 py-2 text-sm font-medium ${activeTab === "spending" ? "bg-gray-100 text-gray-900" : "text-gray-600 hover:bg-gray-50"}`}
+            >
+              Spending Detail
+            </button>
+            <button
+              onClick={() => setActiveTab("transport")}
+              className={`px-4 py-2 text-sm font-medium ${activeTab === "transport" ? "bg-gray-100 text-gray-900" : "text-gray-600 hover:bg-gray-50"}`}
+            >
+              Transport Allocations
+            </button>
           </div>
           <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
             <SelectTrigger className="w-40">
@@ -200,8 +350,15 @@ export default function FinancialDashboard() {
             </SelectContent>
           </Select>
 
-          <Button onClick={handleRefresh} disabled={isFetching} variant="outline" className="border-2 border-gray-200 hover:bg-gray-50">
-            <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
+          <Button
+            onClick={handleRefresh}
+            disabled={isFetching}
+            variant="outline"
+            className="border-2 border-gray-200 hover:bg-gray-50"
+          >
+            <RefreshCw
+              className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`}
+            />
             Refresh
           </Button>
 
@@ -213,29 +370,50 @@ export default function FinancialDashboard() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {statsCards.map((stat, index) => {
           const IconComponent = stat.icon as any;
           return (
-            <div key={index} className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 cursor-pointer group overflow-hidden rounded-xl">
-              <div className={`absolute inset-0 bg-gradient-to-br ${stat.bgColor} opacity-50`}></div>
+            <div
+              key={index}
+              className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 cursor-pointer group overflow-hidden rounded-xl"
+            >
+              <div
+                className={`absolute inset-0 bg-gradient-to-br ${stat.bgColor} opacity-50`}
+              ></div>
               <div className="relative p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex-1">
-                    <p className="text-sm font-semibold text-gray-600 mb-2">{stat.title}</p>
-                    <p className="text-3xl font-bold text-gray-900 mb-1">{stat.value}</p>
+                    <p className="text-sm font-semibold text-gray-600 mb-2">
+                      {stat.title}
+                    </p>
+                    <p className="text-3xl font-bold text-gray-900 mb-1">
+                      {stat.value}
+                    </p>
                     <p className="text-sm text-gray-500">{stat.description}</p>
                   </div>
-                  <div className={`w-16 h-16 bg-gradient-to-r ${stat.color} rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg`}>
+                  <div
+                    className={`w-16 h-16 bg-gradient-to-r ${stat.color} rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg`}
+                  >
                     <IconComponent className="w-8 h-8 text-white" />
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
-                    {stat.trendUp ? <ArrowUp className="w-4 h-4 text-green-600 mr-1" /> : <ArrowDown className="w-4 h-4 text-red-600 mr-1" />}
-                    <span className={`text-sm font-semibold ${stat.trendUp ? "text-green-600" : "text-red-600"}`}>{stat.trend}</span>
-                    <span className="text-sm text-gray-500 ml-2">vs last month</span>
+                    {stat.trendUp ? (
+                      <ArrowUp className="w-4 h-4 text-green-600 mr-1" />
+                    ) : (
+                      <ArrowDown className="w-4 h-4 text-red-600 mr-1" />
+                    )}
+                    <span
+                      className={`text-sm font-semibold ${stat.trendUp ? "text-green-600" : "text-red-600"}`}
+                    >
+                      {stat.trend}
+                    </span>
+                    <span className="text-sm text-gray-500 ml-2">
+                      vs last month
+                    </span>
                   </div>
                 </div>
               </div>
@@ -256,22 +434,49 @@ export default function FinancialDashboard() {
                     <FolderOpen className="w-6 h-6 mr-3" />
                     Project Budgets
                   </div>
-                  <Badge className="bg-white/20 text-white">{project_budgets.length}</Badge>
+                  <Badge className="bg-white/20 text-white">
+                    {project_budgets.length}
+                  </Badge>
                 </div>
-                <div className="text-purple-100 mt-2 text-sm">Budget allocation by project</div>
+                <div className="text-purple-100 mt-2 text-sm">
+                  Budget allocation by project
+                </div>
               </div>
               <div className="p-6 space-y-4">
                 {project_budgets.map((project, index) => (
-                  <Link key={index} href={`/ketua-tim/projects/${project.id}`} prefetch onMouseEnter={() => router.prefetch(`/ketua-tim/projects/${project.id}`)}>
+                  <Link
+                    key={index}
+                    href={`/ketua-tim/projects/${project.id}`}
+                    prefetch
+                    onMouseEnter={() =>
+                      router.prefetch(`/ketua-tim/projects/${project.id}`)
+                    }
+                  >
                     <div className="group flex items-center p-4 rounded-2xl hover:bg-gradient-to-r hover:from-gray-50 hover:to-purple-50 transition-all duration-300 transform hover:scale-105 cursor-pointer border border-gray-100 hover:border-purple-200 hover:shadow-lg">
                       <div className="flex-1">
-                        <div className="font-semibold text-gray-900 group-hover:text-purple-600 transition-colors">{project.nama_project}</div>
-                        <div className="text-sm text-gray-500 group-hover:text-purple-500 mt-1">Transport: {formatCurrency(project.transport_budget)} • Honor: {formatCurrency(project.honor_budget)}</div>
-                        <div className="text-sm text-gray-400 mt-1">Deadline: {new Date(project.deadline).toLocaleDateString("id-ID")}</div>
+                        <div className="font-semibold text-gray-900 group-hover:text-purple-600 transition-colors">
+                          {project.nama_project}
+                        </div>
+                        <div className="text-sm text-gray-500 group-hover:text-purple-500 mt-1">
+                          Transport: {formatCurrency(project.transport_budget)}{" "}
+                          • Honor: {formatCurrency(project.honor_budget)}
+                        </div>
+                        <div className="text-sm text-gray-400 mt-1">
+                          Deadline:{" "}
+                          {new Date(project.deadline).toLocaleDateString(
+                            "id-ID"
+                          )}
+                        </div>
                       </div>
                       <div className="ml-4 text-right">
-                        <div className="text-lg font-bold text-gray-900">{formatCurrency(project.total_budget)}</div>
-                        <Badge className={`${project.status === "active" ? "bg-green-100 text-green-800" : project.status === "upcoming" ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-800"}`}>{project.status.toUpperCase()}</Badge>
+                        <div className="text-lg font-bold text-gray-900">
+                          {formatCurrency(project.total_budget)}
+                        </div>
+                        <Badge
+                          className={`${project.status === "active" ? "bg-green-100 text-green-800" : project.status === "upcoming" ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-800"}`}
+                        >
+                          {project.status.toUpperCase()}
+                        </Badge>
                       </div>
                     </div>
                   </Link>
@@ -286,21 +491,34 @@ export default function FinancialDashboard() {
                   <BarChart3 className="w-6 h-6 mr-3" />
                   Top Spenders
                 </div>
-                <div className="text-orange-100 mt-2 text-sm">Highest budget allocations</div>
+                <div className="text-orange-100 mt-2 text-sm">
+                  Highest budget allocations
+                </div>
               </div>
               <div className="p-6 space-y-6">
                 {/* Top Pegawai */}
                 <div>
-                  <h4 className="font-semibold text-gray-900 mb-3">Team Members</h4>
+                  <h4 className="font-semibold text-gray-900 mb-3">
+                    Team Members
+                  </h4>
                   <div className="space-y-2">
                     {top_spenders.pegawai.map((pegawai, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-blue-50 border border-blue-100">
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-3 rounded-lg bg-blue-50 border border-blue-100"
+                      >
                         <div>
-                          <div className="font-medium text-gray-900">{pegawai.name}</div>
-                          <div className="text-sm text-gray-500">{pegawai.projects} projects</div>
+                          <div className="font-medium text-gray-900">
+                            {pegawai.name}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {pegawai.projects} projects
+                          </div>
                         </div>
                         <div className="text-right">
-                          <div className="font-semibold text-blue-600">{formatCurrency(pegawai.amount)}</div>
+                          <div className="font-semibold text-blue-600">
+                            {formatCurrency(pegawai.amount)}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -312,20 +530,36 @@ export default function FinancialDashboard() {
                   <h4 className="font-semibold text-gray-900 mb-3">Partners</h4>
                   <div className="space-y-2">
                     {top_spenders.mitra.map((mitra, index) => (
-                      <div key={index} className={`flex items-center justify-between p-3 rounded-lg border ${mitra.remaining_limit < 0 ? "bg-red-50 border-red-200" : "bg-green-50 border-green-100"}`}>
+                      <div
+                        key={index}
+                        className={`flex items-center justify-between p-3 rounded-lg border ${mitra.remaining_limit < 0 ? "bg-red-50 border-red-200" : "bg-green-50 border-green-100"}`}
+                      >
                         <div>
-                          <div className="font-medium text-gray-900">{mitra.name}</div>
-                          <div className="text-sm text-gray-500">{mitra.projects} projects</div>
+                          <div className="font-medium text-gray-900">
+                            {mitra.name}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {mitra.projects} projects
+                          </div>
                           {mitra.remaining_limit < 0 && (
                             <div className="text-xs text-red-600 flex items-center mt-1">
                               <AlertCircle className="w-3 h-3 mr-1" />
-                              Exceeds limit by {formatCurrency(Math.abs(mitra.remaining_limit))}
+                              Exceeds limit by{" "}
+                              {formatCurrency(Math.abs(mitra.remaining_limit))}
                             </div>
                           )}
                         </div>
                         <div className="text-right">
-                          <div className={`font-semibold ${mitra.remaining_limit < 0 ? "text-red-600" : "text-green-600"}`}>{formatCurrency(mitra.amount)}</div>
-                          <div className="text-xs text-gray-500">{mitra.remaining_limit >= 0 ? `${formatCurrency(mitra.remaining_limit)} left` : "Over limit"}</div>
+                          <div
+                            className={`font-semibold ${mitra.remaining_limit < 0 ? "text-red-600" : "text-green-600"}`}
+                          >
+                            {formatCurrency(mitra.amount)}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {mitra.remaining_limit >= 0
+                              ? `${formatCurrency(mitra.remaining_limit)} left`
+                              : "Over limit"}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -338,27 +572,49 @@ export default function FinancialDashboard() {
           {/* Quick Actions */}
           <div className="border-0 shadow-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white overflow-hidden rounded-xl">
             <div className="p-8">
-              <h3 className="text-2xl font-bold mb-6">Financial Reports & Actions</h3>
+              <h3 className="text-2xl font-bold mb-6">
+                Financial Reports & Actions
+              </h3>
               <div className="grid md:grid-cols-3 gap-6">
-                <Button asChild className="bg-white/20 hover:bg-white/30 text-white border-white/30 h-auto p-4 justify-start">
-                  <Link href="/ketua-tim/reports" prefetch onMouseEnter={() => router.prefetch("/ketua-tim/reports")}>
+                <Button
+                  asChild
+                  className="bg-white/20 hover:bg-white/30 text-white border-white/30 h-auto p-4 justify-start"
+                >
+                  <Link
+                    href="/ketua-tim/reports"
+                    prefetch
+                    onMouseEnter={() => router.prefetch("/ketua-tim/reports")}
+                  >
                     <div className="flex items-center">
                       <FileText className="w-6 h-6 mr-3" />
                       <div className="text-left">
                         <div className="font-semibold">Generate Report</div>
-                        <div className="text-sm opacity-80">Monthly financial report</div>
+                        <div className="text-sm opacity-80">
+                          Monthly financial report
+                        </div>
                       </div>
                     </div>
                   </Link>
                 </Button>
 
-                <Button asChild className="bg-white/20 hover:bg-white/30 text-white border-white/30 h-auto p-4 justify-start">
-                  <Link href="/ketua-tim/projects/new" prefetch onMouseEnter={() => router.prefetch("/ketua-tim/projects/new")}>
+                <Button
+                  asChild
+                  className="bg-white/20 hover:bg-white/30 text-white border-white/30 h-auto p-4 justify-start"
+                >
+                  <Link
+                    href="/ketua-tim/projects/new"
+                    prefetch
+                    onMouseEnter={() =>
+                      router.prefetch("/ketua-tim/projects/new")
+                    }
+                  >
                     <div className="flex items-center">
                       <FolderOpen className="w-6 h-6 mr-3" />
                       <div className="text-left">
                         <div className="font-semibold">New Project</div>
-                        <div className="text-sm opacity-80">Create with budget</div>
+                        <div className="text-sm opacity-80">
+                          Create with budget
+                        </div>
                       </div>
                     </div>
                   </Link>
@@ -369,7 +625,9 @@ export default function FinancialDashboard() {
                     <CheckCircle className="w-6 h-6 mr-3" />
                     <div className="text-left">
                       <div className="font-semibold">Budget Review</div>
-                      <div className="text-sm opacity-80">Review allocations</div>
+                      <div className="text-sm opacity-80">
+                        Review allocations
+                      </div>
                     </div>
                   </div>
                 </Button>
@@ -384,8 +642,12 @@ export default function FinancialDashboard() {
           <div className="lg:col-span-2 border-0 shadow-xl rounded-xl overflow-hidden">
             <div className="bg-gradient-to-r from-teal-600 to-emerald-600 p-6">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-white">Spending Calendar</h2>
-                <div className="text-white text-sm">{format(selectedDate, "MMMM yyyy", { locale: localeId })}</div>
+                <h2 className="text-xl font-bold text-white">
+                  Spending Calendar
+                </h2>
+                <div className="text-white text-sm">
+                  {format(selectedDate, "MMMM yyyy", { locale: localeId })}
+                </div>
               </div>
             </div>
             <div className="p-5">
@@ -400,12 +662,14 @@ export default function FinancialDashboard() {
                   lowWorkload: (date) => {
                     const y = format(date, "yyyy-MM-dd");
                     const rec = daily?.days.find((d) => d.date === y);
-                    return !!rec && rec.total < 1_000_000;
+                    return !!rec && rec.total > 0 && rec.total < 1_000_000;
                   },
                   mediumWorkload: (date) => {
                     const y = format(date, "yyyy-MM-dd");
                     const rec = daily?.days.find((d) => d.date === y);
-                    return !!rec && rec.total >= 1_000_000 && rec.total <= 3_000_000;
+                    return (
+                      !!rec && rec.total >= 1_000_000 && rec.total <= 3_000_000
+                    );
                   },
                   highWorkload: (date) => {
                     const y = format(date, "yyyy-MM-dd");
@@ -414,15 +678,23 @@ export default function FinancialDashboard() {
                   },
                   hasEvents: (date) => {
                     const y = format(date, "yyyy-MM-dd");
-                    return !!daily?.days.find((d) => d.date === y && d.total > 0);
+                    return !!daily?.days.find(
+                      (d) => d.date === y && d.total > 0
+                    );
                   },
                 }}
               />
               <div className="mt-4 flex flex-wrap items-center gap-3 text-xs">
                 <span className="text-gray-500">Legend:</span>
-                <Badge className="bg-green-100 text-green-800 border-green-200">&lt; 1 juta</Badge>
-                <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">1 - 3 juta</Badge>
-                <Badge className="bg-red-100 text-red-800 border-red-200">&gt; 3 juta</Badge>
+                <Badge className="bg-green-100 text-green-800 border-green-200">
+                  &lt; 1 juta
+                </Badge>
+                <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">
+                  1 - 3 juta
+                </Badge>
+                <Badge className="bg-red-100 text-red-800 border-red-200">
+                  &gt; 3 juta
+                </Badge>
               </div>
             </div>
           </div>
@@ -432,22 +704,130 @@ export default function FinancialDashboard() {
               <h3 className="font-bold text-white">Spending Details</h3>
             </div>
             <div className="p-4 space-y-3">
-              <div className="text-sm text-gray-600">{format(selectedDate, "EEEE, dd MMMM yyyy", { locale: localeId })}</div>
-              <Button variant="outline" className="border-2 border-gray-200 hover:bg-gray-50" onClick={() => refetchDailyDetails()}>
-                <RefreshCw className={`w-4 h-4 mr-2 ${fetchingDay ? "animate-spin" : ""}`} /> Refresh Day
+              <div className="text-sm text-gray-600">
+                {format(selectedDate, "EEEE, dd MMMM yyyy", {
+                  locale: localeId,
+                })}
+              </div>
+              <Button
+                variant="outline"
+                className="border-2 border-gray-200 hover:bg-gray-50"
+                onClick={() => refetchDailyDetails()}
+              >
+                <RefreshCw
+                  className={`w-4 h-4 mr-2 ${fetchingDay ? "animate-spin" : ""}`}
+                />{" "}
+                Refresh Day
               </Button>
               <div className="divide-y">
                 {(dailyDetails?.details || []).map((d, i) => (
-                  <div key={i} className="py-3 flex items-center justify-between">
+                  <div
+                    key={i}
+                    className="py-3 flex items-center justify-between"
+                  >
                     <div>
-                      <div className="font-medium text-gray-900">{d.recipient_name}</div>
-                      <div className="text-xs text-gray-500">{d.recipient_type.toUpperCase()} • {d.project_name || d.project_id}</div>
+                      <div className="font-medium text-gray-900">
+                        {d.recipient_name}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {d.recipient_type.toUpperCase()} •{" "}
+                        {d.project_name || d.project_id}
+                      </div>
                     </div>
-                    <div className="font-semibold text-gray-900">{formatCurrency(d.amount)}</div>
+                    <div className="font-semibold text-gray-900">
+                      {formatCurrency(d.amount)}
+                    </div>
                   </div>
                 ))}
                 {(!dailyDetails || dailyDetails.details.length === 0) && (
-                  <div className="text-sm text-gray-500 py-6">Tidak ada pengeluaran untuk tanggal ini.</div>
+                  <div className="text-sm text-gray-500 py-6">
+                    Tidak ada pengeluaran untuk tanggal ini.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "transport" && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 border-0 shadow-xl rounded-xl overflow-hidden">
+            <div className="bg-gradient-to-r from-indigo-600 to-blue-600 p-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-white">
+                  Transport Allocation Calendar
+                </h2>
+                <div className="text-white text-sm">
+                  {format(selectedDate, "MMMM yyyy", { locale: localeId })}
+                </div>
+              </div>
+            </div>
+            <div className="p-5">
+              <Calendar
+                mode="single"
+                month={selectedDate}
+                onMonthChange={(d) => d && setSelectedDate(d)}
+                selected={selectedDate}
+                onSelect={(d) => d && setSelectedDate(d)}
+                className="!w-full"
+                modifiers={{
+                  // Reuse built-in styling used by Spending tab
+                  hasEvents: (date) => {
+                    const y = format(date, "yyyy-MM-dd");
+                    const rec = transportDaily?.days.find((d) => d.date === y);
+                    return !!rec && rec.count > 0;
+                  },
+                }}
+              />
+              <div className="mt-4 flex flex-wrap items-center gap-3 text-xs">
+                <span className="text-gray-500">Legend:</span>
+                <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+                  Allocation exists
+                </Badge>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-0 shadow-xl rounded-xl overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-4">
+              <h3 className="font-bold text-white">Allocation Details</h3>
+            </div>
+            <div className="p-4 space-y-3">
+              <div className="text-sm text-gray-600">
+                {format(selectedDate, "EEEE, dd MMMM yyyy", {
+                  locale: localeId,
+                })}
+              </div>
+              <Button
+                variant="outline"
+                className="border-2 border-gray-200 hover:bg-gray-50"
+                onClick={() => refetchTransportDetails()}
+              >
+                <RefreshCw
+                  className={`w-4 h-4 mr-2 ${fetchingTransportDay ? "animate-spin" : ""}`}
+                />{" "}
+                Refresh Day
+              </Button>
+              <div className="divide-y">
+                {(transportDetails?.details || []).map((d, i) => (
+                  <div key={i} className="py-3">
+                    <div className="font-medium text-gray-900">
+                      {d.employee_name}
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      {d.project_name}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {d.task_title || d.task_description}
+                    </div>
+                  </div>
+                ))}
+                {(!transportDetails ||
+                  transportDetails.details.length === 0) && (
+                  <div className="text-sm text-gray-500 py-6">
+                    Tidak ada alokasi transport pada tanggal ini.
+                  </div>
                 )}
               </div>
             </div>

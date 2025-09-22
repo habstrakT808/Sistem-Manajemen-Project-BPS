@@ -19,6 +19,7 @@ import {
   Calendar,
   DollarSign,
   ClipboardList,
+  ChevronDown,
 } from "lucide-react";
 import { useAuth } from "@/lib/hooks/useAuth";
 
@@ -36,44 +37,7 @@ export function KetuaTimLayout({ children }: KetuaTimLayoutProps) {
     await signOut();
   };
 
-  const navigationItems = [
-    {
-      title: "Dashboard",
-      href: "/ketua-tim",
-      icon: Home,
-      description: "Overview sistem",
-    },
-    {
-      title: "Projects",
-      href: "/ketua-tim/projects",
-      icon: FolderOpen,
-      description: "Kelola projects",
-    },
-    {
-      title: "Team Management",
-      href: "/ketua-tim/team",
-      icon: Users,
-      description: "Kelola tim",
-    },
-    {
-      title: "Task Management",
-      href: "/ketua-tim/tasks",
-      icon: ClipboardList,
-      description: "Kelola tugas",
-    },
-    {
-      title: "Financial Reports",
-      href: "/ketua-tim/financial",
-      icon: DollarSign,
-      description: "Laporan keuangan",
-    },
-    {
-      title: "Analytics",
-      href: "/ketua-tim/analytics",
-      icon: BarChart3,
-      description: "Analisis performa",
-    },
-  ];
+  const [openManagement, setOpenManagement] = React.useState(true);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
@@ -117,31 +81,139 @@ export function KetuaTimLayout({ children }: KetuaTimLayoutProps) {
           <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-3 mb-4">
             Navigation
           </div>
-          {navigationItems.map((item, index) => {
-            const IconComponent = item.icon;
-            return (
+          {/* Dashboard */}
+          <Link
+            href="/ketua-tim"
+            prefetch
+            onMouseEnter={() => router.prefetch("/ketua-tim")}
+          >
+            <div className="group flex items-center p-3 rounded-xl hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-300 transform hover:scale-105 cursor-pointer border border-transparent hover:border-blue-200">
+              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center mr-4 group-hover:scale-110 transition-transform duration-300">
+                <Home className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1">
+                <div className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+                  Dashboard
+                </div>
+                <div className="text-sm text-gray-500 group-hover:text-blue-500 mt-1">
+                  Overview sistem
+                </div>
+              </div>
+            </div>
+          </Link>
+
+          {/* Management dropdown */}
+          <button
+            type="button"
+            onClick={() => setOpenManagement((v) => !v)}
+            className="w-full group flex items-center p-3 rounded-xl hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-300 border border-transparent hover:border-blue-200"
+          >
+            <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center mr-4 group-hover:scale-110 transition-transform duration-300">
+              <FolderOpen className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex-1 text-left">
+              <div className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+                Management
+              </div>
+              <div className="text-sm text-gray-500 group-hover:text-blue-500 mt-1">
+                Projects, tasks, and team
+              </div>
+            </div>
+            <ChevronDown
+              className={`w-4 h-4 transition-transform ${openManagement ? "rotate-180" : "rotate-0"}`}
+            />
+          </button>
+          {openManagement && (
+            <div className="ml-4 space-y-2">
               <Link
-                key={index}
-                href={item.href}
+                href="/ketua-tim/projects"
                 prefetch
-                onMouseEnter={() => router.prefetch(item.href)}
+                onMouseEnter={() => router.prefetch("/ketua-tim/projects")}
               >
-                <div className="group flex items-center p-3 rounded-xl hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-300 transform hover:scale-105 cursor-pointer border border-transparent hover:border-blue-200">
-                  <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center mr-4 group-hover:scale-110 transition-transform duration-300">
-                    <IconComponent className="w-5 h-5 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                      {item.title}
+                <div className="flex items-center p-3 rounded-xl hover:bg-blue-50 transition-all cursor-pointer">
+                  <FolderOpen className="w-4 h-4 text-blue-600 mr-3" />
+                  <div>
+                    <div className="font-medium text-gray-900">
+                      Projects Management
                     </div>
-                    <div className="text-sm text-gray-500 group-hover:text-blue-500 mt-1">
-                      {item.description}
-                    </div>
+                    <div className="text-xs text-gray-500">Kelola projects</div>
                   </div>
                 </div>
               </Link>
-            );
-          })}
+              <Link
+                href="/ketua-tim/tasks"
+                prefetch
+                onMouseEnter={() => router.prefetch("/ketua-tim/tasks")}
+              >
+                <div className="flex items-center p-3 rounded-xl hover:bg-blue-50 transition-all cursor-pointer">
+                  <ClipboardList className="w-4 h-4 text-blue-600 mr-3" />
+                  <div>
+                    <div className="font-medium text-gray-900">
+                      Task Management
+                    </div>
+                    <div className="text-xs text-gray-500">Kelola tugas</div>
+                  </div>
+                </div>
+              </Link>
+              <Link
+                href="/ketua-tim/team"
+                prefetch
+                onMouseEnter={() => router.prefetch("/ketua-tim/team")}
+              >
+                <div className="flex items-center p-3 rounded-xl hover:bg-blue-50 transition-all cursor-pointer">
+                  <Users className="w-4 h-4 text-blue-600 mr-3" />
+                  <div>
+                    <div className="font-medium text-gray-900">
+                      Team Management
+                    </div>
+                    <div className="text-xs text-gray-500">Kelola tim</div>
+                  </div>
+                </div>
+              </Link>
+            </div>
+          )}
+
+          {/* Financial Report */}
+          <Link
+            href="/ketua-tim/financial"
+            prefetch
+            onMouseEnter={() => router.prefetch("/ketua-tim/financial")}
+          >
+            <div className="group flex items-center p-3 rounded-xl hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-300 transform hover:scale-105 cursor-pointer border border-transparent hover:border-blue-200">
+              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center mr-4 group-hover:scale-110 transition-transform duration-300">
+                <DollarSign className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1">
+                <div className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+                  Financial Report
+                </div>
+                <div className="text-sm text-gray-500 group-hover:text-blue-500 mt-1">
+                  Laporan keuangan
+                </div>
+              </div>
+            </div>
+          </Link>
+
+          {/* Analytics */}
+          <Link
+            href="/ketua-tim/analytics"
+            prefetch
+            onMouseEnter={() => router.prefetch("/ketua-tim/analytics")}
+          >
+            <div className="group flex items-center p-3 rounded-xl hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-300 transform hover:scale-105 cursor-pointer border border-transparent hover:border-blue-200">
+              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center mr-4 group-hover:scale-110 transition-transform duration-300">
+                <BarChart3 className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1">
+                <div className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+                  Analytics
+                </div>
+                <div className="text-sm text-gray-500 group-hover:text-blue-500 mt-1">
+                  Analisis performa
+                </div>
+              </div>
+            </div>
+          </Link>
         </div>
 
         {/* Quick Actions */}

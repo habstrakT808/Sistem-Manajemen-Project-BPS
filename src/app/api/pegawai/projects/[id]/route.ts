@@ -104,23 +104,18 @@ async function getProjectDetail(
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  // Check if pegawai is assigned to this project first
-  const { data: assignment, error: assignmentError } = await serviceClient
-    .from("project_assignments")
-    .select("uang_transport")
+  // Check if pegawai has access to this project via project_members or as leader
+  const { data: projectAccess, error: accessError } = await serviceClient
+    .from("project_members")
+    .select("role")
     .eq("project_id", projectId)
-    .eq("assignee_type", "pegawai")
-    .eq("assignee_id", pegawaiId)
+    .eq("user_id", pegawaiId)
     .single();
 
-  if (assignmentError || !assignment) {
-    throw new Error("Project not found or access denied");
-  }
-
-  // Get basic project info
+  // Also check if user is the project leader
   const { data: project, error: projectError } = await serviceClient
     .from("projects")
-    .select("*")
+    .select("leader_user_id, ketua_tim_id")
     .eq("id", projectId)
     .single();
 
@@ -128,11 +123,30 @@ async function getProjectDetail(
     throw new Error(`Project not found: ${projectError?.message}`);
   }
 
+  const isLeader =
+    project.leader_user_id === pegawaiId || project.ketua_tim_id === pegawaiId;
+  const isMember = projectAccess && !accessError;
+
+  if (!isLeader && !isMember) {
+    throw new Error("Project not found or access denied");
+  }
+
+  // Get full project info
+  const { data: fullProject, error: fullProjectError } = await serviceClient
+    .from("projects")
+    .select("*")
+    .eq("id", projectId)
+    .single();
+
+  if (fullProjectError || !fullProject) {
+    throw new Error(`Project not found: ${fullProjectError?.message}`);
+  }
+
   // Get ketua tim info
   const { data: ketuaTim, error: ketuaTimError } = await serviceClient
     .from("users")
     .select("nama_lengkap, email")
-    .eq("id", project.ketua_tim_id)
+    .eq("id", fullProject.ketua_tim_id)
     .single();
 
   if (ketuaTimError) {
@@ -144,7 +158,7 @@ async function getProjectDetail(
     .from("tasks")
     .select("id, deskripsi_tugas, tanggal_tugas, status, response_pegawai")
     .eq("project_id", projectId)
-    .eq("pegawai_id", pegawaiId)
+    .or(`assignee_user_id.eq.${pegawaiId},pegawai_id.eq.${pegawaiId}`)
     .order("tanggal_tugas", { ascending: true });
 
   if (tasksError) {
@@ -166,19 +180,18 @@ async function getProjectDetail(
       ? Math.round((taskStats.completed / taskStats.total) * 100)
       : 0;
 
-  // Get all team members (pegawai)
-  const { data: teamAssignments, error: teamError } = await serviceClient
-    .from("project_assignments")
-    .select("assignee_id, uang_transport")
-    .eq("project_id", projectId)
-    .eq("assignee_type", "pegawai");
+  // Get all team members (pegawai) from project_members
+  const { data: teamMembersData, error: teamError } = await serviceClient
+    .from("project_members")
+    .select("user_id")
+    .eq("project_id", projectId);
 
   if (teamError) {
-    console.warn("Failed to fetch team member assignments:", teamError.message);
+    console.warn("Failed to fetch team members:", teamError.message);
   }
 
-  const pegawaiIds = (teamAssignments || [])
-    .map((a: { assignee_id: string }) => a.assignee_id)
+  const pegawaiIds = (teamMembersData || [])
+    .map((m: { user_id: string }) => m.user_id)
     .filter((id: string | null | undefined) => Boolean(id));
 
   let teamMembers: ProjectDetail["team_members"] = [];
@@ -195,104 +208,33 @@ async function getProjectDetail(
       );
     }
 
-    const idToUser: Record<
-      string,
-      { id: string; nama_lengkap: string; email: string }
-    > = {};
-    (usersRows || []).forEach((u) => {
-      idToUser[u.id] = u as { id: string; nama_lengkap: string; email: string };
-    });
-
-    teamMembers = (teamAssignments || []).map(
-      (assignment: { assignee_id: string; uang_transport: number }) => {
-        const userRow = idToUser[assignment.assignee_id];
-        return {
-          id: userRow?.id || assignment.assignee_id,
-          nama_lengkap: userRow?.nama_lengkap || "",
-          email: userRow?.email || "",
-          uang_transport: assignment.uang_transport || 0,
-        };
-      }
-    );
+    teamMembers = (usersRows || []).map((user: any) => ({
+      id: user.id,
+      nama_lengkap: user.nama_lengkap || "",
+      email: user.email || "",
+      uang_transport: 0, // Will be calculated from tasks
+    }));
   }
 
-  // Get mitra partners
-  const { data: mitraAssignments, error: mitraError } = await serviceClient
-    .from("project_assignments")
-    .select("assignee_id, honor")
-    .eq("project_id", projectId)
-    .eq("assignee_type", "mitra");
-
-  if (mitraError) {
-    console.warn("Failed to fetch mitra assignments:", mitraError.message);
-  }
-
-  const mitraIds = (mitraAssignments || [])
-    .map((a: { assignee_id: string }) => a.assignee_id)
-    .filter((id: string | null | undefined) => Boolean(id));
-
+  // Get mitra partners (simplified for now)
   let mitraPartners: ProjectDetail["mitra_partners"] = [];
-  if (mitraIds.length > 0) {
-    const { data: mitraRows, error: mitraRowsError } = await serviceClient
-      .from("mitra")
-      .select("id, nama_mitra, jenis, rating_average")
-      .in("id", mitraIds);
+  // TODO: Implement mitra partners if needed
 
-    if (mitraRowsError) {
-      console.warn("Failed to fetch mitra rows:", mitraRowsError.message);
-    }
-
-    const idToMitra: Record<
-      string,
-      { id: string; nama_mitra: string; jenis: string; rating_average: number }
-    > = {};
-    (mitraRows || []).forEach((m) => {
-      idToMitra[m.id] = m as {
-        id: string;
-        nama_mitra: string;
-        jenis: string;
-        rating_average: number;
-      };
-    });
-
-    mitraPartners = (mitraAssignments || []).map(
-      (assignment: { assignee_id: string; honor: number }) => {
-        const mitraRow = idToMitra[assignment.assignee_id];
-        return {
-          id: mitraRow?.id || assignment.assignee_id,
-          nama_mitra: mitraRow?.nama_mitra || "",
-          jenis: mitraRow?.jenis || "",
-          honor: assignment.honor || 0,
-          rating_average: mitraRow?.rating_average || 0,
-        };
-      }
-    );
-  }
-
-  // Get team size (total assignments)
-  const { data: allAssignments, error: countError } = await serviceClient
-    .from("project_assignments")
-    .select("id")
-    .eq("project_id", projectId);
-
-  if (countError) {
-    console.warn("Failed to fetch assignment count:", countError.message);
-  }
-
-  const teamSize = allAssignments?.length || 0;
+  // Get team size (total members)
+  const teamSize = teamMembers.length;
 
   return {
-    id: project.id,
-    nama_project: project.nama_project,
-    deskripsi: project.deskripsi,
-    tanggal_mulai: project.tanggal_mulai,
-    deadline: project.deadline,
-    status: project.status,
+    id: fullProject.id,
+    nama_project: fullProject.nama_project,
+    deskripsi: fullProject.deskripsi,
+    tanggal_mulai: fullProject.tanggal_mulai,
+    deadline: fullProject.deadline,
+    status: fullProject.status,
     ketua_tim: {
       nama_lengkap: ketuaTim?.nama_lengkap || "Unknown",
       email: ketuaTim?.email || "unknown@example.com",
     },
-    uang_transport: assignment?.uang_transport || 0,
+    uang_transport: 0, // Will be calculated from tasks or assignments
     my_task_stats: taskStats,
     my_progress: progress,
     team_size: teamSize,

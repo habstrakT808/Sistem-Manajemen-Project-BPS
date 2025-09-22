@@ -5,12 +5,12 @@ import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/../database/types/database.types";
 
 export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { name: string } }
+  _request: NextRequest,
+  context: { params: Promise<{ name: string }> }
 ) {
   try {
     const supabase = await createClient();
-    const { name: skillName } = params;
+    const { name: skillName } = await context.params;
 
     // Auth check
     const {
@@ -33,7 +33,11 @@ export async function DELETE(
       error: unknown;
     };
 
-    if (profileError || !userProfile || userProfile.role !== "pegawai") {
+    if (
+      profileError ||
+      !userProfile ||
+      (userProfile as any).role !== "pegawai"
+    ) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

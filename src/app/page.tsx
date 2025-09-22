@@ -9,19 +9,17 @@ import {
   Footer,
 } from "@/components/landing";
 
-export default function HomePage() {
+export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-white">
+    <main className="min-h-screen flex flex-col">
       <Header />
-      <main>
-        <HeroSection />
-        <RoleSelection />
-        <Features />
-        <HowItWorks />
-        <FAQ />
-        <Contact />
-      </main>
+      <HeroSection />
+      <RoleSelection />
+      <Features />
+      <HowItWorks />
+      <FAQ />
+      <Contact />
       <Footer />
-    </div>
+    </main>
   );
 }

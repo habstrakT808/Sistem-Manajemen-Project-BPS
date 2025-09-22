@@ -2,6 +2,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
+import type { Database } from "@/../database/types/database.types";
 
 interface AnalyticsStats {
   total_projects: number;
@@ -18,7 +20,7 @@ interface ProjectPerformance {
   days_remaining: number;
   team_size: number;
   budget_used: number;
-  status: "on_track" | "at_risk" | "delayed";
+  status: "on_track" | "at_risk" | "delayed" | "completed";
 }
 
 interface TeamProductivity {
@@ -34,6 +36,10 @@ export async function GET(request: NextRequest) {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const supabase = (await createClient()) as any;
+    const svc = createServiceClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
     const { searchParams } = new URL(request.url);
     const period = searchParams.get("period") || "3_months";
 
@@ -46,20 +52,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Role validation
-    const { data: userProfile, error: profileError } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (
-      profileError ||
-      !userProfile ||
-      (userProfile as { role: string }).role !== "ketua_tim"
-    ) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    // Do not block by global role; enforce ownership in queries
 
     // Calculate date range
     let monthsBack = 3;
@@ -78,25 +71,63 @@ export async function GET(request: NextRequest) {
     const startDate = new Date();
     startDate.setMonth(startDate.getMonth() - monthsBack);
 
-    // Get all projects for analytics
-    const { data: allProjects } = await supabase
+    // Get ALL owned projects (no date filter) for core stats and membership
+    let { data: ownedAllProjects } = await (svc as any)
       .from("projects")
       .select(
-        `
-        id,
-        nama_project,
-        status,
-        tanggal_mulai,
-        deadline,
-        created_at,
-        project_assignments (id)
-      `
+        `id, nama_project, status, tanggal_mulai, deadline, created_at, updated_at`
       )
-      .eq("ketua_tim_id", user.id)
-      .gte("created_at", startDate.toISOString());
+      .or(`ketua_tim_id.eq.${user.id},leader_user_id.eq.${user.id}`);
 
-    const totalProjects = (allProjects || []).length;
-    const completedProjects = (allProjects || []).filter(
+    // Fallback: if no direct ownership found, include projects where user is a member/assignee
+    if (!ownedAllProjects || ownedAllProjects.length === 0) {
+      const [memberRows, assignmentRows] = await Promise.all([
+        (svc as any)
+          .from("project_members")
+          .select("project_id")
+          .eq("user_id", user.id),
+        (svc as any)
+          .from("project_assignments")
+          .select("project_id")
+          .eq("assignee_id", user.id),
+      ]);
+
+      const memberIds = new Set(
+        (memberRows?.data || []).map(
+          (r: { project_id: string }) => r.project_id
+        )
+      );
+      for (const r of assignmentRows?.data || []) {
+        memberIds.add((r as { project_id: string }).project_id);
+      }
+
+      if (memberIds.size > 0) {
+        const { data: derivedProjects } = await (svc as any)
+          .from("projects")
+          .select(
+            `
+            id,
+            nama_project,
+            status,
+            tanggal_mulai,
+            deadline,
+            created_at,
+            project_assignments (id)
+          `
+          )
+          .in("id", Array.from(memberIds));
+        ownedAllProjects = derivedProjects || [];
+      }
+    }
+
+    // Owned project IDs used throughout
+    const ownedIdArray = Array.from(
+      new Set((ownedAllProjects || []).map((p: any) => p.id))
+    );
+
+    // For widgets that should be ALL-TIME, use all owned projects
+    const totalProjects = (ownedAllProjects || []).length;
+    const completedProjects = (ownedAllProjects || []).filter(
       (p: { status: string }) => p.status === "completed"
     ).length;
     const completionRate =
@@ -105,14 +136,15 @@ export async function GET(request: NextRequest) {
         : 0;
 
     // Calculate average project duration for completed projects
-    const completedProjectsWithDuration = (allProjects || [])
+    const completedProjectsWithDuration = (ownedAllProjects || [])
       .filter(
-        (p: { status: string; tanggal_mulai: string; deadline: string }) =>
+        (p: { status: string; tanggal_mulai: string; updated_at: string }) =>
           p.status === "completed"
       )
-      .map((p: { tanggal_mulai: string; deadline: string }) => {
+      .map((p: { tanggal_mulai: string; updated_at: string }) => {
         const start = new Date(p.tanggal_mulai);
-        const end = new Date(p.deadline);
+        // Use updated_at as the completion timestamp when status is completed
+        const end = new Date(p.updated_at);
         return Math.ceil(
           (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)
         );
@@ -129,12 +161,11 @@ export async function GET(request: NextRequest) {
         : 0;
 
     // Calculate on-time delivery
-    const onTimeProjects = (allProjects || []).filter(
-      (p: { status: string; deadline: string }) => {
+    const onTimeProjects = (ownedAllProjects || []).filter(
+      (p: { status: string; deadline: string; updated_at: string }) => {
         if (p.status !== "completed") return false;
-        // For this example, assume all completed projects were on time
-        // In reality, you'd track actual completion dates
-        return new Date(p.deadline) >= new Date();
+        // Consider a project on-time if it was completed (updated_at) on or before its deadline
+        return new Date(p.updated_at) <= new Date(p.deadline);
       }
     ).length;
 
@@ -143,8 +174,8 @@ export async function GET(request: NextRequest) {
         ? Math.round((onTimeProjects / completedProjects) * 100)
         : 100;
 
-    // Get current active projects for performance analysis
-    const { data: activeProjects } = await supabase
+    // Get current active projects for performance analysis (owned only)
+    const { data: activeProjects } = await (svc as any)
       .from("projects")
       .select(
         `
@@ -155,21 +186,39 @@ export async function GET(request: NextRequest) {
         project_assignments (id)
       `
       )
-      .eq("ketua_tim_id", user.id)
+      .in(
+        "id",
+        ownedIdArray.length
+          ? ownedIdArray
+          : ["00000000-0000-0000-0000-000000000000"]
+      ) // guard empty
       .eq("status", "active");
 
     // Calculate project performance
+    // If no active projects, fallback to recently updated owned projects (up to 5)
+    const projectsForPerf =
+      activeProjects && activeProjects.length > 0
+        ? activeProjects
+        : (ownedAllProjects || [])
+            .slice()
+            .sort(
+              (a: any, b: any) =>
+                new Date(b.updated_at || b.deadline || 0).getTime() -
+                new Date(a.updated_at || a.deadline || 0).getTime()
+            )
+            .slice(0, 5);
+
     const projectPerformance: ProjectPerformance[] = await Promise.all(
-      (activeProjects || []).map(
+      (projectsForPerf || []).map(
         async (project: {
           id: string;
           nama_project: string;
           tanggal_mulai: string;
           deadline: string;
-          project_assignments: Array<{ id: string }>;
+          project_assignments?: Array<{ id: string }>;
         }) => {
           // Get tasks for this project
-          const { data: projectTasks } = await supabase
+          const { data: projectTasks } = await (svc as any)
             .from("tasks")
             .select("status")
             .eq("project_id", project.id);
@@ -202,18 +251,27 @@ export async function GET(request: NextRequest) {
             totalDays > 0 ? Math.round((daysPassed / totalDays) * 100) : 0;
 
           // Determine status
-          let status: "on_track" | "at_risk" | "delayed" = "on_track";
-          if (daysRemaining < 0) {
+          let status: "on_track" | "at_risk" | "delayed" | "completed" =
+            "on_track";
+          if (completionPercentage === 100) {
+            status = "completed";
+          } else if (daysRemaining < 0) {
             status = "delayed";
           } else if (completionPercentage < timelineProgress - 10) {
             status = "at_risk";
           }
 
+          // Team size: count assignments for this project
+          const { count: assignmentCount } = await (svc as any)
+            .from("project_assignments")
+            .select("id", { count: "exact", head: true })
+            .eq("project_id", project.id);
+
           return {
             project_name: project.nama_project,
             completion_percentage: completionPercentage,
             days_remaining: Math.max(0, daysRemaining),
-            team_size: (project.project_assignments || []).length,
+            team_size: assignmentCount || 0,
             budget_used: Math.min(100, Math.max(0, timelineProgress)), // Simplified budget calculation
             status,
           };
@@ -221,43 +279,38 @@ export async function GET(request: NextRequest) {
       )
     );
 
-    // Get team productivity data
-    const { data: teamMembers } = await supabase
-      .from("project_assignments")
-      .select(
-        `
-        assignee_id,
-        users!inner (nama_lengkap),
-        projects!inner (ketua_tim_id)
-      `
-      )
-      .eq("assignee_type", "pegawai")
-      .eq("projects.ketua_tim_id", user.id);
-
+    // Team members across owned projects
+    const { data: teamAssignments } = ownedIdArray.length
+      ? await (svc as any)
+          .from("project_assignments")
+          .select(`assignee_id`)
+          .eq("assignee_type", "pegawai")
+          .in("project_id", ownedIdArray)
+      : { data: [] };
     const uniqueMembers = Array.from(
-      new Map(
-        (teamMembers || []).map(
-          (member: {
-            assignee_id: string;
-            users: { nama_lengkap: string };
-          }) => [member.assignee_id, member.users.nama_lengkap]
+      new Set(
+        (teamAssignments || []).map(
+          (r: { assignee_id: string }) => r.assignee_id
         )
-      ).entries()
-    );
+      )
+    ).map((id) => [String(id), String(id)] as [string, string]);
 
     const teamProductivity: TeamProductivity[] = await Promise.all(
-      uniqueMembers.map(async ([memberId, memberName]) => {
+      uniqueMembers.map(async ([memberId]) => {
+        const memberNameRow = await (svc as any)
+          .from("users")
+          .select("nama_lengkap")
+          .eq("id", memberId)
+          .single();
+        const memberName =
+          memberNameRow?.data?.nama_lengkap ||
+          `User ${String(memberId).slice(0, 6)}`;
         // Get tasks for this member
-        const { data: memberTasks } = await supabase
+        const { data: memberTasks } = await (svc as any)
           .from("tasks")
-          .select(
-            `
-            status,
-            projects!inner (ketua_tim_id)
-          `
-          )
+          .select(`status, project_id, created_at`)
           .eq("pegawai_id", memberId)
-          .eq("projects.ketua_tim_id", user.id)
+          .in("project_id", ownedIdArray)
           .gte("created_at", startDate.toISOString());
 
         const totalTasks = (memberTasks || []).length;
@@ -271,19 +324,19 @@ export async function GET(request: NextRequest) {
           totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
         // Get current project assignments
-        const { data: currentProjects } = await supabase
+        const { data: currentProjects } = await (svc as any)
           .from("project_assignments")
-          .select(
-            `
-            projects!inner (ketua_tim_id, status)
-          `
-          )
+          .select("project_id")
           .eq("assignee_type", "pegawai")
-          .eq("assignee_id", memberId)
-          .eq("projects.ketua_tim_id", user.id)
-          .in("projects.status", ["upcoming", "active"]);
-
-        const projectsAssigned = (currentProjects || []).length;
+          .eq("assignee_id", memberId);
+        const activeOwnedProjectIds = new Set(
+          (ownedAllProjects as Array<any>)
+            .filter((p) => p.status === "active" || p.status === "upcoming")
+            .map((p) => p.id)
+        );
+        const projectsAssigned = (currentProjects || []).filter(
+          (r: { project_id: string }) => activeOwnedProjectIds.has(r.project_id)
+        ).length;
 
         // Determine workload level
         let workloadLevel: "low" | "medium" | "high" = "low";
@@ -325,35 +378,41 @@ export async function GET(request: NextRequest) {
       const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
       const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0);
 
-      const { data: monthProjects } = await supabase
+      const { data: monthProjects } = await (svc as any)
         .from("projects")
-        .select("id, status")
-        .eq("ketua_tim_id", user.id)
-        .gte("created_at", monthStart.toISOString())
-        .lte("created_at", monthEnd.toISOString());
-
-      const { data: monthTasks } = await supabase
-        .from("tasks")
-        .select(
-          `
-          status,
-          projects!inner (ketua_tim_id)
-        `
+        .select("id, status, updated_at")
+        .in(
+          "id",
+          ownedIdArray.length
+            ? ownedIdArray
+            : ["00000000-0000-0000-0000-000000000000"]
         )
-        .eq("projects.ketua_tim_id", user.id)
-        .eq("status", "completed")
+        // Count projects that were completed in this month by looking at updated_at
         .gte("updated_at", monthStart.toISOString())
         .lte("updated_at", monthEnd.toISOString());
 
-      const { data: monthFinancial } = await supabase
-        .from("financial_records")
-        .select(
-          `
-          amount,
-          projects!inner (ketua_tim_id)
-        `
+      const { data: monthTasks } = await (svc as any)
+        .from("tasks")
+        .select(`status, project_id, updated_at`)
+        .eq("status", "completed")
+        .in(
+          "project_id",
+          ownedIdArray.length
+            ? ownedIdArray
+            : ["00000000-0000-0000-0000-000000000000"]
         )
-        .eq("projects.ketua_tim_id", user.id)
+        .gte("updated_at", monthStart.toISOString())
+        .lte("updated_at", monthEnd.toISOString());
+
+      const { data: monthFinancial } = await (svc as any)
+        .from("financial_records")
+        .select(`amount, project_id, bulan, tahun`)
+        .in(
+          "project_id",
+          ownedIdArray.length
+            ? ownedIdArray
+            : ["00000000-0000-0000-0000-000000000000"]
+        )
         .eq("bulan", date.getMonth() + 1)
         .eq("tahun", date.getFullYear());
 

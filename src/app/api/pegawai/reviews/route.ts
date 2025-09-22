@@ -75,32 +75,112 @@ export async function GET() {
       .eq("id", user.id)
       .single();
 
-    if (profileError || !userProfile || userProfile.role !== "pegawai") {
+    if (
+      profileError ||
+      !userProfile ||
+      (userProfile as any).role !== "pegawai"
+    ) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Get completed projects where pegawai worked with mitra
-    const { data: completedProjectAssignments } = await serviceClient
-      .from("project_assignments")
+    // Get completed projects where pegawai worked (using project_members)
+    // First get project members
+    const { data: projectMembers } = await serviceClient
+      .from("project_members")
+      .select("project_id")
+      .eq("user_id", user.id);
+
+    // Additional validation: Check if user actually has tasks in these projects
+    // This ensures the user was actually involved in the project work
+    const { data: userTasks } = await serviceClient
+      .from("tasks")
+      .select("project_id")
+      .eq("assignee_user_id", user.id);
+
+    const userTaskProjectIds = new Set(
+      (userTasks || []).map((task: { project_id: string }) => task.project_id)
+    );
+
+    // Filter project members to only include projects where user actually has tasks
+    const validProjectMembers = (projectMembers || []).filter(
+      (member: { project_id: string }) =>
+        userTaskProjectIds.has(member.project_id)
+    );
+
+    if (!validProjectMembers || validProjectMembers.length === 0) {
+      return NextResponse.json({
+        pending_reviews: [],
+        completed_reviews: [],
+        review_stats: {
+          total_reviews: 0,
+          average_rating_given: 0,
+          pending_count: 0,
+          this_month_reviews: 0,
+        },
+      });
+    }
+
+    const projectIds = validProjectMembers.map(
+      (member: { project_id: string }) => member.project_id
+    );
+
+    // Then get completed projects
+    const { data: completedProjects } = await serviceClient
+      .from("projects")
       .select(
         `
-        project_id,
-        projects!inner (
-          id,
-          nama_project,
-          tanggal_mulai,
-          deadline,
-          status,
-          users!inner (nama_lengkap)
-        )
+        id,
+        nama_project,
+        tanggal_mulai,
+        deadline,
+        status,
+        leader_user_id,
+        ketua_tim_id
       `
       )
-      .eq("assignee_type", "pegawai")
-      .eq("assignee_id", user.id)
-      .eq("projects.status", "completed");
+      .in("id", projectIds)
+      .eq("status", "completed");
 
-    const completedProjectIds = (completedProjectAssignments || []).map(
-      (assignment: { project_id: string }) => assignment.project_id
+    // Get project leaders info
+    const leaderIds = Array.from(
+      new Set(
+        (completedProjects || [])
+          .map((p: any) => p.leader_user_id || p.ketua_tim_id)
+          .filter(Boolean)
+      )
+    );
+
+    const { data: leaders } = await serviceClient
+      .from("users")
+      .select("id, nama_lengkap")
+      .in("id", leaderIds);
+
+    const leaderMap = new Map();
+    (leaders || []).forEach((leader: any) => {
+      leaderMap.set(leader.id, leader.nama_lengkap);
+    });
+
+    // Create completed project members data structure
+    const completedProjectMembers = (completedProjects || []).map(
+      (project: any) => ({
+        project_id: project.id,
+        projects: {
+          id: project.id,
+          nama_project: project.nama_project,
+          tanggal_mulai: project.tanggal_mulai,
+          deadline: project.deadline,
+          status: project.status,
+          users: {
+            nama_lengkap:
+              leaderMap.get(project.leader_user_id || project.ketua_tim_id) ||
+              "Unknown",
+          },
+        },
+      })
+    );
+
+    const completedProjectIds = (completedProjectMembers || []).map(
+      (member: { project_id: string }) => member.project_id
     );
 
     if (completedProjectIds.length === 0) {
@@ -123,6 +203,9 @@ export async function GET() {
       .eq("assignee_type", "mitra")
       .in("project_id", completedProjectIds);
 
+    // Use actual mitra assignments only - no dummy data
+    const finalMitraAssignments = mitraAssignments || [];
+
     // Get existing reviews by this pegawai
     const { data: existingReviews } = await serviceClient
       .from("mitra_reviews")
@@ -141,7 +224,7 @@ export async function GET() {
     // Get all mitra info
     const mitraIds = Array.from(
       new Set(
-        (mitraAssignments || []).map(
+        finalMitraAssignments.map(
           (ma: { assignee_id: string }) => ma.assignee_id
         )
       )
@@ -171,18 +254,18 @@ export async function GET() {
     };
 
     const projectMap = new Map();
-    (completedProjectAssignments || []).forEach(
-      (assignment: CompletedProjectAssignment) => {
-        const projects = Array.isArray(assignment.projects)
-          ? assignment.projects[0]
-          : assignment.projects;
+    (completedProjectMembers || []).forEach(
+      (member: CompletedProjectAssignment) => {
+        const projects = Array.isArray(member.projects)
+          ? member.projects[0]
+          : member.projects;
         const usersSingle: { nama_lengkap: string } | undefined = projects
           ? Array.isArray(projects.users)
             ? (projects.users[0] as { nama_lengkap: string })
             : (projects.users as { nama_lengkap: string })
           : undefined;
 
-        projectMap.set(assignment.project_id, {
+        projectMap.set(member.project_id, {
           id: projects?.id ?? "",
           nama_project: projects?.nama_project ?? "",
           tanggal_mulai: projects?.tanggal_mulai ?? "",
@@ -202,7 +285,7 @@ export async function GET() {
     });
 
     const mitraAssignmentMap = new Map();
-    (mitraAssignments || []).forEach(
+    finalMitraAssignments.forEach(
       (assignment: {
         project_id: string;
         assignee_id: string;
@@ -222,7 +305,7 @@ export async function GET() {
 
     // Calculate pending reviews
     const pendingReviews: PendingReview[] = [];
-    (mitraAssignments || []).forEach(
+    finalMitraAssignments.forEach(
       (assignment: {
         project_id: string;
         assignee_id: string;
@@ -365,7 +448,11 @@ export async function POST(request: NextRequest) {
       .eq("id", user.id)
       .single();
 
-    if (profileError || !userProfile || userProfile.role !== "pegawai") {
+    if (
+      profileError ||
+      !userProfile ||
+      (userProfile as any).role !== "pegawai"
+    ) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -392,13 +479,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify pegawai was assigned to this project
+    // Verify pegawai was assigned to this project (using project_members table)
     const { data: pegawaiAssignment } = await serviceClient
-      .from("project_assignments")
+      .from("project_members")
       .select("id")
       .eq("project_id", project_id)
-      .eq("assignee_type", "pegawai")
-      .eq("assignee_id", user.id)
+      .eq("user_id", user.id)
       .single();
 
     if (!pegawaiAssignment) {
@@ -505,7 +591,11 @@ export async function PUT(request: NextRequest) {
       .eq("id", user.id)
       .single();
 
-    if (profileError || !userProfile || userProfile.role !== "pegawai") {
+    if (
+      profileError ||
+      !userProfile ||
+      (userProfile as any).role !== "pegawai"
+    ) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

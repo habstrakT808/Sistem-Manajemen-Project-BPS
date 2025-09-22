@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
+import type { Database } from "@/../database/types/database.types";
 
 export async function GET(
   _request: NextRequest,
@@ -18,18 +20,41 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Role validation: must be ketua_tim
-    const { data: userProfile, error: profileError } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-    if (profileError || !userProfile || userProfile.role !== "ketua_tim") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    // Use service client to avoid RLS recursion issues
+    const svc = createServiceClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    // Check if user is ketua_tim in any team (team-specific role validation)
+    const { data: teamMemberships, error: membershipError } = await svc
+      .from("project_members")
+      .select(
+        `
+        role,
+        projects!inner (
+          ketua_tim_id
+        )
+      `
+      )
+      .eq("user_id", user.id)
+      .eq("role", "leader");
+
+    // Check if user is a leader in any team
+    const isKetuaTim = (teamMemberships || []).length > 0;
+
+    if (!isKetuaTim) {
+      return NextResponse.json(
+        {
+          error: "Forbidden",
+          details: "User must be a team leader to access this endpoint",
+        },
+        { status: 403 }
+      );
     }
 
     // Fetch mitra info
-    const { data: mitra, error: mitraErr } = await supabase
+    const { data: mitra, error: mitraErr } = await svc
       .from("mitra")
       .select(
         "id, nama_mitra, jenis, kontak, alamat, deskripsi, rating_average"
@@ -41,7 +66,7 @@ export async function GET(
     }
 
     // Fetch reviews with project and reviewer info
-    const { data: reviews } = await supabase
+    const { data: reviews } = await svc
       .from("mitra_reviews")
       .select(
         `id, rating, komentar, created_at, project_id, pegawai_id,
@@ -85,7 +110,13 @@ export async function GET(
       const p = Array.isArray(r.projects) ? r.projects[0] : r.projects;
       const u = Array.isArray(r.users) ? r.users[0] : r.users;
       if (p) {
-        const entry = projectMap.get(p.id) || {
+        const entry: {
+          id: string;
+          nama_project: string;
+          status: string;
+          deadline: string;
+          ratings: number[];
+        } = (projectMap.get(p.id) as any) || {
           id: p.id,
           nama_project: p.nama_project,
           status: p.status,

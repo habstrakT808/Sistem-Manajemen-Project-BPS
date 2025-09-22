@@ -1,4 +1,5 @@
-// File: src/components/ketua-tim/index.ts (Update)
+// File: src/components/ketua-tim/index.ts
+// UPDATED: Export all ketua tim components
 
 export { default as KetuaTimDashboard } from "./KetuaTimDashboard";
 export { default as ProjectWizard } from "./ProjectWizard";
@@ -7,7 +8,7 @@ export { default as ProjectDetail } from "./ProjectDetail";
 export { default as ProjectEditForm } from "./ProjectEditForm";
 export { default as TaskManagement } from "./TaskManagement";
 export { default as TeamManagement } from "./TeamManagement";
+export { default as MemberDetail } from "./MemberDetail";
 export { default as FinancialDashboard } from "./FinancialDashboard";
 export { default as AnalyticsDashboard } from "./AnalyticsDashboard";
-export { default as MemberDetail } from "./MemberDetail";
 export { default as MitraReviews } from "./MitraReviews";

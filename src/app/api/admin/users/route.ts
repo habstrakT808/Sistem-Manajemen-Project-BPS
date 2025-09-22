@@ -13,6 +13,44 @@ const supabaseAdmin = createClient<Database>(
   }
 );
 
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const role = searchParams.get("role");
+    const isActiveParam = searchParams.get("is_active");
+
+    // Build query
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let query: any = (supabaseAdmin as any)
+      .from("users")
+      .select("id, email, role, nama_lengkap, no_telepon, alamat, is_active");
+
+    if (role) {
+      query = query.eq("role", role);
+    }
+
+    if (isActiveParam !== null) {
+      const isActive = isActiveParam === "true";
+      query = query.eq("is_active", isActive);
+    }
+
+    const { data, error } = await query.order("nama_lengkap", {
+      ascending: true,
+    });
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    return NextResponse.json({ data });
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -34,16 +72,50 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create auth user
+    // Disallow global role 'ketua_tim' – use project-level leader instead
+    if (role === "ketua_tim") {
+      return NextResponse.json(
+        {
+          error:
+            "Role 'ketua_tim' is not allowed globally. Use 'pegawai' and assign leader per project.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // Check if user already exists
+    const { data: existingUser } = await supabaseAdmin.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000,
+    });
+
+    const userExists = existingUser?.users?.some(
+      (user) => user.email === email
+    );
+    if (userExists) {
+      return NextResponse.json(
+        { error: "User with this email already exists" },
+        { status: 400 }
+      );
+    }
+
+    // Create auth user with additional metadata
     const { data: authData, error: authError } =
       await supabaseAdmin.auth.admin.createUser({
         email,
         password,
         email_confirm: true,
+        user_metadata: {
+          nama_lengkap,
+          no_telepon: no_telepon || null,
+          alamat: alamat || null,
+          role,
+        },
       });
 
     if (authError) {
       console.error("Error creating auth user:", authError);
+      console.error("Auth error details:", JSON.stringify(authError, null, 2));
       return NextResponse.json(
         { error: "Failed to create user: " + authError.message },
         { status: 400 }
@@ -57,7 +129,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create user profile
+    // Wait a moment for any triggers to complete
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // Check if user profile was created by trigger
+    const { data: existingProfile, error: checkError } = await (
+      supabaseAdmin as any
+    )
+      .from("users")
+      .select("*")
+      .eq("id", authData.user.id)
+      .single();
+
+    if (checkError && checkError.code !== "PGRST116") {
+      console.error("Error checking user profile:", checkError);
+    }
+
+    // Create or update user profile
     const insertData: Database["public"]["Tables"]["users"]["Insert"] = {
       id: authData.user.id,
       email,
@@ -68,17 +156,36 @@ export async function POST(request: NextRequest) {
       is_active: is_active !== undefined ? is_active : true,
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error: profileError } = await (supabaseAdmin as any)
-      .from("users")
-      .insert(insertData);
+    let profileError;
+    if (existingProfile) {
+      // Update existing profile
+      const { error } = await (supabaseAdmin as any)
+        .from("users")
+        .update(insertData)
+        .eq("id", authData.user.id);
+      profileError = error;
+    } else {
+      // Insert new profile
+      const { error } = await (supabaseAdmin as any)
+        .from("users")
+        .insert(insertData);
+      profileError = error;
+    }
 
     if (profileError) {
-      console.error("Error creating user profile:", profileError);
+      console.error("Error creating/updating user profile:", profileError);
+      console.error(
+        "Profile error details:",
+        JSON.stringify(profileError, null, 2)
+      );
       // Try to delete the auth user if profile creation fails
-      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+      try {
+        await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+      } catch (deleteError) {
+        console.error("Error deleting auth user:", deleteError);
+      }
       return NextResponse.json(
-        { error: "Failed to create user profile" },
+        { error: "Failed to create user profile: " + profileError.message },
         { status: 400 }
       );
     }
@@ -97,8 +204,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error in POST /api/admin/users:", error);
+    console.error("Full error details:", JSON.stringify(error, null, 2));
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Internal server error: " + (error as Error).message },
       { status: 500 }
     );
   }

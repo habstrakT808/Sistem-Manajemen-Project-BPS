@@ -139,7 +139,7 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
           assignee_type: string;
           assignee_id: string;
           uang_transport?: number;
-          uang_honor?: number;
+          honor?: number;
         }) => {
           if (assignment.assignee_type === "pegawai") {
             pegawaiIds.push(assignment.assignee_id);
@@ -147,7 +147,7 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
               assignment.uang_transport || 0;
           } else if (assignment.assignee_type === "mitra") {
             mitraIds.push(assignment.assignee_id);
-            honorData[assignment.assignee_id] = assignment.uang_honor || 0;
+            honorData[assignment.assignee_id] = assignment.honor || 0;
           }
         }
       );

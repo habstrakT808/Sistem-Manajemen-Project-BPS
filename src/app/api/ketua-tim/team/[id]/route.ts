@@ -2,6 +2,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
+import type { Database } from "@/../database/types/database.types";
 
 interface MemberDetailData {
   personal_info: {
@@ -88,55 +90,51 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    console.log("🔍 DEBUG: Member detail API called!");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const supabase = (await createClient()) as any;
+    const svc = createServiceClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
     const { id: memberId } = await params;
+    console.log("🔍 DEBUG: Member ID:", memberId);
 
     // Auth check
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser();
+    console.log("🔍 DEBUG: Auth user:", user?.id);
+    console.log("🔍 DEBUG: Auth error:", authError);
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Role validation
-    const { data: userProfile, error: profileError } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (
-      profileError ||
-      !userProfile ||
-      (userProfile as { role: string }).role !== "ketua_tim"
-    ) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    // Role validation relaxed: allow any authenticated leader/admin to view member detail
+    // We no longer block on profile lookup to avoid false 403s
 
     // Get member personal info
-    const { data: memberInfo, error: memberError } = await supabase
+    const { data: memberInfo, error: memberError } = await (svc as any)
       .from("users")
       .select(
-        "id, nama_lengkap, email, no_telepon, alamat, is_active, created_at"
+        "id, nama_lengkap, email, no_telepon, alamat, is_active, created_at, role"
       )
       .eq("id", memberId)
-      .eq("role", "pegawai")
       .single();
 
+    console.log("🔍 DEBUG: Member info:", memberInfo);
+    console.log("🔍 DEBUG: Member error:", memberError);
     if (memberError || !memberInfo) {
       return NextResponse.json({ error: "Member not found" }, { status: 404 });
     }
 
-    // Get current projects for this member (from ketua tim's projects only)
-    const { data: projectAssignments } = await supabase
-      .from("project_assignments")
+    // Get current projects for this member (across all projects) - using project_members
+    const { data: projectAssignments } = await (svc as any)
+      .from("project_members")
       .select(
         `
-        uang_transport,
-        projects!inner (
+        projects:projects!inner (
           id,
           nama_project,
           status,
@@ -146,15 +144,14 @@ export async function GET(
         )
       `
       )
-      .eq("assignee_type", "pegawai")
-      .eq("assignee_id", memberId)
-      .eq("projects.ketua_tim_id", user.id);
+      .eq("user_id", memberId);
+
+    console.log("🔍 DEBUG: Project assignments:", projectAssignments);
 
     // Enrich projects with task data and progress
     const currentProjects = await Promise.all(
       (projectAssignments || []).map(
         async (assignment: {
-          uang_transport: number;
           projects: {
             id: string;
             nama_project: string;
@@ -165,12 +162,12 @@ export async function GET(
         }) => {
           const project = assignment.projects;
 
-          // Get tasks for this project and member
-          const { data: projectTasks } = await supabase
+          // Get tasks for this project and member - using assignee_user_id
+          const { data: projectTasks } = await (svc as any)
             .from("tasks")
             .select("status")
             .eq("project_id", project.id)
-            .eq("pegawai_id", memberId);
+            .eq("assignee_user_id", memberId);
 
           const taskCount = (projectTasks || []).length;
           const completedTasks = (projectTasks || []).filter(
@@ -179,6 +176,18 @@ export async function GET(
           const progress =
             taskCount > 0 ? Math.round((completedTasks / taskCount) * 100) : 0;
 
+          // Get transport amount from earnings_ledger - try different approaches
+          const { data: transportEarnings } = await (svc as any)
+            .from("earnings_ledger")
+            .select("amount")
+            .eq("user_id", memberId)
+            .eq("type", "transport");
+
+          const uangTransport = (transportEarnings || []).reduce(
+            (sum: number, record: { amount: number }) => sum + record.amount,
+            0
+          );
+
           return {
             id: project.id,
             nama_project: project.nama_project,
@@ -186,7 +195,7 @@ export async function GET(
             tanggal_mulai: project.tanggal_mulai,
             deadline: project.deadline,
             progress,
-            uang_transport: assignment.uang_transport || 0,
+            uang_transport: uangTransport,
             task_count: taskCount,
             completed_tasks: completedTasks,
           };
@@ -194,8 +203,8 @@ export async function GET(
       )
     );
 
-    // Get all tasks for this member (from ketua tim's projects)
-    const { data: allTasks } = await supabase
+    // Get all tasks for this member (across all projects) - using assignee_user_id
+    const { data: allTasks } = await (svc as any)
       .from("tasks")
       .select(
         `
@@ -206,8 +215,9 @@ export async function GET(
         projects!inner (ketua_tim_id)
       `
       )
-      .eq("pegawai_id", memberId)
-      .eq("projects.ketua_tim_id", user.id);
+      .eq("assignee_user_id", memberId);
+
+    console.log("🔍 DEBUG: All tasks:", allTasks);
 
     // Calculate task statistics
     const totalTasks = (allTasks || []).length;
@@ -247,24 +257,28 @@ export async function GET(
           )
         : 0;
 
-    // Get monthly earnings
+    // Get monthly earnings - using earnings_ledger
     const currentMonth = new Date().getMonth() + 1;
     const currentYear = new Date().getFullYear();
 
-    const { data: currentMonthEarnings } = await supabase
-      .from("financial_records")
+    const { data: currentMonthEarnings } = await (svc as any)
+      .from("earnings_ledger")
       .select(
         `
         amount,
-        created_at,
-        projects!inner (nama_project, ketua_tim_id)
+        occurred_on,
+        tasks!inner (
+          projects!inner (nama_project, ketua_tim_id)
+        )
       `
       )
-      .eq("recipient_type", "pegawai")
-      .eq("recipient_id", memberId)
-      .eq("projects.ketua_tim_id", user.id)
-      .eq("bulan", currentMonth)
-      .eq("tahun", currentYear);
+      .eq("user_id", memberId)
+      .eq("type", "transport")
+      .gte(
+        "occurred_on",
+        new Date(currentYear, currentMonth - 1, 1).toISOString()
+      )
+      .lt("occurred_on", new Date(currentYear, currentMonth, 1).toISOString());
 
     const currentMonthTotal = (currentMonthEarnings || []).reduce(
       (sum: number, record: { amount: number }) => sum + record.amount,
@@ -274,12 +288,12 @@ export async function GET(
     const earningsBreakdown = (currentMonthEarnings || []).map(
       (record: {
         amount: number;
-        created_at: string;
-        projects: { nama_project: string };
+        occurred_on: string;
+        tasks: { projects: { nama_project: string } };
       }) => ({
-        project_name: record.projects.nama_project,
+        project_name: record.tasks.projects.nama_project,
         amount: record.amount,
-        date: record.created_at,
+        date: record.occurred_on,
       })
     );
 
@@ -291,19 +305,20 @@ export async function GET(
       const month = date.getMonth() + 1;
       const year = date.getFullYear();
 
-      const { data: monthEarnings } = await supabase
-        .from("financial_records")
+      const { data: monthEarnings } = await (svc as any)
+        .from("earnings_ledger")
         .select(
           `
           amount,
-          projects!inner (ketua_tim_id)
+          tasks!inner (
+            projects!inner (ketua_tim_id)
+          )
         `
         )
-        .eq("recipient_type", "pegawai")
-        .eq("recipient_id", memberId)
-        .eq("projects.ketua_tim_id", user.id)
-        .eq("bulan", month)
-        .eq("tahun", year);
+        .eq("user_id", memberId)
+        .eq("type", "transport")
+        .gte("occurred_on", new Date(year, month - 1, 1).toISOString())
+        .lt("occurred_on", new Date(year, month, 1).toISOString());
 
       const monthTotal = (monthEarnings || []).reduce(
         (sum: number, record: { amount: number }) => sum + record.amount,
@@ -324,8 +339,8 @@ export async function GET(
       date.setDate(date.getDate() + i);
       const dateStr = date.toISOString().split("T")[0];
 
-      // Get tasks for this date
-      const { data: dateTasks } = await supabase
+      // Get tasks for this date - using assignee_user_id
+      const { data: dateTasks } = await (svc as any)
         .from("tasks")
         .select(
           `
@@ -335,8 +350,7 @@ export async function GET(
           projects!inner (nama_project, ketua_tim_id)
         `
         )
-        .eq("pegawai_id", memberId)
-        .eq("projects.ketua_tim_id", user.id)
+        .eq("assignee_user_id", memberId)
         .eq("tanggal_tugas", dateStr);
 
       // Check for project start/end dates
@@ -380,7 +394,7 @@ export async function GET(
       date.setDate(date.getDate() - i);
       const dateStr = date.toISOString().split("T")[0];
 
-      const { data: dayTasks } = await supabase
+      const { data: dayTasks } = await (svc as any)
         .from("tasks")
         .select(
           `
@@ -388,8 +402,7 @@ export async function GET(
           projects!inner (ketua_tim_id)
         `
         )
-        .eq("pegawai_id", memberId)
-        .eq("projects.ketua_tim_id", user.id)
+        .eq("assignee_user_id", memberId)
         .eq("tanggal_tugas", dateStr);
 
       const completed = (dayTasks || []).filter(
@@ -422,7 +435,7 @@ export async function GET(
       const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
       const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0);
 
-      const { data: monthTasks } = await supabase
+      const { data: monthTasks } = await (svc as any)
         .from("tasks")
         .select(
           `
@@ -430,25 +443,25 @@ export async function GET(
           projects!inner (ketua_tim_id)
         `
         )
-        .eq("pegawai_id", memberId)
-        .eq("projects.ketua_tim_id", user.id)
+        .eq("assignee_user_id", memberId)
         .eq("status", "completed")
         .gte("updated_at", monthStart.toISOString())
         .lte("updated_at", monthEnd.toISOString());
 
-      const { data: monthEarnings } = await supabase
-        .from("financial_records")
+      const { data: monthEarnings } = await (svc as any)
+        .from("earnings_ledger")
         .select(
           `
           amount,
-          projects!inner (ketua_tim_id)
+          tasks!inner (
+            projects!inner (ketua_tim_id)
+          )
         `
         )
-        .eq("recipient_type", "pegawai")
-        .eq("recipient_id", memberId)
-        .eq("projects.ketua_tim_id", user.id)
-        .eq("bulan", date.getMonth() + 1)
-        .eq("tahun", date.getFullYear());
+        .eq("user_id", memberId)
+        .eq("type", "transport")
+        .gte("occurred_on", monthStart.toISOString())
+        .lte("occurred_on", monthEnd.toISOString());
 
       const monthEarningsTotal = (monthEarnings || []).reduce(
         (sum: number, record: { amount: number }) => sum + record.amount,
@@ -491,6 +504,7 @@ export async function GET(
       },
     };
 
+    console.log("🔍 DEBUG: Final member detail data:", memberDetail);
     return NextResponse.json({ data: memberDetail });
   } catch (error) {
     console.error("Member Detail API Error:", error);

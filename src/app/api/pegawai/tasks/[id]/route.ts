@@ -1,89 +1,159 @@
+// File: src/app/api/pegawai/tasks/[id]/route.ts
+// UPDATED: Support new task structure
+
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
+import type { Database } from "@/types/database";
 
-interface TaskUpdateData {
-  status?: "pending" | "in_progress" | "completed";
-  response_pegawai?: string;
+interface RouteParams {
+  params: Promise<{ id: string }>;
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+interface TaskExistsData {
+  id: string;
+  assignee_user_id: string | null;
+  pegawai_id: string | null;
+  project_id: string;
+  title: string | null;
+  deskripsi_tugas: string;
+}
+
+interface TaskData {
+  id: string;
+  title: string | null;
+  deskripsi_tugas: string;
+  start_date: string | null;
+  end_date: string | null;
+  has_transport: boolean | null;
+  status: string;
+  response_pegawai: string | null;
+  created_at: string;
+  updated_at: string;
+  project_id: string;
+}
+
+interface ProjectData {
+  id: string;
+  nama_project: string;
+  deskripsi: string;
+  status: string;
+}
+
+export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const supabase = await createClient();
     const { id: taskId } = await params;
-    const updateData: TaskUpdateData = await request.json();
 
-    // Authentication check
+    // Auth check
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser();
-
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Role validation
-    const { data: userProfile, error: profileError } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (
-      profileError ||
-      !userProfile ||
-      (userProfile as { role: string }).role !== "pegawai"
-    ) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
-    // Use service client for task update to bypass RLS
-    const serviceClient = createServiceClient(
+    // Service client to avoid RLS issues
+    const svc = createServiceClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // Verify task belongs to this pegawai
-    const { data: task, error: taskError } = await serviceClient
+    // Debug: Check if task exists and get all relevant fields
+    const { data: taskExists, error: existsError } = await svc
       .from("tasks")
-      .select("pegawai_id")
+      .select(
+        "id, assignee_user_id, pegawai_id, project_id, title, deskripsi_tugas"
+      )
       .eq("id", taskId)
       .single();
 
-    if (taskError) {
+    console.log("Debug - Task exists check:", {
+      taskId,
+      userId: user.id,
+      taskExists,
+      existsError,
+    });
+
+    if (existsError) {
+      console.log("Debug - Task does not exist:", existsError);
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
-    if (task.pegawai_id !== user.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    // Check if user has access to this task
+    const taskExistsData = taskExists as TaskExistsData;
+    const hasAccess =
+      taskExistsData.assignee_user_id === user.id ||
+      taskExistsData.pegawai_id === user.id;
+    console.log("Debug - User access:", {
+      assignee_user_id: taskExistsData.assignee_user_id,
+      pegawai_id: taskExistsData.pegawai_id,
+      user_id: user.id,
+      hasAccess,
+    });
+
+    if (!hasAccess) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
-    // Update task using service client
-    const { data: updatedTask, error: updateError } = await serviceClient
+    // Get task details separately to avoid FK relationship errors
+    const { data: task, error: taskError } = await svc
       .from("tasks")
-      .update({
-        ...updateData,
-        updated_at: new Date().toISOString(),
-      })
+      .select(
+        `
+        id,
+        title,
+        deskripsi_tugas,
+        start_date,
+        end_date,
+        has_transport,
+        status,
+        response_pegawai,
+        created_at,
+        updated_at,
+        project_id
+      `
+      )
       .eq("id", taskId)
-      .select()
       .single();
 
-    if (updateError) {
-      console.error("Task update error:", updateError);
+    if (taskError || !task) {
+      console.log("Debug - Task fetch error:", taskError);
       return NextResponse.json(
-        { error: "Failed to update task" },
+        { error: "Failed to fetch task details" },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ data: updatedTask });
+    // Get project details separately
+    const taskData = task as TaskData;
+    const { data: project, error: projectError } = await svc
+      .from("projects")
+      .select("id, nama_project, deskripsi, status")
+      .eq("id", taskData.project_id)
+      .single();
+
+    if (projectError) {
+      console.log("Debug - Project fetch error:", projectError);
+      return NextResponse.json(
+        { error: "Failed to fetch project details" },
+        { status: 500 }
+      );
+    }
+
+    // Combine task and project data
+    const projectData = project as ProjectData;
+    const taskWithProject = {
+      ...taskData,
+      project: projectData,
+    };
+
+    return NextResponse.json({
+      data: taskWithProject,
+    });
   } catch (error) {
-    console.error("Task Update API Error:", error);
+    console.error("Task GET API Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -91,97 +161,85 @@ export async function PUT(
   }
 }
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
     const supabase = await createClient();
     const { id: taskId } = await params;
+    type TasksUpdate = Database["public"]["Tables"]["tasks"]["Update"];
+    const body: TasksUpdate = await request.json();
 
-    // Authentication check
+    // Auth check
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser();
-
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Use service client for task retrieval
-    const serviceClient = createServiceClient(
+    // Service client to avoid RLS issues
+    const svc = createServiceClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // Get task data
-    const { data: task, error: taskError } = await serviceClient
+    // Verify task belongs to user (check both assignee_user_id and pegawai_id)
+    const { data: task, error: taskError } = await svc
       .from("tasks")
-      .select(
-        "id, deskripsi_tugas, tanggal_tugas, status, response_pegawai, created_at, updated_at, project_id, pegawai_id"
-      )
+      .select("id, assignee_user_id, pegawai_id")
       .eq("id", taskId)
-      .eq("pegawai_id", user.id)
+      .or(`assignee_user_id.eq.${user.id},pegawai_id.eq.${user.id}`)
       .single();
 
-    if (taskError) {
-      return NextResponse.json({ error: "Task not found" }, { status: 404 });
-    }
-
-    // Get project data
-    const { data: project, error: projectError } = await serviceClient
-      .from("projects")
-      .select("id, nama_project, status, deadline, ketua_tim_id")
-      .eq("id", task.project_id)
-      .single();
-
-    if (projectError) {
-      console.error("Project fetch error:", projectError);
+    if (taskError || !task) {
       return NextResponse.json(
-        { error: "Failed to fetch project" },
-        { status: 500 }
+        { error: "Task not found or access denied" },
+        { status: 404 }
       );
     }
 
-    // Get ketua tim data
-    const { data: ketuaTim, error: ketuaTimError } = await serviceClient
-      .from("users")
-      .select("id, nama_lengkap")
-      .eq("id", project.ketua_tim_id)
-      .single();
-
-    if (ketuaTimError) {
-      console.error("Ketua tim fetch error:", ketuaTimError);
-      return NextResponse.json(
-        { error: "Failed to fetch ketua tim" },
-        { status: 500 }
-      );
-    }
-
-    // Combine data
-    const enrichedTask = {
-      id: task.id,
-      deskripsi_tugas: task.deskripsi_tugas,
-      tanggal_tugas: task.tanggal_tugas,
-      status: task.status,
-      response_pegawai: task.response_pegawai,
-      created_at: task.created_at,
-      updated_at: task.updated_at,
-      projects: {
-        id: project.id,
-        nama_project: project.nama_project,
-        status: project.status,
-        deadline: project.deadline,
-        users: {
-          nama_lengkap: ketuaTim?.nama_lengkap || "Unknown Team Lead",
-        },
-      },
+    // Update task
+    const updateFields: TasksUpdate = {
+      updated_at: new Date().toISOString(),
     };
 
-    return NextResponse.json({ data: enrichedTask });
+    if (body.status) {
+      updateFields.status = body.status;
+    }
+
+    if (body.response_pegawai !== undefined) {
+      updateFields.response_pegawai = body.response_pegawai;
+    }
+
+    const { data: updatedTask, error: updateError } = await svc
+      .from("tasks")
+      .update(updateFields as unknown as never)
+      .eq("id", taskId)
+      .select(
+        `
+        id,
+        title,
+        deskripsi_tugas,
+        start_date,
+        end_date,
+        has_transport,
+        status,
+        response_pegawai,
+        updated_at
+      `
+      )
+      .single();
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    return NextResponse.json({
+      data: updatedTask,
+      message: "Task updated successfully",
+    });
   } catch (error) {
-    console.error("Task Detail API Error:", error);
+    console.error("Task Update API Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

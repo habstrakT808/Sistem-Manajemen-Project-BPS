@@ -71,7 +71,22 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { nama_mitra, jenis, kontak, alamat, deskripsi, is_active } = body;
+    const {
+      nama_mitra,
+      jenis,
+      kontak,
+      alamat,
+      deskripsi,
+      is_active,
+      posisi_id,
+      posisi_nama,
+      jeniskelamin,
+      pendidikan,
+      pekerjaan_id,
+      pekerjaan_nama,
+      sobat_id,
+      email,
+    } = body;
 
     // Validate required fields
     if (!nama_mitra || !jenis) {
@@ -81,14 +96,40 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const insertData: Database["public"]["Tables"]["mitra"]["Insert"] = {
+    const insertData = {
       nama_mitra,
       jenis,
       kontak: kontak || null,
       alamat: alamat || null,
       deskripsi: deskripsi || null,
       is_active: is_active !== undefined ? is_active : true,
-    };
+      posisi_id: posisi_id || null,
+      jeniskelamin: jeniskelamin || null,
+      pendidikan: pendidikan || null,
+      pekerjaan_id: pekerjaan_id || null,
+      sobat_id: sobat_id || null,
+      email: email || null,
+    } as any;
+
+    // If posisi_nama provided and no posisi_id, create it
+    if (!insertData.posisi_id && posisi_nama) {
+      const { data: pos } = await (supabaseAdmin as any)
+        .from("mitra_positions")
+        .insert({ name: posisi_nama })
+        .select("id")
+        .single();
+      if (pos?.id) insertData.posisi_id = pos.id;
+    }
+
+    // If pekerjaan_nama provided and no pekerjaan_id, create it
+    if (!insertData.pekerjaan_id && pekerjaan_nama) {
+      const { data: occ } = await (supabaseAdmin as any)
+        .from("mitra_occupations")
+        .insert({ name: pekerjaan_nama })
+        .select("id")
+        .single();
+      if (occ?.id) insertData.pekerjaan_id = occ.id;
+    }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (supabaseAdmin as any)
@@ -121,8 +162,23 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, nama_mitra, jenis, kontak, alamat, deskripsi, is_active } =
-      body;
+    const {
+      id,
+      nama_mitra,
+      jenis,
+      kontak,
+      alamat,
+      deskripsi,
+      is_active,
+      posisi_id,
+      posisi_nama,
+      jeniskelamin,
+      pendidikan,
+      pekerjaan_id,
+      pekerjaan_nama,
+      sobat_id,
+      email,
+    } = body;
 
     if (!id || !nama_mitra || !jenis) {
       return NextResponse.json(
@@ -131,7 +187,7 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const updateData: Database["public"]["Tables"]["mitra"]["Update"] = {
+    const updateData = {
       nama_mitra,
       jenis,
       kontak: kontak || null,
@@ -139,7 +195,31 @@ export async function PUT(request: NextRequest) {
       deskripsi: deskripsi || null,
       is_active: is_active !== undefined ? is_active : true,
       updated_at: new Date().toISOString(),
-    };
+      posisi_id: posisi_id || null,
+      jeniskelamin: jeniskelamin || null,
+      pendidikan: pendidikan || null,
+      pekerjaan_id: pekerjaan_id || null,
+      sobat_id: sobat_id || null,
+      email: email || null,
+    } as any;
+
+    if (!updateData.posisi_id && posisi_nama) {
+      const { data: pos } = await (supabaseAdmin as any)
+        .from("mitra_positions")
+        .insert({ name: posisi_nama })
+        .select("id")
+        .single();
+      if (pos?.id) updateData.posisi_id = pos.id;
+    }
+
+    if (!updateData.pekerjaan_id && pekerjaan_nama) {
+      const { data: occ } = await (supabaseAdmin as any)
+        .from("mitra_occupations")
+        .insert({ name: pekerjaan_nama })
+        .select("id")
+        .single();
+      if (occ?.id) updateData.pekerjaan_id = occ.id;
+    }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabaseAdmin as any)

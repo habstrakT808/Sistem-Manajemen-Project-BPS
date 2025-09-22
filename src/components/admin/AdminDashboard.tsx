@@ -42,7 +42,7 @@ export default function AdminDashboard() {
     } = await supabase.auth.getUser();
     if (!user?.id) return null;
 
-    const { data } = await supabase.rpc("get_dashboard_stats", {
+    const { data } = await (supabase as any).rpc("get_dashboard_stats", {
       user_id: user.id,
     });
     return data as DashboardStats;
@@ -305,7 +305,7 @@ export default function AdminDashboard() {
       {/* Quick Actions & System Status */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
         {/* Quick Actions */}
-        <div className="border-0 shadow-xl rounded-xl overflow-hidden">
+        <div className="border-0 shadow-xl rounded-xl overflow-hidden bg-white">
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6">
             <div className="font-semibold flex items-center text-white text-xl">
               <Zap className="w-6 h-6 mr-3" />
@@ -315,7 +315,7 @@ export default function AdminDashboard() {
               Common administrative tasks
             </div>
           </div>
-          <div className="p-6 space-y-4">
+          <div className="p-6 space-y-4 bg-white">
             {quickActions.map((action, index) => {
               const IconComponent = action.icon;
               return (
@@ -348,7 +348,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* System Status */}
-        <div className="border-0 shadow-xl rounded-xl overflow-hidden">
+        <div className="border-0 shadow-xl rounded-xl overflow-hidden bg-white">
           <div className="bg-gradient-to-r from-green-600 to-teal-600 p-6">
             <div className="font-semibold flex items-center text-white text-xl">
               <Activity className="w-6 h-6 mr-3" />
@@ -358,7 +358,7 @@ export default function AdminDashboard() {
               Current system health and status
             </div>
           </div>
-          <div className="p-6 space-y-6">
+          <div className="p-6 space-y-6 bg-white">
             {systemStatus.map((system, index) => {
               const IconComponent = system.icon;
               return (

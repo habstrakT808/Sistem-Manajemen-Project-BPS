@@ -274,7 +274,7 @@ export default function SystemSettings() {
         </TabsList>
 
         <TabsContent value="financial" className="space-y-6">
-          <div className="border-0 shadow-xl rounded-xl overflow-hidden">
+          <div className="border-0 shadow-xl rounded-xl overflow-hidden bg-white">
             <div className="bg-gradient-to-r from-green-600 to-teal-600 p-6">
               <div className="font-semibold flex items-center text-white text-xl">
                 <DollarSign className="w-6 h-6 mr-3" />
@@ -284,7 +284,7 @@ export default function SystemSettings() {
                 Configure financial limits and currency settings
               </div>
             </div>
-            <div className="p-6 space-y-6">
+            <div className="p-6 space-y-6 bg-white">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label htmlFor="mitra_limit">Mitra Monthly Limit</Label>
@@ -367,7 +367,7 @@ export default function SystemSettings() {
         </TabsContent>
 
         <TabsContent value="workload" className="space-y-6">
-          <div className="border-0 shadow-xl rounded-xl overflow-hidden">
+          <div className="border-0 shadow-xl rounded-xl overflow-hidden bg-white">
             <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6">
               <div className="font-semibold flex items-center text-white text-xl">
                 <Users className="w-6 h-6 mr-3" />
@@ -377,7 +377,7 @@ export default function SystemSettings() {
                 Configure workload thresholds and indicators
               </div>
             </div>
-            <div className="p-6 space-y-6">
+            <div className="p-6 space-y-6 bg-white">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-2">
                   <Label htmlFor="low_threshold">Low Workload Threshold</Label>
@@ -490,7 +490,7 @@ export default function SystemSettings() {
         </TabsContent>
 
         <TabsContent value="notifications" className="space-y-6">
-          <div className="border-0 shadow-xl rounded-xl overflow-hidden">
+          <div className="border-0 shadow-xl rounded-xl overflow-hidden bg-white">
             <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-6">
               <div className="font-semibold flex items-center text-white text-xl">
                 <Bell className="w-6 h-6 mr-3" />
@@ -500,7 +500,7 @@ export default function SystemSettings() {
                 Configure system notifications and alerts
               </div>
             </div>
-            <div className="p-6 space-y-6">
+            <div className="p-6 space-y-6 bg-white">
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
@@ -613,7 +613,7 @@ export default function SystemSettings() {
         </TabsContent>
 
         <TabsContent value="system" className="space-y-6">
-          <div className="border-0 shadow-xl rounded-xl overflow-hidden">
+          <div className="border-0 shadow-xl rounded-xl overflow-hidden bg-white">
             <div className="bg-gradient-to-r from-orange-600 to-red-600 p-6">
               <div className="font-semibold flex items-center text-white text-xl">
                 <Database className="w-6 h-6 mr-3" />
@@ -623,7 +623,7 @@ export default function SystemSettings() {
                 Configure system behavior and maintenance
               </div>
             </div>
-            <div className="p-6 space-y-6">
+            <div className="p-6 space-y-6 bg-white">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label htmlFor="data_retention">Data Retention (Days)</Label>

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -46,6 +47,12 @@ import {
   User,
   TrendingUp,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { MitraForm } from "./MitraForm";
 
@@ -84,8 +91,19 @@ export function MitraManagement() {
     "all" | "active" | "inactive"
   >("all");
   const [showMitraForm, setShowMitraForm] = useState(false);
+  const [detailMitra, setDetailMitra] = useState<MitraRow | null>(null);
   const [editingMitra, setEditingMitra] = useState<MitraRow | null>(null);
   const [deletingMitra, setDeletingMitra] = useState<MitraRow | null>(null);
+  const [positionsMap, setPositionsMap] = useState<Record<string, string>>({});
+  const [occupationsMap, setOccupationsMap] = useState<Record<string, string>>(
+    {}
+  );
+
+  const truncate = (value?: string | null, max = 48) => {
+    const s = (value || "").trim();
+    if (s.length <= max) return s || "-";
+    return s.slice(0, max).trimEnd() + "...";
+  };
 
   const fetchMitra = useCallback(async () => {
     try {
@@ -111,6 +129,33 @@ export function MitraManagement() {
   useEffect(() => {
     fetchMitra();
   }, [fetchMitra]);
+
+  // Prefetch positions and occupations to resolve names in Detail dialog
+  useEffect(() => {
+    const preloadLookups = async () => {
+      try {
+        const [pRes, oRes] = await Promise.all([
+          fetch("/api/admin/mitra-positions", { cache: "no-store" }),
+          fetch("/api/admin/mitra-occupations", { cache: "no-store" }),
+        ]);
+        const pJson = await pRes.json();
+        const oJson = await oRes.json();
+        if (Array.isArray(pJson.data)) {
+          const map: Record<string, string> = {};
+          for (const item of pJson.data) if (item?.id) map[item.id] = item.name;
+          setPositionsMap(map);
+        }
+        if (Array.isArray(oJson.data)) {
+          const map: Record<string, string> = {};
+          for (const item of oJson.data) if (item?.id) map[item.id] = item.name;
+          setOccupationsMap(map);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    preloadLookups();
+  }, []);
 
   const handleDeleteMitra = async (mitraItem: MitraRow) => {
     try {
@@ -323,7 +368,7 @@ export function MitraManagement() {
       </div>
 
       {/* Filters */}
-      <div className="border-0 shadow-xl rounded-xl overflow-hidden">
+      <div className="border-0 shadow-xl rounded-xl overflow-hidden bg-white">
         <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-6">
           <div className="font-semibold text-xl text-gray-900">
             Filters & Search
@@ -332,7 +377,7 @@ export function MitraManagement() {
             Find and filter mitra based on their information
           </div>
         </div>
-        <div className="p-6">
+        <div className="p-6 bg-white">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
               <div className="relative">
@@ -409,7 +454,7 @@ export function MitraManagement() {
       </div>
 
       {/* Mitra Table */}
-      <div className="border-0 shadow-xl rounded-xl overflow-hidden">
+      <div className="border-0 shadow-xl rounded-xl overflow-hidden bg-white">
         <div className="bg-gradient-to-r from-gray-50 to-purple-50 p-6">
           <div className="font-semibold text-xl">
             Mitra ({filteredMitra.length})
@@ -418,7 +463,7 @@ export function MitraManagement() {
             A list of all business partners and contractors
           </div>
         </div>
-        <div className="p-0">
+        <div className="p-0 bg-white">
           {loading ? (
             <div className="flex items-center justify-center h-32">
               <div className="flex items-center space-x-2">
@@ -475,7 +520,7 @@ export function MitraManagement() {
                               {mitraItem.nama_mitra}
                             </div>
                             <div className="text-sm text-gray-500">
-                              {mitraItem.deskripsi || "No description"}
+                              {truncate(mitraItem.deskripsi, 48)}
                             </div>
                           </div>
                         </div>
@@ -549,6 +594,14 @@ export function MitraManagement() {
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
+                              onClick={() => setDetailMitra(mitraItem)}
+                              className="rounded-lg"
+                            >
+                              <Eye className="w-4 h-4 mr-2" />
+                              Detail
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
                               onClick={() => {
                                 setEditingMitra(mitraItem);
                                 setShowMitraForm(true);
@@ -607,6 +660,147 @@ export function MitraManagement() {
           )}
         </div>
       </div>
+
+      {/* Detail Dialog */}
+      <Dialog open={!!detailMitra} onOpenChange={() => setDetailMitra(null)}>
+        <DialogContent className="rounded-2xl w-[65vw] max-w-[1000px] bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold">
+              Mitra Detail
+            </DialogTitle>
+          </DialogHeader>
+          {detailMitra && (
+            <div className="space-y-6">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold">
+                  {detailMitra.nama_mitra.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <div className="text-xl font-semibold text-gray-900">
+                    {detailMitra.nama_mitra}
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    Created{" "}
+                    {new Date(detailMitra.created_at).toLocaleDateString(
+                      "id-ID"
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="bg-white rounded-xl border p-4">
+                  <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">
+                    Status
+                  </div>
+                  <div className="font-medium text-gray-900">
+                    {detailMitra.is_active ? "Active" : "Inactive"}
+                  </div>
+                </div>
+                <div className="bg-white rounded-xl border p-4">
+                  <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">
+                    Jenis
+                  </div>
+                  <div className="font-medium text-gray-900">
+                    {detailMitra.jenis === "individu"
+                      ? "Individu"
+                      : "Perusahaan"}
+                  </div>
+                </div>
+                <div className="bg-white rounded-xl border p-4">
+                  <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">
+                    Sobat ID
+                  </div>
+                  <div className="font-medium text-gray-900">
+                    {(detailMitra as any).sobat_id || "-"}
+                  </div>
+                </div>
+                <div className="bg-white rounded-xl border p-4">
+                  <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">
+                    Email
+                  </div>
+                  <div className="font-medium text-gray-900 break-all">
+                    {(detailMitra as any).email || "-"}
+                  </div>
+                </div>
+                <div className="bg-white rounded-xl border p-4">
+                  <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">
+                    Kontak
+                  </div>
+                  <div className="font-medium text-gray-900">
+                    {detailMitra.kontak || "-"}
+                  </div>
+                </div>
+                <div className="bg-white rounded-xl border p-4 md:col-span-2 lg:col-span-3">
+                  <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">
+                    Alamat
+                  </div>
+                  <div className="font-medium text-gray-900">
+                    {detailMitra.alamat || "-"}
+                  </div>
+                </div>
+                <div className="bg-white rounded-xl border p-4">
+                  <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">
+                    Posisi
+                  </div>
+                  <div className="font-medium text-gray-900">
+                    {(detailMitra as any).posisi_id
+                      ? positionsMap[
+                          (detailMitra as any).posisi_id as string
+                        ] || "-"
+                      : "-"}
+                  </div>
+                </div>
+                <div className="bg-white rounded-xl border p-4">
+                  <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">
+                    Pekerjaan
+                  </div>
+                  <div className="font-medium text-gray-900">
+                    {(detailMitra as any).pekerjaan_id
+                      ? occupationsMap[
+                          (detailMitra as any).pekerjaan_id as string
+                        ] || "-"
+                      : "-"}
+                  </div>
+                </div>
+                <div className="bg-white rounded-xl border p-4">
+                  <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">
+                    Jenis Kelamin
+                  </div>
+                  <div className="font-medium text-gray-900">
+                    {(detailMitra as any).jeniskelamin === "laki_laki"
+                      ? "Laki-laki"
+                      : (detailMitra as any).jeniskelamin === "perempuan"
+                        ? "Perempuan"
+                        : "-"}
+                  </div>
+                </div>
+                <div className="bg-white rounded-xl border p-4">
+                  <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">
+                    Pendidikan
+                  </div>
+                  <div className="font-medium text-gray-900">
+                    {(detailMitra as any).pendidikan === "sma"
+                      ? "SMA/SMK"
+                      : (detailMitra as any).pendidikan === "d4s1"
+                        ? "D4/S1"
+                        : "-"}
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl border p-4 md:col-span-2 lg:col-span-3">
+                <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">
+                  Deskripsi
+                </div>
+                <div className="text-gray-900">
+                  {detailMitra.deskripsi || "-"}
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog

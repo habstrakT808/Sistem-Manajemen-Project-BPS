@@ -45,7 +45,7 @@ interface ProjectData {
   deadline: string;
   status: "upcoming" | "active" | "completed";
   created_at: string;
-  project_assignments: Array<{
+  project_assignments?: Array<{
     id: string;
     assignee_type: "pegawai" | "mitra";
     assignee_id: string;
@@ -108,7 +108,7 @@ export default function ProjectList() {
       { page: currentPage, status: selectedStatus },
     ],
     queryFn: () => fetchProjectsRequest(currentPage, selectedStatus),
-    keepPreviousData: true,
+    placeholderData: (prev) => prev as ProjectsResponse | undefined,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -141,20 +141,22 @@ export default function ProjectList() {
   }, [pagination.page, pagination.totalPages, selectedStatus, queryClient]);
 
   const calculateProjectBudget = (
-    assignments: ProjectData["project_assignments"]
+    assignments: ProjectData["project_assignments"] | undefined
   ) => {
-    return assignments.reduce((total, assignment) => {
+    const list = Array.isArray(assignments) ? assignments : [];
+    return list.reduce((total, assignment) => {
       return total + (assignment.uang_transport || 0) + (assignment.honor || 0);
     }, 0);
   };
 
-  const getTeamSummary = (assignments: ProjectData["project_assignments"]) => {
-    const pegawaiCount = assignments.filter(
+  const getTeamSummary = (
+    assignments: ProjectData["project_assignments"] | undefined
+  ) => {
+    const list = Array.isArray(assignments) ? assignments : [];
+    const pegawaiCount = list.filter(
       (a) => a.assignee_type === "pegawai"
     ).length;
-    const mitraCount = assignments.filter(
-      (a) => a.assignee_type === "mitra"
-    ).length;
+    const mitraCount = list.filter((a) => a.assignee_type === "mitra").length;
     return `${pegawaiCount} Pegawai, ${mitraCount} Mitra`;
   };
 
@@ -309,6 +311,8 @@ export default function ProjectList() {
         </Button>
       </div>
 
+      {/* Removed summary stats to simplify header */}
+
       {/* Status Tabs */}
       <Tabs
         value={selectedStatus}
@@ -387,12 +391,13 @@ export default function ProjectList() {
                 return (
                   <div
                     key={project.id}
-                    className="border-0 shadow-xl rounded-xl overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1"
+                    className="border-0 shadow-xl rounded-xl overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 bg-white"
                     onMouseEnter={() => {
                       router.prefetch(viewHref);
                       prefetchProjectDetail(project.id);
                     }}
                   >
+                    <div className="h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
                     <div className="p-6">
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex-1">
@@ -401,7 +406,7 @@ export default function ProjectList() {
                               {project.nama_project}
                             </h3>
                             <Badge
-                              className={`${(project.status === "upcoming" && "bg-blue-100 text-blue-800 border-blue-200") || (project.status === "active" && "bg-green-100 text-green-800 border-green-200") || (project.status === "completed" && "bg-gray-100 text-gray-800 border-gray-200")} border flex items-center space-x-1`}
+                              className={`${(project.status === "upcoming" && "bg-blue-100 text-blue-800 border-blue-200") || (project.status === "active" && "bg-green-100 text-green-800 border-green-200") || (project.status === "completed" && "bg-gray-100 text-gray-800 border-gray-200")} border flex items-center space-x-1 shadow-sm`}
                             >
                               <StatusIcon className="w-3 h-3" />
                               <span>{project.status.toUpperCase()}</span>
@@ -413,7 +418,7 @@ export default function ProjectList() {
 
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                             <div className="flex items-center space-x-2">
-                              <Calendar className="w-4 h-4 text-blue-500" />
+                              <Calendar className="w-4 h-4 text-blue-600" />
                               <div className="text-sm">
                                 <div className="font-medium text-gray-900">
                                   Timeline
@@ -431,7 +436,7 @@ export default function ProjectList() {
                             </div>
 
                             <div className="flex items-center space-x-2">
-                              <Users className="w-4 h-4 text-green-500" />
+                              <Users className="w-4 h-4 text-emerald-600" />
                               <div className="text-sm">
                                 <div className="font-medium text-gray-900">
                                   Team
@@ -443,12 +448,12 @@ export default function ProjectList() {
                             </div>
 
                             <div className="flex items-center space-x-2">
-                              <DollarSign className="w-4 h-4 text-orange-500" />
+                              <DollarSign className="w-4 h-4 text-orange-600" />
                               <div className="text-sm">
                                 <div className="font-medium text-gray-900">
                                   Budget
                                 </div>
-                                <div className="text-gray-500">
+                                <div className="text-gray-600">
                                   {formatCurrency(budget)}
                                 </div>
                               </div>
@@ -546,7 +551,7 @@ export default function ProjectList() {
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div
-                            className="bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full transition-all duration-300"
+                            className="bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 h-2 rounded-full transition-all duration-300"
                             style={{
                               width:
                                 typeof (project as any).progress === "number"

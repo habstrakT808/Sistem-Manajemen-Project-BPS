@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Database } from "@/../database/types/database.types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,6 +40,19 @@ interface FormData {
   alamat: string;
   deskripsi: string;
   is_active: boolean;
+  posisi_id?: string | null;
+  posisi_nama?: string;
+  jeniskelamin?: "laki_laki" | "perempuan" | "";
+  pendidikan?: "sma" | "d4s1" | "";
+  pekerjaan_id?: string | null;
+  pekerjaan_nama?: string;
+  sobat_id?: string;
+  email?: string;
+}
+
+interface OptionItem {
+  id: string;
+  name: string;
 }
 
 export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
@@ -50,10 +63,37 @@ export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
     alamat: mitra?.alamat || "",
     deskripsi: mitra?.deskripsi || "",
     is_active: mitra?.is_active ?? true,
+
+    posisi_id: (mitra as any)?.posisi_id || null,
+    jeniskelamin: ((mitra as any)?.jeniskelamin as any) || "",
+    pendidikan: ((mitra as any)?.pendidikan as any) || "",
+    pekerjaan_id: (mitra as any)?.pekerjaan_id || null,
+    sobat_id: (mitra as any)?.sobat_id || "",
+    email: (mitra as any)?.email || "",
   });
   const [loading, setLoading] = useState(false);
+  const [positions, setPositions] = useState<OptionItem[]>([]);
+  const [occupations, setOccupations] = useState<OptionItem[]>([]);
 
   const isEditing = !!mitra;
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [pRes, oRes] = await Promise.all([
+          fetch("/api/admin/mitra-positions", { cache: "no-store" }),
+          fetch("/api/admin/mitra-occupations", { cache: "no-store" }),
+        ]);
+        const pJson = await pRes.json();
+        const oJson = await oRes.json();
+        if (pRes.ok && Array.isArray(pJson.data)) setPositions(pJson.data);
+        if (oRes.ok && Array.isArray(oJson.data)) setOccupations(oJson.data);
+      } catch {
+        // ignore
+      }
+    };
+    load();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,6 +115,14 @@ export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
             alamat: formData.alamat || null,
             deskripsi: formData.deskripsi || null,
             is_active: formData.is_active,
+            posisi_id: formData.posisi_id || null,
+            posisi_nama: formData.posisi_nama || undefined,
+            jeniskelamin: formData.jeniskelamin || null,
+            pendidikan: formData.pendidikan || null,
+            pekerjaan_id: formData.pekerjaan_id || null,
+            pekerjaan_nama: formData.pekerjaan_nama || undefined,
+            sobat_id: formData.sobat_id || null,
+            email: formData.email || null,
           }),
         });
 
@@ -100,6 +148,14 @@ export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
             alamat: formData.alamat || null,
             deskripsi: formData.deskripsi || null,
             is_active: formData.is_active,
+            posisi_id: formData.posisi_id || null,
+            posisi_nama: formData.posisi_nama || undefined,
+            jeniskelamin: formData.jeniskelamin || null,
+            pendidikan: formData.pendidikan || null,
+            pekerjaan_id: formData.pekerjaan_id || null,
+            pekerjaan_nama: formData.pekerjaan_nama || undefined,
+            sobat_id: formData.sobat_id || null,
+            email: formData.email || null,
           }),
         });
 
@@ -146,7 +202,7 @@ export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Form */}
         <div className="lg:col-span-2">
-          <div className="border-0 shadow-xl rounded-xl overflow-hidden">
+          <div className="border-0 shadow-xl rounded-xl overflow-hidden bg-white">
             <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-6">
               <div className="font-semibold text-xl">Partner Information</div>
               <div className="text-muted-foreground text-sm">
@@ -155,7 +211,7 @@ export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
                   : "Enter the partner details below"}
               </div>
             </div>
-            <div className="p-6">
+            <div className="p-6 bg-white">
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Partner Name */}
@@ -178,7 +234,7 @@ export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
                     <Label htmlFor="jenis">Partner Type *</Label>
                     <Select
                       value={formData.jenis}
-                      onValueChange={(value: "perusahaan" | "individu") =>
+                      onValueChange={(value: "individu") =>
                         setFormData({ ...formData, jenis: value })
                       }
                     >
@@ -186,12 +242,6 @@ export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="rounded-xl">
-                        <SelectItem value="perusahaan">
-                          <div className="flex items-center">
-                            <Building className="w-4 h-4 mr-2" />
-                            Perusahaan - Company
-                          </div>
-                        </SelectItem>
                         <SelectItem value="individu">
                           <div className="flex items-center">
                             <User className="w-4 h-4 mr-2" />
@@ -268,6 +318,208 @@ export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
                   />
                 </div>
 
+                {/* Extra Fields */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label>Posisi</Label>
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={formData.posisi_id || ""}
+                        onValueChange={(v) =>
+                          setFormData({ ...formData, posisi_id: v || null })
+                        }
+                      >
+                        <SelectTrigger className="rounded-xl border-2 focus:border-purple-300 w-full md:w-auto min-w-[220px]">
+                          <SelectValue placeholder="Pilih posisi" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {positions.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      <Input
+                        placeholder="Or type new position"
+                        value={formData.posisi_nama || ""}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            posisi_nama: e.target.value,
+                          })
+                        }
+                        className="rounded-xl border-2 focus:border-purple-300"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="border-2"
+                        onClick={async () => {
+                          const name = (formData.posisi_nama || "").trim();
+                          if (!name) return;
+                          const res = await fetch(
+                            "/api/admin/mitra-positions",
+                            {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ name }),
+                            }
+                          );
+                          const json = await res.json();
+                          if (res.ok) {
+                            setPositions((prev) => [
+                              { id: json.data.id, name },
+                              ...prev,
+                            ]);
+                            setFormData({
+                              ...formData,
+                              posisi_id: json.data.id,
+                            });
+                            toast.success("Position added");
+                          } else
+                            toast.error(json.error || "Failed to add position");
+                        }}
+                      >
+                        +
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Jenis Kelamin</Label>
+                    <Select
+                      value={formData.jeniskelamin || ""}
+                      onValueChange={(v: "laki_laki" | "perempuan") =>
+                        setFormData({ ...formData, jeniskelamin: v })
+                      }
+                    >
+                      <SelectTrigger className="rounded-xl border-2 focus:border-purple-300">
+                        <SelectValue placeholder="Pilih jenis kelamin" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="laki_laki">Laki-laki</SelectItem>
+                        <SelectItem value="perempuan">Perempuan</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Pendidikan</Label>
+                    <Select
+                      value={formData.pendidikan || ""}
+                      onValueChange={(v: "sma" | "d4s1") =>
+                        setFormData({ ...formData, pendidikan: v })
+                      }
+                    >
+                      <SelectTrigger className="rounded-xl border-2 focus:border-purple-300">
+                        <SelectValue placeholder="Pilih pendidikan" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="sma">Tamat SMA/Sederajat</SelectItem>
+                        <SelectItem value="d4s1">Tamat D4/S1</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Pekerjaan</Label>
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={formData.pekerjaan_id || ""}
+                        onValueChange={(v) =>
+                          setFormData({ ...formData, pekerjaan_id: v || null })
+                        }
+                      >
+                        <SelectTrigger className="rounded-xl border-2 focus:border-purple-300 w-full md:w-auto min-w-[220px]">
+                          <SelectValue placeholder="Pilih pekerjaan" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {occupations.map((o) => (
+                            <SelectItem key={o.id} value={o.id}>
+                              {o.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      <Input
+                        placeholder="Or type new occupation"
+                        value={formData.pekerjaan_nama || ""}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            pekerjaan_nama: e.target.value,
+                          })
+                        }
+                        className="rounded-xl border-2 focus:border-purple-300"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="border-2"
+                        onClick={async () => {
+                          const name = (formData.pekerjaan_nama || "").trim();
+                          if (!name) return;
+                          const res = await fetch(
+                            "/api/admin/mitra-occupations",
+                            {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ name }),
+                            }
+                          );
+                          const json = await res.json();
+                          if (res.ok) {
+                            setOccupations((prev) => [
+                              { id: json.data.id, name },
+                              ...prev,
+                            ]);
+                            setFormData({
+                              ...formData,
+                              pekerjaan_id: json.data.id,
+                            });
+                            toast.success("Occupation added");
+                          } else
+                            toast.error(
+                              json.error || "Failed to add occupation"
+                            );
+                        }}
+                      >
+                        +
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="sobat_id">Sobat ID</Label>
+                    <Input
+                      id="sobat_id"
+                      value={formData.sobat_id || ""}
+                      onChange={(e) =>
+                        setFormData({ ...formData, sobat_id: e.target.value })
+                      }
+                      placeholder="Unique ID from client"
+                      className="rounded-xl border-2 focus:border-purple-300"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={formData.email || ""}
+                      onChange={(e) =>
+                        setFormData({ ...formData, email: e.target.value })
+                      }
+                      placeholder="email@example.com"
+                      className="rounded-xl border-2 focus:border-purple-300"
+                    />
+                  </div>
+                </div>
+
                 {/* Actions */}
                 <div className="flex items-center justify-end space-x-4 pt-6">
                   <Button
@@ -306,28 +558,15 @@ export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
         {/* Info Panel */}
         <div className="space-y-6">
           {/* Partner Type Info */}
-          <div className="border-0 shadow-xl rounded-xl overflow-hidden">
+          <div className="border-0 shadow-xl rounded-xl overflow-hidden bg-white">
             <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-6">
               <div className="font-semibold text-lg flex items-center">
-                <Building className="w-5 h-5 mr-2" />
-                Partner Types
+                <User className="w-5 h-5 mr-2" />
+                Partner Type
               </div>
             </div>
-            <div className="p-6 space-y-4">
-              <div className="p-4 bg-blue-50 rounded-xl">
-                <div className="flex items-center mb-2">
-                  <Building className="w-5 h-5 text-blue-600 mr-2" />
-                  <span className="font-semibold text-blue-900">
-                    Perusahaan
-                  </span>
-                </div>
-                <p className="text-sm text-blue-700">
-                  Corporate entities, companies, and organizations that provide
-                  services or products.
-                </p>
-              </div>
-
-              <div className="p-4 bg-green-50 rounded-xl">
+            <div className="p-6 space-y-4 bg-white">
+              <div className="p-4 bg-white rounded-xl">
                 <div className="flex items-center mb-2">
                   <User className="w-5 h-5 text-green-600 mr-2" />
                   <span className="font-semibold text-green-900">Individu</span>
@@ -341,15 +580,15 @@ export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
           </div>
 
           {/* Monthly Limit Info */}
-          <div className="border-0 shadow-xl rounded-xl overflow-hidden">
+          <div className="border-0 shadow-xl rounded-xl overflow-hidden bg-white">
             <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-6">
               <div className="font-semibold text-lg flex items-center">
                 <DollarSign className="w-5 h-5 mr-2" />
                 Financial Limits
               </div>
             </div>
-            <div className="p-6">
-              <div className="p-4 bg-orange-50 rounded-xl">
+            <div className="p-6 bg-white">
+              <div className="p-4 bg-white rounded-xl">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-semibold text-orange-900">
                     Monthly Limit

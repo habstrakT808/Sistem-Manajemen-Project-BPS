@@ -239,9 +239,6 @@ export function UserForm({ user, onClose, onSuccess }: UserFormProps) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="pegawai">Pegawai - Employee</SelectItem>
-                    <SelectItem value="ketua_tim">
-                      Ketua Tim - Project Manager
-                    </SelectItem>
                     <SelectItem value="admin">
                       Admin - System Administrator
                     </SelectItem>

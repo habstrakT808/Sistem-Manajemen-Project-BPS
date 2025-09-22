@@ -1,8 +1,9 @@
 // File: src/components/ketua-tim/TaskManagement.tsx
+// COMPLETELY UPDATED: New task structure with transport management
 
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -51,15 +53,22 @@ import {
   Trash2,
   Eye,
   Loader2,
+  DollarSign,
+  MapPin,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { formatCurrency } from "@/lib/utils";
 
 interface TaskData {
   id: string;
   project_id: string;
-  pegawai_id: string;
-  tanggal_tugas: string;
+  assignee_user_id: string;
+  title: string;
   deskripsi_tugas: string;
+  start_date: string;
+  end_date: string;
+  has_transport: boolean;
   status: "pending" | "in_progress" | "completed";
   response_pegawai: string | null;
   created_at: string;
@@ -73,29 +82,44 @@ interface TaskData {
     nama_lengkap: string;
     email: string;
   };
+  task_transport_allocations: Array<{
+    id: string;
+    allocation_date: string | null;
+    allocated_at: string | null;
+    canceled_at: string | null;
+  }>;
 }
 
 interface ProjectOption {
   id: string;
   nama_project: string;
-  pegawai_assignments: Array<{
-    assignee_id: string;
-    users?: { nama_lengkap: string };
-  }>;
+}
+
+interface ProjectMember {
+  id: string;
+  nama_lengkap: string;
+  email: string;
+  role: string;
 }
 
 interface TaskFormData {
   project_id: string;
-  pegawai_id: string;
-  tanggal_tugas: string;
-  deskripsi_tugas: string;
+  assignee_user_id: string;
+  title: string;
+  description: string;
+  start_date: string;
+  end_date: string;
+  has_transport: boolean;
 }
 
 const initialFormData: TaskFormData = {
   project_id: "",
-  pegawai_id: "",
-  tanggal_tugas: "",
-  deskripsi_tugas: "",
+  assignee_user_id: "",
+  title: "",
+  description: "",
+  start_date: "",
+  end_date: "",
+  has_transport: false,
 };
 
 async function fetchTasksRequest(
@@ -105,6 +129,7 @@ async function fetchTasksRequest(
   const params = new URLSearchParams();
   if (selectedStatus !== "all") params.append("status", selectedStatus);
   if (selectedProject !== "all") params.append("project_id", selectedProject);
+
   const response = await fetch(`/api/ketua-tim/tasks?${params.toString()}`, {
     cache: "no-store",
   });
@@ -119,46 +144,18 @@ async function fetchProjectsRequest(): Promise<ProjectOption[]> {
   });
   const result = await response.json();
   if (!response.ok) throw new Error(result.error || "Failed to fetch projects");
+  return result.data as ProjectOption[];
+}
 
-  // Enrich projects with pegawai assignments
-  const enriched = await Promise.all(
-    (result.data as ProjectOption[]).map(async (project: ProjectOption) => {
-      try {
-        const assignmentResponse = await fetch(
-          `/api/ketua-tim/projects/${project.id}`,
-          { cache: "no-store" }
-        );
-        const assignmentResult = await assignmentResponse.json();
-        if (assignmentResponse.ok && assignmentResult.data) {
-          const pegawaiAssignments =
-            assignmentResult.data.project_assignments
-              ?.filter(
-                (a: { assignee_type: string }) => a.assignee_type === "pegawai"
-              )
-              ?.map(
-                (a: {
-                  assignee_id: string;
-                  assignee_details?: { nama_lengkap: string };
-                }) => ({
-                  assignee_id: a.assignee_id,
-                  users: a.assignee_details
-                    ? { nama_lengkap: a.assignee_details.nama_lengkap }
-                    : undefined,
-                })
-              ) || [];
-          return {
-            ...project,
-            pegawai_assignments: pegawaiAssignments,
-          } as ProjectOption;
-        }
-        return { ...project, pegawai_assignments: [] } as ProjectOption;
-      } catch {
-        return { ...project, pegawai_assignments: [] } as ProjectOption;
-      }
-    })
-  );
-
-  return enriched;
+async function fetchProjectMembers(
+  projectId: string
+): Promise<ProjectMember[]> {
+  const response = await fetch(`/api/ketua-tim/projects/${projectId}/members`, {
+    cache: "no-store",
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || "Failed to fetch members");
+  return result.data as ProjectMember[];
 }
 
 export default function TaskManagement() {
@@ -169,69 +166,55 @@ export default function TaskManagement() {
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [selectedProject, setSelectedProject] = useState<string>("all");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [projectMembers, setProjectMembers] = useState<
-    { id: string; nama_lengkap: string; email: string }[]
-  >([]);
-  const [loadingMembers, setLoadingMembers] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<TaskData | null>(null);
-  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<TaskData | null>(null);
   const [creating, setCreating] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // Fetch data with React Query
   const { data: tasks, isLoading } = useQuery<TaskData[], Error>({
     queryKey: ["ketua", "tasks", { selectedStatus, selectedProject }],
     queryFn: () => fetchTasksRequest(selectedStatus, selectedProject),
-    keepPreviousData: true,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000, // 30 seconds for real-time feel
   });
 
   const { data: projects } = useQuery<ProjectOption[], Error>({
-    queryKey: ["ketua", "projects", "forTasks"],
+    queryKey: ["ketua", "projects", "list"],
     queryFn: fetchProjectsRequest,
     staleTime: 5 * 60 * 1000,
   });
 
+  const { data: projectMembers, isLoading: loadingMembers } = useQuery<
+    ProjectMember[],
+    Error
+  >({
+    queryKey: ["ketua", "projects", "members", formData.project_id],
+    queryFn: () => fetchProjectMembers(formData.project_id),
+    enabled: !!formData.project_id,
+    staleTime: 2 * 60 * 1000,
+  });
+
   useEffect(() => {
     router.prefetch("/ketua-tim/tasks");
+    router.prefetch("/ketua-tim/projects");
   }, [router]);
-
-  const fetchProjectMembers = useCallback(async (projectId: string) => {
-    if (!projectId) {
-      setProjectMembers([]);
-      return;
-    }
-    setLoadingMembers(true);
-    try {
-      const response = await fetch(
-        `/api/ketua-tim/projects/${projectId}/members`,
-        { cache: "no-store" }
-      );
-      const result = await response.json();
-      if (!response.ok)
-        throw new Error(result.error || "Failed to fetch project members");
-      setProjectMembers(result.data || []);
-    } catch (error) {
-      console.error("Error fetching project members:", error);
-      toast.error("Failed to load team members");
-      setProjectMembers([]);
-    } finally {
-      setLoadingMembers(false);
-    }
-  }, []);
 
   const handleCreateTask = async () => {
     if (
       !formData.project_id ||
-      !formData.pegawai_id ||
-      !formData.tanggal_tugas ||
-      !formData.deskripsi_tugas
+      !formData.assignee_user_id ||
+      !formData.title ||
+      !formData.description ||
+      !formData.start_date ||
+      !formData.end_date
     ) {
       toast.error("Please fill in all required fields");
       return;
     }
+
     setCreating(true);
     try {
       const response = await fetch("/api/ketua-tim/tasks", {
@@ -239,13 +222,16 @@ export default function TaskManagement() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
+
       const result = await response.json();
       if (!response.ok)
         throw new Error(result.error || "Failed to create task");
+
       toast.success("Task created successfully!");
       setFormData(initialFormData);
       setIsCreateDialogOpen(false);
-      // Invalidate related lists instantly
+
+      // Invalidate all related queries instantly
       queryClient.invalidateQueries({ queryKey: ["ketua", "tasks"] });
       queryClient.invalidateQueries({ queryKey: ["ketua", "dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["ketua", "projects"] });
@@ -264,29 +250,30 @@ export default function TaskManagement() {
     setIsViewDialogOpen(true);
   };
 
-  const handleEditTask = async (task: TaskData) => {
+  const handleEditTask = (task: TaskData) => {
     setSelectedTask(task);
     setFormData({
       project_id: task.project_id,
-      pegawai_id: task.pegawai_id,
-      tanggal_tugas: task.tanggal_tugas,
-      deskripsi_tugas: task.deskripsi_tugas,
+      assignee_user_id:
+        task.assignee_user_id ||
+        (task as unknown as { pegawai_id?: string }).pegawai_id ||
+        "",
+      title: (task as { title?: string }).title || "",
+      description: task.deskripsi_tugas || "",
+      start_date: (task as { start_date?: string }).start_date
+        ? String((task as { start_date?: string }).start_date).split("T")[0]
+        : "",
+      end_date: (task as { end_date?: string }).end_date
+        ? String((task as { end_date?: string }).end_date).split("T")[0]
+        : "",
+      has_transport: task.has_transport,
     });
-    await fetchProjectMembers(task.project_id);
     setIsEditDialogOpen(true);
   };
 
   const handleUpdateTask = async () => {
     if (!selectedTask) return;
-    if (
-      !formData.project_id ||
-      !formData.pegawai_id ||
-      !formData.tanggal_tugas ||
-      !formData.deskripsi_tugas
-    ) {
-      toast.error("Please fill in all required fields");
-      return;
-    }
+
     setUpdating(true);
     try {
       const response = await fetch(`/api/ketua-tim/tasks/${selectedTask.id}`, {
@@ -294,17 +281,19 @@ export default function TaskManagement() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
+
       const result = await response.json();
       if (!response.ok)
         throw new Error(result.error || "Failed to update task");
+
       toast.success("Task updated successfully!");
       setFormData(initialFormData);
       setSelectedTask(null);
       setIsEditDialogOpen(false);
-      // Invalidate lists
+
+      // Invalidate queries
       queryClient.invalidateQueries({ queryKey: ["ketua", "tasks"] });
       queryClient.invalidateQueries({ queryKey: ["ketua", "dashboard"] });
-      queryClient.invalidateQueries({ queryKey: ["ketua", "projects"] });
     } catch (error) {
       console.error("Error updating task:", error);
       toast.error(
@@ -317,21 +306,25 @@ export default function TaskManagement() {
 
   const handleDeleteTask = async () => {
     if (!selectedTask) return;
+
     setDeleting(true);
     try {
       const response = await fetch(`/api/ketua-tim/tasks/${selectedTask.id}`, {
         method: "DELETE",
       });
-      const result = await response.json();
-      if (!response.ok)
+
+      if (!response.ok) {
+        const result = await response.json();
         throw new Error(result.error || "Failed to delete task");
+      }
+
       toast.success("Task deleted successfully!");
       setSelectedTask(null);
       setIsDeleteDialogOpen(false);
-      // Invalidate lists
+
+      // Invalidate queries
       queryClient.invalidateQueries({ queryKey: ["ketua", "tasks"] });
       queryClient.invalidateQueries({ queryKey: ["ketua", "dashboard"] });
-      queryClient.invalidateQueries({ queryKey: ["ketua", "projects"] });
     } catch (error) {
       console.error("Error deleting task:", error);
       toast.error(
@@ -339,6 +332,28 @@ export default function TaskManagement() {
       );
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleCancelTransport = async (taskId: string) => {
+    try {
+      const response = await fetch(
+        `/api/ketua-tim/tasks/${taskId}/transport/cancel`,
+        {
+          method: "POST",
+        }
+      );
+
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || "Failed to cancel transport");
+      }
+
+      toast.success("Transport allocation canceled");
+      queryClient.invalidateQueries({ queryKey: ["ketua", "tasks"] });
+    } catch (error) {
+      console.error("Error canceling transport:", error);
+      toast.error("Failed to cancel transport");
     }
   };
 
@@ -369,12 +384,19 @@ export default function TaskManagement() {
   };
 
   const filteredTasks = (tasks || []).filter((task) => {
+    const q = (searchTerm || "").toLowerCase();
+    const title = (task as { title?: string }).title
+      ? ((task as { title?: string }).title as string).toLowerCase()
+      : "";
+    const desc = (task.deskripsi_tugas || "").toLowerCase();
+    const projectName = (task.projects?.nama_project || "").toLowerCase();
+    const assigneeName = (task.users?.nama_lengkap || "").toLowerCase();
     const matchesSearch =
-      task.deskripsi_tugas.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      task.projects.nama_project
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      task.users.nama_lengkap.toLowerCase().includes(searchTerm.toLowerCase());
+      !q ||
+      title.includes(q) ||
+      desc.includes(q) ||
+      projectName.includes(q) ||
+      assigneeName.includes(q);
     return matchesSearch;
   });
 
@@ -402,10 +424,11 @@ export default function TaskManagement() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-            Task Management
+            Advanced Task Management
           </h1>
           <p className="text-gray-600 text-lg mt-2">
-            Create and manage daily tasks for your team members.
+            Create and manage tasks with transport allocations for your team
+            members.
           </p>
         </div>
 
@@ -416,15 +439,15 @@ export default function TaskManagement() {
               Create Task
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-lg">
             <DialogHeader>
               <DialogTitle>Create New Task</DialogTitle>
               <DialogDescription>
-                Assign a new task to a team member for a specific project.
+                Create a task with date range and optional transport allocation.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="project">Project *</Label>
                 <Select
@@ -433,9 +456,8 @@ export default function TaskManagement() {
                     setFormData((prev) => ({
                       ...prev,
                       project_id: value,
-                      pegawai_id: "",
+                      assignee_user_id: "",
                     }));
-                    fetchProjectMembers(value);
                   }}
                 >
                   <SelectTrigger>
@@ -452,11 +474,14 @@ export default function TaskManagement() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="pegawai">Team Member *</Label>
+                <Label htmlFor="assignee">Team Member *</Label>
                 <Select
-                  value={formData.pegawai_id}
+                  value={formData.assignee_user_id}
                   onValueChange={(value) =>
-                    setFormData((prev) => ({ ...prev, pegawai_id: value }))
+                    setFormData((prev) => ({
+                      ...prev,
+                      assignee_user_id: value,
+                    }))
                   }
                   disabled={!formData.project_id || loadingMembers}
                 >
@@ -465,14 +490,16 @@ export default function TaskManagement() {
                       placeholder={
                         loadingMembers
                           ? "Loading team members..."
-                          : projectMembers.length === 0
-                            ? "No team members in this project"
-                            : "Select team member"
+                          : !formData.project_id
+                            ? "Select project first"
+                            : (projectMembers?.length || 0) === 0
+                              ? "No team members available"
+                              : "Select team member"
                       }
                     />
                   </SelectTrigger>
                   <SelectContent>
-                    {projectMembers.map((member) => (
+                    {(projectMembers || []).map((member) => (
                       <SelectItem key={member.id} value={member.id}>
                         <div className="flex items-center justify-between w-full">
                           <span>{member.nama_lengkap}</span>
@@ -487,33 +514,82 @@ export default function TaskManagement() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="tanggal_tugas">Task Date *</Label>
+                <Label htmlFor="title">Task Title *</Label>
                 <Input
-                  id="tanggal_tugas"
-                  type="date"
-                  value={formData.tanggal_tugas}
+                  id="title"
+                  value={formData.title || ""}
                   onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      tanggal_tugas: e.target.value,
-                    }))
+                    setFormData((prev) => ({ ...prev, title: e.target.value }))
                   }
+                  placeholder="Enter task title"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="deskripsi_tugas">Task Description *</Label>
+                <Label htmlFor="description">Task Description *</Label>
                 <Textarea
-                  id="deskripsi_tugas"
-                  value={formData.deskripsi_tugas}
+                  id="description"
+                  value={formData.description || ""}
                   onChange={(e) =>
                     setFormData((prev) => ({
                       ...prev,
-                      deskripsi_tugas: e.target.value,
+                      description: e.target.value,
                     }))
                   }
                   placeholder="Describe the task in detail..."
                   rows={3}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="start_date">Start Date *</Label>
+                  <Input
+                    id="start_date"
+                    type="date"
+                    value={formData.start_date || ""}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        start_date: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="end_date">End Date *</Label>
+                  <Input
+                    id="end_date"
+                    type="date"
+                    value={formData.end_date || ""}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        end_date: e.target.value,
+                      }))
+                    }
+                    min={formData.start_date}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-xl">
+                <div className="flex items-center space-x-3">
+                  <MapPin className="w-5 h-5 text-blue-500" />
+                  <div>
+                    <div className="font-semibold text-gray-900">
+                      Transport Allowance
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      Provide {formatCurrency(150000)} transport allowance
+                    </div>
+                  </div>
+                </div>
+                <Switch
+                  checked={formData.has_transport}
+                  onCheckedChange={(checked) =>
+                    setFormData((prev) => ({ ...prev, has_transport: checked }))
+                  }
                 />
               </div>
             </div>
@@ -521,7 +597,10 @@ export default function TaskManagement() {
             <DialogFooter>
               <Button
                 variant="outline"
-                onClick={() => setIsCreateDialogOpen(false)}
+                onClick={() => {
+                  setIsCreateDialogOpen(false);
+                  setFormData(initialFormData);
+                }}
                 disabled={creating}
               >
                 Cancel
@@ -546,327 +625,6 @@ export default function TaskManagement() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-
-        {/* View Task Dialog */}
-        <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-          <DialogContent className="sm:max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Task Details</DialogTitle>
-              <DialogDescription>
-                View detailed information about this task.
-              </DialogDescription>
-            </DialogHeader>
-
-            {selectedTask && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div>
-                      <Label className="text-sm font-medium text-gray-500">
-                        Status
-                      </Label>
-                      <div className="mt-1">
-                        <Badge
-                          className={`${getStatusColor(selectedTask.status)} border flex items-center space-x-1 w-fit`}
-                        >
-                          {(() => {
-                            const StatusIcon = getStatusIcon(
-                              selectedTask.status
-                            );
-                            return (
-                              <>
-                                <StatusIcon className="w-3 h-3" />
-                                <span>
-                                  {selectedTask.status
-                                    .replace("_", " ")
-                                    .toUpperCase()}
-                                </span>
-                              </>
-                            );
-                          })()}
-                        </Badge>
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label className="text-sm font-medium text-gray-500">
-                        Task Date
-                      </Label>
-                      <p className="mt-1 text-sm text-gray-900">
-                        {new Date(
-                          selectedTask.tanggal_tugas
-                        ).toLocaleDateString("id-ID")}
-                      </p>
-                    </div>
-
-                    <div>
-                      <Label className="text-sm font-medium text-gray-500">
-                        Assigned To
-                      </Label>
-                      <p className="mt-1 text-sm text-gray-900">
-                        {selectedTask.users.nama_lengkap}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {selectedTask.users.email}
-                      </p>
-                    </div>
-
-                    <div>
-                      <Label className="text-sm font-medium text-gray-500">
-                        Project
-                      </Label>
-                      <p className="mt-1 text-sm text-gray-900">
-                        {selectedTask.projects.nama_project}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div>
-                      <Label className="text-sm font-medium text-gray-500">
-                        Task Description
-                      </Label>
-                      <div className="mt-1 p-3 bg-gray-50 rounded-lg">
-                        <p className="text-sm text-gray-900 whitespace-pre-wrap">
-                          {selectedTask.deskripsi_tugas}
-                        </p>
-                      </div>
-                    </div>
-
-                    {selectedTask.response_pegawai && (
-                      <div>
-                        <Label className="text-sm font-medium text-gray-500">
-                          Employee Response
-                        </Label>
-                        <div className="mt-1 p-3 bg-blue-50 rounded-lg">
-                          <p className="text-sm text-blue-900 whitespace-pre-wrap">
-                            {selectedTask.response_pegawai}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="border-t pt-4">
-                  <div className="grid grid-cols-2 gap-4 text-xs text-gray-500">
-                    <div>
-                      <span className="font-medium">Created:</span>{" "}
-                      {new Date(selectedTask.created_at).toLocaleDateString(
-                        "id-ID"
-                      )}{" "}
-                      at{" "}
-                      {new Date(selectedTask.created_at).toLocaleTimeString(
-                        "id-ID"
-                      )}
-                    </div>
-                    <div>
-                      <span className="font-medium">Updated:</span>{" "}
-                      {new Date(selectedTask.updated_at).toLocaleDateString(
-                        "id-ID"
-                      )}{" "}
-                      at{" "}
-                      {new Date(selectedTask.updated_at).toLocaleTimeString(
-                        "id-ID"
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setIsViewDialogOpen(false)}
-              >
-                Close
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Edit Task Dialog */}
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Edit Task</DialogTitle>
-              <DialogDescription>
-                Update the task details and assignment.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-project">Project *</Label>
-                <Select
-                  value={formData.project_id}
-                  onValueChange={(value) => {
-                    setFormData((prev) => ({
-                      ...prev,
-                      project_id: value,
-                      pegawai_id: "",
-                    }));
-                    fetchProjectMembers(value);
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select project" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(projects || []).map((project) => (
-                      <SelectItem key={project.id} value={project.id}>
-                        {project.nama_project}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="edit-pegawai">Team Member *</Label>
-                <Select
-                  value={formData.pegawai_id}
-                  onValueChange={(value) =>
-                    setFormData((prev) => ({ ...prev, pegawai_id: value }))
-                  }
-                  disabled={!formData.project_id || loadingMembers}
-                >
-                  <SelectTrigger>
-                    <SelectValue
-                      placeholder={
-                        loadingMembers
-                          ? "Loading team members..."
-                          : projectMembers.length === 0
-                            ? "No team members in this project"
-                            : "Select team member"
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {projectMembers.map((member) => (
-                      <SelectItem key={member.id} value={member.id}>
-                        <div className="flex items-center justify-between w-full">
-                          <span>{member.nama_lengkap}</span>
-                          <span className="text-xs text-gray-500 ml-2">
-                            {member.email}
-                          </span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="edit-tanggal_tugas">Task Date *</Label>
-                <Input
-                  id="edit-tanggal_tugas"
-                  type="date"
-                  value={formData.tanggal_tugas}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      tanggal_tugas: e.target.value,
-                    }))
-                  }
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="edit-deskripsi_tugas">Task Description *</Label>
-                <Textarea
-                  id="edit-deskripsi_tugas"
-                  value={formData.deskripsi_tugas}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      deskripsi_tugas: e.target.value,
-                    }))
-                  }
-                  placeholder="Describe the task in detail..."
-                  rows={3}
-                />
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setIsEditDialogOpen(false)}
-                disabled={updating}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleUpdateTask}
-                disabled={updating}
-                className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
-              >
-                {updating ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Updating...
-                  </>
-                ) : (
-                  <>
-                    <Edit className="w-4 h-4 mr-2" />
-                    Update Task
-                  </>
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Delete Task Dialog */}
-        <AlertDialog
-          open={isDeleteDialogOpen}
-          onOpenChange={setIsDeleteDialogOpen}
-        >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Task</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete this task? This action cannot be
-                undone.
-                {selectedTask && (
-                  <div className="mt-2 p-3 bg-red-50 rounded-lg">
-                    <p className="text-sm font-medium text-red-900">
-                      Task Details:
-                    </p>
-                    <p className="text-sm text-red-800 mt-1">
-                      {selectedTask.deskripsi_tugas}
-                    </p>
-                    <p className="text-xs text-red-700 mt-1">
-                      Assigned to: {selectedTask.users.nama_lengkap}
-                    </p>
-                  </div>
-                )}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleDeleteTask}
-                disabled={deleting}
-                className="bg-red-600 hover:bg-red-700"
-              >
-                {deleting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Deleting...
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete Task
-                  </>
-                )}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </div>
 
       {/* Search & Filters */}
@@ -944,7 +702,6 @@ export default function TaskManagement() {
         </TabsList>
 
         <TabsContent value={selectedStatus} className="space-y-6">
-          {/* Task List */}
           <div className="grid grid-cols-1 gap-6">
             {filteredTasks.length === 0 ? (
               <div className="text-center py-12">
@@ -968,56 +725,123 @@ export default function TaskManagement() {
             ) : (
               filteredTasks.map((task) => {
                 const StatusIcon = getStatusIcon(task.status);
+                const transportAllocation =
+                  task.task_transport_allocations?.[0];
+                const hasActiveTransport =
+                  task.has_transport && !transportAllocation?.canceled_at;
+
                 return (
                   <div
                     key={task.id}
-                    className="border-0 shadow-xl rounded-xl overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1"
+                    className="border-0 shadow-xl rounded-xl overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 bg-white"
                   >
+                    {/* Colorful top accent */}
+                    <div
+                      className={`h-1 bg-gradient-to-r ${
+                        task.status === "completed"
+                          ? "from-emerald-500 to-green-600"
+                          : task.status === "in_progress"
+                            ? "from-blue-500 to-indigo-600"
+                            : "from-amber-500 to-orange-600"
+                      }`}
+                    />
                     <div className="p-6">
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex-1">
                           <div className="flex items-center space-x-3 mb-2">
                             <Badge
-                              className={`${getStatusColor(task.status)} border flex items-center space-x-1`}
+                              className={`${getStatusColor(task.status)} border flex items-center space-x-1 shadow-sm`}
                             >
                               <StatusIcon className="w-3 h-3" />
                               <span>
                                 {task.status.replace("_", " ").toUpperCase()}
                               </span>
                             </Badge>
-                            <span className="text-sm text-gray-500">
-                              {new Date(task.tanggal_tugas).toLocaleDateString(
+
+                            {hasActiveTransport && (
+                              <Badge className="bg-green-100 text-green-800 border-green-200 flex items-center space-x-1">
+                                <DollarSign className="w-3 h-3" />
+                                <span>Transport: {formatCurrency(150000)}</span>
+                              </Badge>
+                            )}
+
+                            <span className="text-sm text-gray-600">
+                              {new Date(task.start_date).toLocaleDateString(
+                                "id-ID"
+                              )}{" "}
+                              -{" "}
+                              {new Date(task.end_date).toLocaleDateString(
                                 "id-ID"
                               )}
                             </span>
                           </div>
+
                           <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                            {task.deskripsi_tugas}
+                            {task.title}
                           </h3>
+                          <p className="text-gray-600 mb-3">
+                            {task.deskripsi_tugas}
+                          </p>
+
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                             <div className="flex items-center space-x-2">
-                              <Users className="w-4 h-4 text-blue-500" />
+                              <Users className="w-4 h-4 text-indigo-600" />
                               <div className="text-sm">
                                 <div className="font-medium text-gray-900">
                                   Assigned to
                                 </div>
-                                <div className="text-gray-500">
+                                <div className="text-gray-600">
                                   {task.users.nama_lengkap}
                                 </div>
                               </div>
                             </div>
                             <div className="flex items-center space-x-2">
-                              <Calendar className="w-4 h-4 text-green-500" />
+                              <Calendar className="w-4 h-4 text-emerald-600" />
                               <div className="text-sm">
                                 <div className="font-medium text-gray-900">
                                   Project
                                 </div>
-                                <div className="text-gray-500">
+                                <div className="text-gray-600">
                                   {task.projects.nama_project}
                                 </div>
                               </div>
                             </div>
                           </div>
+
+                          {/* Transport Status */}
+                          {hasActiveTransport && (
+                            <div className="mt-4 p-3 bg-gradient-to-r from-green-50 to-teal-50 rounded-lg border border-green-200">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div className="text-sm font-medium text-green-900 flex items-center">
+                                    <MapPin className="w-4 h-4 mr-2" />
+                                    Transport Allocation
+                                  </div>
+                                  <div className="text-sm text-green-700 mt-1">
+                                    {transportAllocation?.allocation_date
+                                      ? `Allocated for: ${new Date(transportAllocation.allocation_date).toLocaleDateString("id-ID")}`
+                                      : "Waiting for date selection"}
+                                  </div>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <div className="text-sm font-semibold text-green-600">
+                                    {formatCurrency(150000)}
+                                  </div>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() =>
+                                      handleCancelTransport(task.id)
+                                    }
+                                    className="border-red-200 text-red-600 hover:bg-red-50"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
                           {task.response_pegawai && (
                             <div className="mt-4 p-3 bg-blue-50 rounded-lg">
                               <div className="text-sm font-medium text-blue-900 mb-1">
@@ -1029,6 +853,7 @@ export default function TaskManagement() {
                             </div>
                           )}
                         </div>
+
                         <div className="flex items-center space-x-2">
                           <Button
                             variant="outline"
@@ -1062,6 +887,7 @@ export default function TaskManagement() {
                           </Button>
                         </div>
                       </div>
+
                       <div className="text-xs text-gray-400">
                         Created:{" "}
                         {new Date(task.created_at).toLocaleDateString("id-ID")}{" "}
@@ -1076,6 +902,334 @@ export default function TaskManagement() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* View Task Dialog */}
+      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Task Details</DialogTitle>
+            <DialogDescription>
+              Complete task information and transport allocation status.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedTask && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-sm font-medium text-gray-500">
+                      Status
+                    </Label>
+                    <div className="mt-1">
+                      <Badge
+                        className={`${getStatusColor(selectedTask.status)} border flex items-center space-x-1 w-fit`}
+                      >
+                        {(() => {
+                          const StatusIcon = getStatusIcon(selectedTask.status);
+                          return (
+                            <>
+                              <StatusIcon className="w-3 h-3" />
+                              <span>
+                                {selectedTask.status
+                                  .replace("_", " ")
+                                  .toUpperCase()}
+                              </span>
+                            </>
+                          );
+                        })()}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-sm font-medium text-gray-500">
+                      Task Period
+                    </Label>
+                    <p className="mt-1 text-sm text-gray-900">
+                      {new Date(selectedTask.start_date).toLocaleDateString(
+                        "id-ID"
+                      )}{" "}
+                      -{" "}
+                      {new Date(selectedTask.end_date).toLocaleDateString(
+                        "id-ID"
+                      )}
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label className="text-sm font-medium text-gray-500">
+                      Assigned To
+                    </Label>
+                    <p className="mt-1 text-sm text-gray-900">
+                      {selectedTask.users.nama_lengkap}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {selectedTask.users.email}
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label className="text-sm font-medium text-gray-500">
+                      Project
+                    </Label>
+                    <p className="mt-1 text-sm text-gray-900">
+                      {selectedTask.projects.nama_project}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-sm font-medium text-gray-500">
+                      Task Title
+                    </Label>
+                    <p className="mt-1 text-lg font-semibold text-gray-900">
+                      {selectedTask.title}
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label className="text-sm font-medium text-gray-500">
+                      Description
+                    </Label>
+                    <div className="mt-1 p-3 bg-gray-50 rounded-lg">
+                      <p className="text-sm text-gray-900 whitespace-pre-wrap">
+                        {selectedTask.deskripsi_tugas}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Transport Information */}
+                  {selectedTask.has_transport && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">
+                        Transport Allocation
+                      </Label>
+                      <div className="mt-1 p-3 bg-green-50 rounded-lg border border-green-200">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="text-sm font-medium text-green-900">
+                              Amount: {formatCurrency(150000)}
+                            </div>
+                            <div className="text-sm text-green-700">
+                              {selectedTask.task_transport_allocations?.[0]
+                                ?.allocation_date
+                                ? `Date: ${new Date(selectedTask.task_transport_allocations[0].allocation_date).toLocaleDateString("id-ID")}`
+                                : "Awaiting date selection"}
+                            </div>
+                          </div>
+                          <Badge className="bg-green-100 text-green-800">
+                            {selectedTask.task_transport_allocations?.[0]
+                              ?.canceled_at
+                              ? "Canceled"
+                              : "Active"}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedTask.response_pegawai && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">
+                        Employee Response
+                      </Label>
+                      <div className="mt-1 p-3 bg-blue-50 rounded-lg">
+                        <p className="text-sm text-blue-900 whitespace-pre-wrap">
+                          {selectedTask.response_pegawai}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsViewDialogOpen(false)}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Task Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Task</DialogTitle>
+            <DialogDescription>
+              Update task details and transport allocation.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="edit-title">Task Title *</Label>
+              <Input
+                id="edit-title"
+                value={formData.title || ""}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, title: e.target.value }))
+                }
+                placeholder="Enter task title"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">Task Description *</Label>
+              <Textarea
+                id="edit-description"
+                value={formData.description || ""}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
+                placeholder="Describe the task in detail..."
+                rows={3}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-start_date">Start Date *</Label>
+                <Input
+                  id="edit-start_date"
+                  type="date"
+                  value={formData.start_date || ""}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      start_date: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-end_date">End Date *</Label>
+                <Input
+                  id="edit-end_date"
+                  type="date"
+                  value={formData.end_date || ""}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      end_date: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-xl">
+              <div className="flex items-center space-x-3">
+                <MapPin className="w-5 h-5 text-blue-500" />
+                <div>
+                  <div className="font-semibold text-gray-900">
+                    Transport Allowance
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    Provide {formatCurrency(150000)} transport allowance
+                  </div>
+                </div>
+              </div>
+              <Switch
+                checked={formData.has_transport}
+                onCheckedChange={(checked) =>
+                  setFormData((prev) => ({ ...prev, has_transport: checked }))
+                }
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsEditDialogOpen(false);
+                setFormData(initialFormData);
+                setSelectedTask(null);
+              }}
+              disabled={updating}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUpdateTask}
+              disabled={updating}
+              className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+            >
+              {updating ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                <>
+                  <Edit className="w-4 h-4 mr-2" />
+                  Update Task
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Task Dialog */}
+      <AlertDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Task</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this task? This will also cancel
+              any transport allocations.
+              {selectedTask && (
+                <div className="mt-2 p-3 bg-red-50 rounded-lg">
+                  <p className="text-sm font-medium text-red-900">
+                    Task: {selectedTask.title}
+                  </p>
+                  <p className="text-sm text-red-800 mt-1">
+                    {selectedTask.deskripsi_tugas}
+                  </p>
+                  <p className="text-xs text-red-700 mt-1">
+                    Assigned to: {selectedTask.users.nama_lengkap}
+                  </p>
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteTask}
+              disabled={deleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Task
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

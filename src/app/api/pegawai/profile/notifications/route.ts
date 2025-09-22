@@ -39,7 +39,7 @@ export async function PUT(request: NextRequest) {
       error: unknown;
     };
 
-    if (profileError || !userProfile || userProfile.role !== "pegawai") {
+    if (profileError || !userProfile || (userProfile as any).role !== "pegawai") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

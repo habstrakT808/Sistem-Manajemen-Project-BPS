@@ -1,38 +1,70 @@
 // File: src/app/api/pegawai/dashboard/route.ts
+// UPDATED: Enhanced dashboard with transport allocation tracking
 
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import {
+  createClient as createServiceClient,
+  SupabaseClient,
+} from "@supabase/supabase-js";
+import type { Database } from "@/../database/types/database.types";
 
-interface PegawaiDashboardStats {
-  assigned_projects: number;
-  active_tasks: number;
+// Helper to query projects with typed service client
+async function fetchProjectNames(
+  client: SupabaseClient<Database>,
+  ids: string[]
+): Promise<Record<string, string>> {
+  const { data } = await client
+    .from("projects")
+    .select("id, nama_project")
+    .in("id", ids);
+  const map: Record<string, string> = {};
+  (data || []).forEach((p) => {
+    const row = p as { id: string; nama_project: string };
+    map[row.id] = row.nama_project;
+  });
+  return map;
+}
+
+interface StatsData {
+  total_tasks: number;
   completed_tasks: number;
-  monthly_earnings: number;
-  pending_reviews: number;
+  pending_tasks: number;
+  total_projects: number;
+  active_projects: number;
+  completed_projects: number;
+  total_earnings: number;
+  transport_earnings: number;
+  pending_transport_allocations?: number;
+  transport_required?: number;
+  transport_allocated?: number;
+  pending_reviews?: number;
 }
 
-interface TodayTask {
+// Removed unused ProjectData interface
+
+interface TaskData {
   id: string;
+  title: string;
   deskripsi_tugas: string;
-  tanggal_tugas: string;
-  status: "pending" | "in_progress" | "completed";
-  project_name: string;
-  response_pegawai?: string;
-}
-
-interface AssignedProject {
-  id: string;
-  nama_project: string;
-  status: "upcoming" | "active" | "completed";
-  deadline: string;
-  ketua_tim_name: string;
-  progress: number;
+  start_date: string;
+  end_date: string;
+  has_transport: boolean;
+  status: string;
+  response_pegawai: string;
+  project_id: string | null;
+  task_transport_allocations?: Array<{
+    id: string;
+    user_id?: string;
+    allocation_date: string | null;
+    allocated_at: string | null;
+    canceled_at: string | null;
+  }>;
 }
 
 export async function GET() {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const supabase = (await createClient()) as any;
+    const supabase = await createClient();
 
     // Auth check
     const {
@@ -43,135 +75,328 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Role validation
-    const { data: userProfile, error: profileError } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single();
+    // Service client to bypass recursive RLS for safe, user-scoped reads
+    const svc = createServiceClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
-    if (
-      profileError ||
-      !userProfile ||
-      (userProfile as { role: string }).role !== "pegawai"
-    ) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    // Compute stats inline to avoid RPC touching projects policies
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
 
-    // Get dashboard statistics using database function
-    const { data: statsResult } = await supabase.rpc("get_dashboard_stats", {
-      user_id: user.id,
-    });
+    const [
+      { count: assignedProjectsCount },
+      { count: activeTasks },
+      { count: completedTasks },
+      { data: monthlyEarningsRows },
+      { count: pendingTransportCount },
+      { count: transportRequired },
+      { count: transportAllocated },
+      { count: pendingReviews },
+    ] = await Promise.all([
+      // Use service role for project_members to avoid recursive policy on projects
+      svc
+        .from("project_members")
+        .select("project_id", { count: "exact", head: true })
+        .eq("user_id", user.id),
+      // Use service role for tasks as tasks policies may reference projects via FOR ALL
+      svc
+        .from("tasks")
+        .select("id", { count: "exact", head: true })
+        .eq("assignee_user_id", user.id)
+        .in("status", ["pending", "in_progress"]),
+      svc
+        .from("tasks")
+        .select("id", { count: "exact", head: true })
+        .eq("assignee_user_id", user.id)
+        .eq("status", "completed"),
+      // Use service role for earnings to avoid transitive policy evaluation
+      svc
+        .from("earnings_ledger")
+        .select("amount, occurred_on")
+        .eq("user_id", user.id)
+        .gte("occurred_on", startOfMonth.toISOString().split("T")[0]),
+      // Use service role for transport allocations to avoid policies referencing projects
+      svc
+        .from("task_transport_allocations")
+        .select("id", { count: "exact" })
+        .eq("user_id", user.id)
+        .is("allocation_date", null)
+        .is("canceled_at", null),
+      // Transport required (all active allocations)
+      svc
+        .from("task_transport_allocations")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .is("canceled_at", null),
+      // Transport allocated (date selected)
+      svc
+        .from("task_transport_allocations")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .not("allocation_date", "is", null)
+        .is("canceled_at", null),
+      // Pending reviews for this user
+      svc
+        .from("mitra_reviews")
+        .select("id", { count: "exact", head: true })
+        .eq("pegawai_id", user.id)
+        .is("rating", null),
+    ]);
 
-    const stats: PegawaiDashboardStats = {
-      assigned_projects: statsResult?.assigned_projects || 0,
-      active_tasks: statsResult?.active_tasks || 0,
-      completed_tasks: statsResult?.completed_tasks || 0,
-      monthly_earnings: statsResult?.monthly_earnings || 0,
-      pending_reviews: statsResult?.pending_reviews || 0,
+    const monthly_earnings = (monthlyEarningsRows || []).reduce(
+      (sum: number, r: { amount: number }) => sum + (r?.amount || 0),
+      0
+    );
+
+    const stats: StatsData = {
+      total_tasks: (activeTasks || 0) + (completedTasks || 0),
+      completed_tasks: completedTasks || 0,
+      pending_tasks: activeTasks || 0,
+      total_projects: assignedProjectsCount || 0,
+      active_projects: 0,
+      completed_projects: 0,
+      total_earnings: monthly_earnings,
+      transport_earnings: monthly_earnings,
+      pending_transport_allocations: pendingTransportCount || 0,
+      transport_required: transportRequired || 0,
+      transport_allocated: transportAllocated || 0,
+      pending_reviews: pendingReviews || 0,
     };
 
-    // Get today's tasks
-    const today = new Date().toISOString().split("T")[0];
-    const { data: todayTasks } = await supabase
+    // Get today's and this week's tasks
+    const today = new Date();
+    const weekFromNow = new Date();
+    weekFromNow.setDate(today.getDate() + 7);
+
+    // Note: avoid join on projects because there is no FK in schema cache
+    const { data: todayTasks, error: tasksError } = await svc
       .from("tasks")
       .select(
         `
         id,
+        title,
         deskripsi_tugas,
-        tanggal_tugas,
+        start_date,
+        end_date,
+        has_transport,
         status,
         response_pegawai,
-        projects!inner (nama_project)
-      `
-      )
-      .eq("pegawai_id", user.id)
-      .eq("tanggal_tugas", today)
-      .order("created_at", { ascending: true });
-
-    // Get assigned projects (active and upcoming)
-    const { data: projectAssignments } = await supabase
-      .from("project_assignments")
-      .select(
-        `
-        projects!inner (
+        project_id,
+        task_transport_allocations (
           id,
-          nama_project,
-          status,
-          deadline,
-          users!inner (nama_lengkap)
+          user_id,
+          allocation_date,
+          canceled_at
         )
       `
       )
-      .eq("assignee_type", "pegawai")
-      .eq("assignee_id", user.id)
-      .in("projects.status", ["upcoming", "active"])
-      .limit(5);
+      .eq("assignee_user_id", user.id)
+      .lte("start_date", weekFromNow.toISOString().split("T")[0])
+      .gte("end_date", today.toISOString().split("T")[0])
+      .order("start_date", { ascending: true });
 
-    // Format today's tasks
-    const formattedTodayTasks: TodayTask[] = (todayTasks || []).map(
-      (task: {
-        id: string;
-        deskripsi_tugas: string;
-        tanggal_tugas: string;
-        status: string;
-        response_pegawai?: string;
-        projects: { nama_project: string };
-      }) => ({
-        id: task.id,
-        deskripsi_tugas: task.deskripsi_tugas,
-        tanggal_tugas: task.tanggal_tugas,
-        status: task.status as "pending" | "in_progress" | "completed",
-        project_name: task.projects.nama_project,
-        response_pegawai: task.response_pegawai,
-      })
+    if (tasksError) {
+      throw tasksError;
+    }
+
+    // Fetch project names with service client to avoid recursive RLS
+    const projectIds = Array.from(
+      new Set(
+        ((todayTasks as TaskData[]) || [])
+          .map((t) => t.project_id)
+          .filter(Boolean)
+      )
+    ) as string[];
+
+    let projectNameById: Record<string, string> = {};
+    if (projectIds.length > 0) {
+      projectNameById = await fetchProjectNames(svc, projectIds);
+    }
+
+    // Build assigned projects without RPC to avoid RLS recursion
+    // 1) Projects where user is leader
+    const { data: ownedProjects } = await svc
+      .from("projects")
+      .select("id, nama_project, status, deadline, leader_user_id")
+      .or(`ketua_tim_id.eq.${user.id},leader_user_id.eq.${user.id}`);
+
+    // 2) Projects where user is member
+    const { data: memberRows } = await svc
+      .from("project_members")
+      .select("project_id, role")
+      .eq("user_id", user.id);
+
+    const memberProjectIds = Array.from(
+      new Set(
+        (memberRows || []).map((r) => (r as { project_id: string }).project_id)
+      )
     );
 
-    // Format assigned projects with progress calculation
-    const formattedProjects = await Promise.all(
-      (projectAssignments || []).map(
-        async (assignment: {
-          projects: {
+    const { data: memberProjects } = await svc
+      .from("projects")
+      .select("id, nama_project, status, deadline, leader_user_id")
+      .in("id", memberProjectIds.length > 0 ? memberProjectIds : ["__none__"]);
+
+    // Merge with role info
+    const leaderIds = new Set(
+      (ownedProjects || []).map((p) => (p as { id: string }).id)
+    );
+    const allProjects = [
+      ...((ownedProjects || []).map((p) => ({
+        ...(p as {
+          id: string;
+          nama_project: string;
+          status: string;
+          deadline: string;
+          leader_user_id: string | null;
+        }),
+        user_role: "leader" as const,
+      })) as Array<{
+        id: string;
+        nama_project: string;
+        status: string;
+        deadline: string;
+        leader_user_id: string | null;
+        user_role: "leader";
+      }>),
+      ...((memberProjects || [])
+        .filter((p) => !leaderIds.has((p as { id: string }).id))
+        .map((p) => ({
+          ...(p as {
             id: string;
             nama_project: string;
             status: string;
             deadline: string;
-            users: { nama_lengkap: string };
-          };
-        }): Promise<AssignedProject> => {
-          const project = assignment.projects;
+            leader_user_id: string | null;
+          }),
+          user_role: "member" as const,
+        })) as Array<{
+        id: string;
+        nama_project: string;
+        status: string;
+        deadline: string;
+        leader_user_id: string | null;
+        user_role: "member";
+      }>),
+    ];
 
-          // Calculate progress based on my completed tasks in this project
-          const { data: myTasks } = await supabase
-            .from("tasks")
-            .select("status")
-            .eq("project_id", project.id)
-            .eq("pegawai_id", user.id);
+    // Map leader names
+    const leaderUserIds = Array.from(
+      new Set(allProjects.map((p) => p.leader_user_id).filter(Boolean))
+    ) as string[];
+    const leaderNameById: Record<string, string> = {};
+    if (leaderUserIds.length > 0) {
+      const { data: leaders } = await svc
+        .from("users")
+        .select("id, nama_lengkap")
+        .in("id", leaderUserIds);
+      (leaders || []).forEach((u) => {
+        const row = u as { id: string; nama_lengkap: string };
+        leaderNameById[row.id] = row.nama_lengkap;
+      });
+    }
 
-          let progress = 0;
-          if (myTasks && myTasks.length > 0) {
-            const completedTasks = myTasks.filter(
-              (task: { status: string }) => task.status === "completed"
-            ).length;
-            progress = Math.round((completedTasks / myTasks.length) * 100);
-          }
-
-          return {
-            id: project.id,
-            nama_project: project.nama_project,
-            status: project.status as "upcoming" | "active" | "completed",
-            deadline: project.deadline,
-            ketua_tim_name: project.users.nama_lengkap,
-            progress,
-          };
+    // Task counts for this user per project
+    const projectIdsForCounts = allProjects.map((p) => p.id);
+    const myPendingByProject: Record<string, number> = {};
+    const myTotalByProject: Record<string, number> = {};
+    if (projectIdsForCounts.length > 0) {
+      const { data: myTasks } = await svc
+        .from("tasks")
+        .select("project_id, status")
+        .eq("assignee_user_id", user.id)
+        .in("project_id", projectIdsForCounts);
+      (myTasks || []).forEach((t) => {
+        const row = t as { project_id: string; status: string };
+        myTotalByProject[row.project_id] =
+          (myTotalByProject[row.project_id] || 0) + 1;
+        if (row.status === "pending" || row.status === "in_progress") {
+          myPendingByProject[row.project_id] =
+            (myPendingByProject[row.project_id] || 0) + 1;
         }
-      )
+      });
+    }
+
+    const assignedProjects = allProjects.map((row) => {
+      const total = myTotalByProject[row.id] || 0;
+      const pending = myPendingByProject[row.id] || 0;
+      return {
+        id: row.id,
+        nama_project: row.nama_project,
+        status: row.status,
+        deadline: row.deadline,
+        ketua_tim_name: row.leader_user_id
+          ? leaderNameById[row.leader_user_id] || "-"
+          : "-",
+        user_role: row.user_role,
+        my_progress:
+          total > 0 ? Math.round(((total - pending) / total) * 100) : 0,
+      };
+    });
+
+    // Format today's tasks
+    const formattedTasks = ((todayTasks as TaskData[]) || []).map(
+      (task: TaskData) => {
+        const rawAlloc = (
+          task as unknown as {
+            task_transport_allocations?: unknown;
+          }
+        ).task_transport_allocations;
+
+        const allocList: Array<{
+          user_id?: string;
+          allocation_date?: string | null;
+          canceled_at?: string | null;
+        }> = Array.isArray(rawAlloc)
+          ? (rawAlloc as Array<{
+              user_id?: string;
+              allocation_date?: string | null;
+              canceled_at?: string | null;
+            }>)
+          : rawAlloc
+            ? [
+                rawAlloc as {
+                  user_id?: string;
+                  allocation_date?: string | null;
+                  canceled_at?: string | null;
+                },
+              ]
+            : [];
+
+        const myAlloc = allocList.find(
+          (a) => a.user_id === user.id && !a.canceled_at
+        ) as
+          | { allocation_date: string | null; canceled_at: string | null }
+          | undefined;
+
+        return {
+          id: task.id,
+          title: task.title,
+          deskripsi_tugas: task.deskripsi_tugas,
+          start_date: task.start_date,
+          end_date: task.end_date,
+          has_transport: task.has_transport,
+          status: task.status,
+          response_pegawai: task.response_pegawai,
+          project_name: task.project_id
+            ? projectNameById[task.project_id] || "-"
+            : "-",
+          transport_allocation: myAlloc
+            ? {
+                allocation_date: myAlloc.allocation_date,
+                canceled_at: myAlloc.canceled_at,
+              }
+            : null,
+        };
+      }
     );
 
     return NextResponse.json({
       stats,
-      today_tasks: formattedTodayTasks,
-      assigned_projects: formattedProjects,
+      today_tasks: formattedTasks,
+      assigned_projects: assignedProjects,
     });
   } catch (error) {
     console.error("Pegawai Dashboard API Error:", error);

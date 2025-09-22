@@ -24,21 +24,6 @@ const RoleSelection = () => {
       role: "admin",
     },
     {
-      title: "KETUA TIM",
-      icon: Users,
-      description: "Buat project, assign tim, dan monitor progress",
-      permissions: [
-        "Buat Project",
-        "Assign Team",
-        "Monitor Progress",
-        "Laporan Tim",
-      ],
-      color: "from-blue-500 to-blue-600",
-      bgColor: "from-blue-50 to-blue-100",
-      textColor: "text-blue-600",
-      role: "ketua_tim",
-    },
-    {
       title: "PEGAWAI",
       icon: User,
       description: "Kerjakan task, update progress, dan submit laporan",
@@ -73,7 +58,7 @@ const RoleSelection = () => {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8">
+        <div className="grid md:grid-cols-2 gap-8 justify-center">
           {roles.map((role, index) => {
             const IconComponent = role.icon;
 

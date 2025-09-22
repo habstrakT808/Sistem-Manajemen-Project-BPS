@@ -1,8 +1,9 @@
 // File: src/components/pegawai/PegawaiDashboard.tsx
+// UPDATED: Modern, beautiful dashboard with enhanced UI/UX
 
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -23,26 +24,42 @@ import {
   CheckSquare,
   Calendar,
   Leaf,
+  MapPin,
+  Clock,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import Link from "next/link";
 
 interface PegawaiDashboardStats {
-  assigned_projects: number;
-  active_tasks: number;
+  total_tasks: number;
   completed_tasks: number;
-  monthly_earnings: number;
-  pending_reviews: number;
+  pending_tasks: number;
+  total_projects: number;
+  active_projects: number;
+  completed_projects: number;
+  total_earnings: number;
+  transport_earnings: number;
+  pending_transport_allocations?: number;
+  transport_required?: number;
+  transport_allocated?: number;
+  pending_reviews?: number;
 }
 
 interface TodayTask {
   id: string;
+  title: string;
   deskripsi_tugas: string;
-  tanggal_tugas: string;
+  start_date: string;
+  end_date: string;
+  has_transport: boolean;
   status: "pending" | "in_progress" | "completed";
   project_name: string;
   response_pegawai?: string;
+  transport_allocation: {
+    allocation_date: string | null;
+    canceled_at: string | null;
+  } | null;
 }
 
 interface AssignedProject {
@@ -51,7 +68,8 @@ interface AssignedProject {
   status: "upcoming" | "active" | "completed";
   deadline: string;
   ketua_tim_name: string;
-  progress: number;
+  my_progress: number;
+  user_role: "leader" | "member";
 }
 
 interface DashboardData {
@@ -82,7 +100,7 @@ export default function PegawaiDashboard() {
   } = useQuery<DashboardData, Error>({
     queryKey: ["pegawai", "dashboard"],
     queryFn: fetchPegawaiDashboard,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 2 * 60 * 1000,
   });
 
   const handleRefresh = async () => {
@@ -90,7 +108,7 @@ export default function PegawaiDashboard() {
     const res = await refetch();
     setRefreshing(false);
     if (res.error) toast.error(res.error.message);
-    else toast.success("Dashboard data refreshed");
+    else toast.success("Dashboard refreshed");
   };
 
   const handleTaskStatusUpdate = async (
@@ -105,14 +123,14 @@ export default function PegawaiDashboard() {
       };
       if (response) updateData.response_pegawai = response;
 
-      const response_api = await fetch(`/api/pegawai/tasks/${taskId}`, {
+      const apiResponse = await fetch(`/api/pegawai/tasks/${taskId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updateData),
       });
 
-      if (!response_api.ok) {
-        const error = await response_api.json();
+      if (!apiResponse.ok) {
+        const error = await apiResponse.json();
         throw new Error(error.error || "Failed to update task");
       }
 
@@ -131,7 +149,6 @@ export default function PegawaiDashboard() {
   };
 
   useEffect(() => {
-    // prefetch key routes from dashboard
     router.prefetch("/pegawai/tasks");
     router.prefetch("/pegawai/projects");
     router.prefetch("/pegawai/earnings");
@@ -140,28 +157,12 @@ export default function PegawaiDashboard() {
 
   if (isLoading && !dashboardData) {
     return (
-      <div className="space-y-8">
-        <div className="flex items-center justify-between">
-          <div className="space-y-2">
-            <div className="h-8 bg-gray-200 rounded w-64 animate-pulse"></div>
-            <div className="h-6 bg-gray-200 rounded w-96 animate-pulse"></div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl flex items-center justify-center mx-auto animate-pulse">
+            <Leaf className="w-8 h-8 text-white" />
           </div>
-          <div className="h-12 bg-gray-200 rounded-xl w-32 animate-pulse"></div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div
-              key={i}
-              className="animate-pulse border-0 shadow-xl rounded-xl"
-            >
-              <div className="p-6">
-                <div className="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
-                <div className="h-8 bg-gray-200 rounded w-1/2 mb-4"></div>
-                <div className="h-3 bg-gray-200 rounded w-full"></div>
-              </div>
-            </div>
-          ))}
+          <p className="text-gray-600 text-lg">Loading your workspace...</p>
         </div>
       </div>
     );
@@ -169,24 +170,22 @@ export default function PegawaiDashboard() {
 
   if (error && !dashboardData) {
     return (
-      <div className="space-y-8">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center space-y-4">
-            <AlertCircle className="w-16 h-16 text-red-500 mx-auto" />
-            <h2 className="text-2xl font-bold text-gray-900">
-              Failed to Load Dashboard
-            </h2>
-            <p className="text-gray-600 max-w-md">{error.message}</p>
-            <Button
-              onClick={handleRefresh}
-              className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700"
-            >
-              <RefreshCw
-                className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`}
-              />
-              Try Again
-            </Button>
-          </div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center space-y-6">
+          <AlertCircle className="w-20 h-20 text-red-500 mx-auto" />
+          <h2 className="text-3xl font-bold text-gray-900">
+            Failed to Load Dashboard
+          </h2>
+          <p className="text-gray-600 max-w-md mx-auto">{error.message}</p>
+          <Button
+            onClick={handleRefresh}
+            className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white px-8 py-3 rounded-2xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
+          >
+            <RefreshCw
+              className={`w-5 h-5 mr-2 ${refreshing ? "animate-spin" : ""}`}
+            />
+            Try Again
+          </Button>
         </div>
       </div>
     );
@@ -196,46 +195,36 @@ export default function PegawaiDashboard() {
 
   const { stats, today_tasks, assigned_projects } = dashboardData;
 
-  const statsCards = [
+  const completionTotal = stats.completed_tasks + stats.pending_tasks;
+  const completionRate =
+    completionTotal > 0
+      ? Math.round((stats.completed_tasks / completionTotal) * 100)
+      : 0;
+
+  const performanceCards = [
     {
-      title: "My Projects",
-      value: stats.assigned_projects,
-      description: "Projects assigned to me",
-      icon: FolderOpen,
-      color: "from-blue-500 to-blue-600",
-      bgColor: "from-blue-50 to-blue-100",
-      href: "/pegawai/projects",
-    },
-    {
-      title: "Active Tasks",
-      value: stats.active_tasks,
-      description: "Tasks in progress",
-      icon: ClipboardList,
+      title: "Task Completion Rate",
+      value: `${completionRate}%`,
+      description: `${stats.completed_tasks}/${completionTotal} completed`,
+      icon: Target,
       color: "from-orange-500 to-orange-600",
       bgColor: "from-orange-50 to-orange-100",
-      href: "/pegawai/tasks?status=pending",
+      href: "/pegawai/tasks",
     },
     {
-      title: "Completed",
-      value: stats.completed_tasks,
-      description: "Tasks completed",
-      icon: CheckCircle,
-      color: "from-green-500 to-green-600",
-      bgColor: "from-green-50 to-green-100",
-      href: "/pegawai/tasks?status=completed",
-    },
-    {
-      title: "Monthly Earnings",
-      value: formatCurrency(stats.monthly_earnings),
-      description: "This month's earnings",
-      icon: DollarSign,
-      color: "from-purple-500 to-purple-600",
-      bgColor: "from-purple-50 to-purple-100",
-      href: "/pegawai/earnings",
+      title: "Transport Dates",
+      value: `${stats.transport_allocated || 0}/${stats.transport_required || 0}`,
+      description: "Allocated / Required",
+      icon: MapPin,
+      color: "from-red-500 to-red-600",
+      bgColor: "from-red-50 to-red-100",
+      href: "/pegawai/tasks?filter=transport",
+      urgent:
+        (stats.transport_required || 0) - (stats.transport_allocated || 0) > 0,
     },
     {
       title: "Pending Reviews",
-      value: stats.pending_reviews,
+      value: stats.pending_reviews || 0,
       description: "Mitra reviews needed",
       icon: Star,
       color: "from-yellow-500 to-yellow-600",
@@ -252,409 +241,708 @@ export default function PegawaiDashboard() {
   });
 
   return (
-    <div className="space-y-8">
-      {/* Workspace Header */}
-      <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 bg-gradient-to-r from-green-600 to-teal-600 bg-clip-text text-transparent">
-              My Workspace
-            </h1>
-            <div className="flex items-center space-x-2 mt-2">
-              <Badge className="bg-gradient-to-r from-green-500 to-teal-600 text-white border-0">
-                <Leaf className="w-3 h-3 mr-1" />
-                Pegawai Access
-              </Badge>
-              <Badge className="bg-white text-green-600 border border-green-200">
-                <Calendar className="w-3 h-3 mr-1" />
-                {new Date().toLocaleDateString("id-ID", {
-                  weekday: "short",
-                  month: "short",
-                  day: "numeric",
-                })}
-              </Badge>
-            </div>
-          </div>
-          <div className="flex items-center space-x-4">
-            <div className="hidden md:flex items-center space-x-2 px-3 py-2 bg-gradient-to-r from-green-50 to-teal-50 rounded-xl">
-              <TrendingUp className="w-4 h-4 text-green-600" />
-              <span className="text-sm font-semibold text-green-600">
-                Productive Day!
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Dashboard Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-            My Dashboard
-          </h1>
-          <p className="text-gray-600 text-lg mt-2">
-            {todayDate} - Have a productive day!
-          </p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+      {/* Hero Section */}
+      <div className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 opacity-90"></div>
+        <div className="absolute inset-0 opacity-20">
+          <div className="absolute top-4 left-4 w-2 h-2 bg-white rounded-full"></div>
+          <div className="absolute top-8 right-8 w-1 h-1 bg-white rounded-full"></div>
+          <div className="absolute bottom-6 left-12 w-1.5 h-1.5 bg-white rounded-full"></div>
+          <div className="absolute bottom-12 right-4 w-2 h-2 bg-white rounded-full"></div>
         </div>
 
-        <div className="flex items-center space-x-4">
-          <Button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            variant="outline"
-            className="border-2 border-gray-200 hover:bg-gray-50"
-          >
-            <RefreshCw
-              className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`}
-            />
-            Refresh
-          </Button>
-
-          <Button
-            asChild
-            className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
-          >
-            <Link
-              href="/pegawai/tasks"
-              prefetch
-              onMouseEnter={() => router.prefetch("/pegawai/tasks")}
-            >
-              <ClipboardList className="w-4 h-4 mr-2" />
-              View All Tasks
-            </Link>
-          </Button>
-        </div>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-        {statsCards.map((stat, index) => {
-          const IconComponent = stat.icon as any;
-          return (
-            <Link
-              key={index}
-              href={stat.href}
-              prefetch
-              onMouseEnter={() => router.prefetch(stat.href)}
-            >
-              <div className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 cursor-pointer group overflow-hidden rounded-xl">
-                <div
-                  className={`absolute inset-0 bg-gradient-to-br ${stat.bgColor} opacity-50`}
-                ></div>
-                <div className="relative p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-gray-600 mb-2">
-                        {stat.title}
-                      </p>
-                      <p className="text-2xl font-bold text-gray-900 mb-1">
-                        {stat.value}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {stat.description}
-                      </p>
-                    </div>
-                    <div
-                      className={`w-12 h-12 bg-gradient-to-r ${stat.color} rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg`}
-                    >
-                      <IconComponent className="w-6 h-6 text-white" />
-                    </div>
+        <div className="relative px-2 md:px-4 lg:px-6 py-8 md:py-12">
+          <div className="max-w-[1600px] mx-auto">
+            <div className="flex items-center justify-between">
+              <div className="space-y-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
+                    <Leaf className="w-6 h-6 text-white" />
                   </div>
-                  <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-green-600 opacity-0 group-hover:opacity-100 transition-all duration-300" />
+                  <div>
+                    <h1 className="text-3xl md:text-4xl font-bold text-white">
+                      Welcome Back!
+                    </h1>
+                    <p className="text-emerald-100 text-base md:text-lg">
+                      {todayDate}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-3">
+                  <Badge className="bg-white/20 backdrop-blur-sm text-white border-white/30 hover:bg-white/30 transition-all duration-300">
+                    <Leaf className="w-3 h-3 mr-1" />
+                    Pegawai Access
+                  </Badge>
+                  <Badge className="bg-white/20 backdrop-blur-sm text-white border-white/30 hover:bg-white/30 transition-all duration-300">
+                    <Calendar className="w-3 h-3 mr-1" />
+                    {new Date().toLocaleDateString("id-ID", {
+                      weekday: "short",
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </Badge>
+                  {(stats.pending_transport_allocations || 0) > 0 && (
+                    <Badge className="bg-red-500/80 backdrop-blur-sm text-white border-red-400/50 animate-pulse hover:bg-red-500 transition-all duration-300">
+                      <MapPin className="w-3 h-3 mr-1" />
+                      {stats.pending_transport_allocations} Transport Dates
+                      Needed
+                    </Badge>
+                  )}
                 </div>
               </div>
-            </Link>
-          );
-        })}
-      </div>
 
-      {/* Today's Tasks & My Projects */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-        {/* Today's Tasks */}
-        <div className="border-0 shadow-xl rounded-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-green-600 to-teal-600 p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center text-white text-xl font-semibold">
-                <ClipboardList className="w-6 h-6 mr-3" />
-                Today&apos;s Tasks
-              </div>
-              <Badge className="bg-white/20 text-white">
-                {today_tasks.length}
-              </Badge>
-            </div>
-            <div className="text-green-100 mt-2 text-sm">
-              Tasks scheduled for today
-            </div>
-          </div>
-          <div className="p-6 space-y-4">
-            {today_tasks.length > 0 ? (
-              <>
-                {today_tasks.map((task, index) => (
-                  <div
-                    key={index}
-                    className={`group p-4 rounded-2xl border transition-all duration-300 ${
-                      task.status === "completed"
-                        ? "bg-green-50 border-green-200"
-                        : task.status === "in_progress"
-                          ? "bg-blue-50 border-blue-200"
-                          : "bg-gray-50 border-gray-200 hover:border-green-300 hover:bg-green-50"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div
-                          className={`font-semibold mb-2 ${
-                            task.status === "completed"
-                              ? "text-green-800 line-through"
-                              : task.status === "in_progress"
-                                ? "text-blue-800"
-                                : "text-gray-900"
-                          }`}
-                        >
-                          {task.deskripsi_tugas}
-                        </div>
-                        <div className="text-sm text-gray-600 mb-2">
-                          Project: {task.project_name}
-                        </div>
-                        {task.response_pegawai && (
-                          <div className="text-sm text-gray-500 bg-white p-2 rounded border">
-                            <strong>Response:</strong> {task.response_pegawai}
-                          </div>
-                        )}
-                      </div>
-                      <div className="ml-4 flex flex-col space-y-2">
-                        <Badge
-                          className={
-                            task.status === "completed"
-                              ? "bg-green-100 text-green-800"
-                              : task.status === "in_progress"
-                                ? "bg-blue-100 text-blue-800"
-                                : "bg-gray-100 text-gray-800"
-                          }
-                        >
-                          {task.status.toUpperCase()}
-                        </Badge>
-                        {task.status === "pending" && (
-                          <Button
-                            size="sm"
-                            onClick={() =>
-                              handleTaskStatusUpdate(task.id, "in_progress")
-                            }
-                            disabled={updatingTask === task.id}
-                            className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
-                          >
-                            <Play className="w-3 h-3 mr-1" />
-                            Start
-                          </Button>
-                        )}
-                        {task.status === "in_progress" && (
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              const response = prompt(
-                                "Add your response (optional):"
-                              );
-                              handleTaskStatusUpdate(
-                                task.id,
-                                "completed",
-                                response || undefined
-                              );
-                            }}
-                            disabled={updatingTask === task.id}
-                            className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white"
-                          >
-                            <CheckSquare className="w-3 h-3 mr-1" />
-                            Complete
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                <div className="pt-4">
-                  <Button
-                    asChild
-                    variant="outline"
-                    className="w-full border-2 border-green-200 text-green-600 hover:bg-green-50"
-                  >
-                    <Link href="/pegawai/tasks">
-                      View All My Tasks
-                      <ArrowRight className="w-4 h-4 ml-2" />
-                    </Link>
-                  </Button>
+              <div className="hidden lg:flex items-center space-x-4">
+                <div className="flex items-center space-x-2 px-4 py-3 bg-white/20 backdrop-blur-sm rounded-2xl border border-white/30">
+                  <TrendingUp className="w-5 h-5 text-white" />
+                  <span className="text-white font-semibold">
+                    Productive Day!
+                  </span>
                 </div>
-              </>
-            ) : (
-              <div className="text-center py-8">
-                <CheckCircle className="w-12 h-12 text-green-300 mx-auto mb-4" />
-                <p className="text-gray-500 mb-2">No tasks for today!</p>
-                <p className="text-sm text-gray-400">Enjoy your free time</p>
-              </div>
-            )}
-          </div>
-        </div>
 
-        {/* My Projects */}
-        <div className="border-0 shadow-xl rounded-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center text-white text-xl font-semibold">
-                <FolderOpen className="w-6 h-6 mr-3" />
-                My Projects
-              </div>
-              <Badge className="bg-white/20 text-white">
-                {assigned_projects.length}
-              </Badge>
-            </div>
-            <div className="text-blue-100 mt-2 text-sm">
-              Projects I&apos;m working on
-            </div>
-          </div>
-          <div className="p-6 space-y-4">
-            {assigned_projects.length > 0 ? (
-              <>
-                {assigned_projects.map((project, index) => (
+                <Button
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                  className="bg-white/20 backdrop-blur-sm text-white border-white/30 hover:bg-white/30 transition-all duration-300"
+                >
+                  <RefreshCw
+                    className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`}
+                  />
+                  Refresh
+                </Button>
+
+                <Button
+                  asChild
+                  className="bg-white text-emerald-600 hover:bg-emerald-50 font-semibold px-6 py-3 rounded-2xl shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300"
+                >
                   <Link
-                    key={index}
-                    href={`/pegawai/projects/${project.id}`}
+                    href="/pegawai/tasks"
                     prefetch
-                    onMouseEnter={() =>
-                      router.prefetch(`/pegawai/projects/${project.id}`)
-                    }
+                    onMouseEnter={() => router.prefetch("/pegawai/tasks")}
                   >
-                    <div className="group flex items-center p-4 rounded-2xl hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50 transition-all duration-300 transform hover:scale-105 cursor-pointer border border-gray-100 hover:border-blue-200 hover:shadow-lg">
-                      <div className="flex-1">
-                        <div className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                          {project.nama_project}
-                        </div>
-                        <div className="text-sm text-gray-500 group-hover:text-blue-500 mt-1">
-                          Ketua Tim: {project.ketua_tim_name}
-                        </div>
-                        <div className="text-sm text-gray-400 mt-1">
-                          Deadline:{" "}
-                          {new Date(project.deadline).toLocaleDateString(
-                            "id-ID"
-                          )}
-                        </div>
-                        <div className="mt-2 flex items-center space-x-2">
-                          <div className="flex-1 bg-gray-200 rounded-full h-2">
-                            <div
-                              className="bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full transition-all duration-300"
-                              style={{ width: `${project.progress}%` }}
-                            ></div>
-                          </div>
-                          <span className="text-sm font-semibold text-gray-600">
-                            {project.progress}%
-                          </span>
-                        </div>
-                      </div>
-                      <div className="ml-4">
-                        <Badge
-                          className={`${
-                            project.status === "active"
-                              ? "bg-green-100 text-green-800"
-                              : project.status === "upcoming"
-                                ? "bg-blue-100 text-blue-800"
-                                : "bg-gray-100 text-gray-800"
-                          }`}
-                        >
-                          {project.status.toUpperCase()}
-                        </Badge>
-                      </div>
-                    </div>
+                    <ClipboardList className="w-4 h-4 mr-2" />
+                    View All Tasks
                   </Link>
-                ))}
-                <div className="pt-4">
-                  <Button
-                    asChild
-                    variant="outline"
-                    className="w-full border-2 border-blue-200 text-blue-600 hover:bg-blue-50"
-                  >
-                    <Link
-                      href="/pegawai/projects"
-                      prefetch
-                      onMouseEnter={() => router.prefetch("/pegawai/projects")}
-                    >
-                      View All My Projects
-                      <ArrowRight className="w-4 h-4 ml-2" />
-                    </Link>
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <div className="text-center py-8">
-                <FolderOpen className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500 mb-2">No projects assigned</p>
-                <p className="text-sm text-gray-400">
-                  Wait for project assignments
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-[1600px] mx-auto px-2 md:px-4 lg:px-6 -mt-8 relative z-10">
+        {/* Quick Stats Overview */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
+          <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-xl border border-white/50 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Tasks</p>
+                <p className="text-3xl font-bold text-gray-900">
+                  {stats.total_tasks}
+                </p>
+                <p className="text-xs text-green-600 font-medium">
+                  +{stats.completed_tasks} completed
                 </p>
               </div>
-            )}
+              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center">
+                <ClipboardList className="w-6 h-6 text-white" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-xl border border-white/50 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">
+                  Active Projects
+                </p>
+                <p className="text-3xl font-bold text-gray-900">
+                  {stats.total_projects}
+                </p>
+                <p className="text-xs text-blue-600 font-medium">
+                  {stats.active_projects} active
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center">
+                <FolderOpen className="w-6 h-6 text-white" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-xl border border-white/50 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">
+                  Monthly Earnings
+                </p>
+                <p className="text-3xl font-bold text-gray-900">
+                  {formatCurrency(stats.total_earnings)}
+                </p>
+                <p className="text-xs text-emerald-600 font-medium">
+                  Transport fees
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-2xl flex items-center justify-center">
+                <DollarSign className="w-6 h-6 text-white" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-xl border border-white/50 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">
+                  Task Completion
+                </p>
+                <p className="text-3xl font-bold text-gray-900">
+                  {stats.completed_tasks}/
+                  {stats.completed_tasks + stats.pending_tasks}
+                </p>
+                <p className="text-xs text-orange-600 font-medium">
+                  This month
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-orange-600 rounded-2xl flex items-center justify-center">
+                <Target className="w-6 h-6 text-white" />
+              </div>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Performance Overview */}
-      <div className="border-0 shadow-xl bg-gradient-to-r from-green-600 to-teal-600 text-white overflow-hidden rounded-xl">
-        <div className="p-8">
-          <div className="grid md:grid-cols-4 gap-8 text-center relative">
-            <div className="space-y-2">
-              <div className="flex items-center justify-center mb-3">
-                <Target className="w-8 h-8" />
+        {/* Performance Metrics */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 lg:gap-8 mb-6 md:mb-8">
+          {performanceCards.map((stat, index) => {
+            const IconComponent = stat.icon;
+            return (
+              <Link
+                key={index}
+                href={stat.href}
+                prefetch
+                onMouseEnter={() => router.prefetch(stat.href)}
+              >
+                <div
+                  className={`group relative overflow-hidden rounded-3xl bg-white/80 backdrop-blur-sm border border-white/50 shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 hover:scale-105 cursor-pointer ${
+                    stat.urgent ? "ring-2 ring-red-300 animate-pulse" : ""
+                  }`}
+                >
+                  {/* Animated background gradient */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-white/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+
+                  {/* Floating particles effect */}
+                  <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-full -translate-y-10 translate-x-10 group-hover:scale-150 transition-transform duration-700"></div>
+                  <div className="absolute bottom-0 left-0 w-16 h-16 bg-gradient-to-tr from-emerald-500/10 to-teal-500/10 rounded-full translate-y-8 -translate-x-8 group-hover:scale-150 transition-transform duration-700"></div>
+
+                  <div className="relative p-8">
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-gray-600 mb-3 tracking-wide uppercase">
+                          {stat.title}
+                        </p>
+                        <p className="text-4xl font-bold text-gray-900 mb-2 group-hover:text-emerald-600 transition-colors duration-300">
+                          {stat.value}
+                        </p>
+                        <p className="text-sm text-gray-500 font-medium">
+                          {stat.description}
+                        </p>
+                      </div>
+                      <div
+                        className={`w-16 h-16 bg-gradient-to-br ${stat.color} rounded-2xl flex items-center justify-center group-hover:scale-110 group-hover:rotate-6 transition-all duration-500 shadow-lg group-hover:shadow-xl`}
+                      >
+                        <IconComponent className="w-8 h-8 text-white" />
+                      </div>
+                    </div>
+
+                    {/* Progress indicator */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                        <span className="text-xs text-emerald-600 font-medium">
+                          Active
+                        </span>
+                      </div>
+                      <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-emerald-600 group-hover:translate-x-1 opacity-0 group-hover:opacity-100 transition-all duration-300" />
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+
+        {/* Today's Tasks & Projects */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 lg:gap-8">
+          {/* Today's Tasks */}
+          <div className="relative overflow-hidden rounded-3xl bg-white/80 backdrop-blur-sm border border-white/50 shadow-xl">
+            {/* Header with gradient */}
+            <div className="relative bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 p-6 md:p-8">
+              <div className="absolute inset-0 opacity-30">
+                <div className="absolute top-2 left-2 w-1.5 h-1.5 bg-white rounded-full"></div>
+                <div className="absolute top-4 right-4 w-1 h-1 bg-white rounded-full"></div>
+                <div className="absolute bottom-3 left-6 w-1.5 h-1.5 bg-white rounded-full"></div>
+                <div className="absolute bottom-6 right-2 w-1 h-1 bg-white rounded-full"></div>
               </div>
-              <div className="text-3xl font-bold">
-                {stats.completed_tasks > 0 && stats.active_tasks > 0
-                  ? Math.round(
-                      (stats.completed_tasks /
-                        (stats.completed_tasks + stats.active_tasks)) *
-                        100
-                    )
-                  : stats.completed_tasks > 0
-                    ? 100
+
+              <div className="relative flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
+                    <ClipboardList className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold text-white">
+                      Today&apos;s Tasks
+                    </h3>
+                    <p className="text-emerald-100 text-sm font-medium">
+                      Tasks for today and this week
+                    </p>
+                  </div>
+                </div>
+                <Badge className="bg-white/20 backdrop-blur-sm text-white border-white/30 text-lg px-4 py-2">
+                  {today_tasks.length}
+                </Badge>
+              </div>
+            </div>
+
+            <div className="p-6 md:p-8 space-y-4 md:space-y-6">
+              {today_tasks.length > 0 ? (
+                <>
+                  {today_tasks.map((task, index) => {
+                    const needsTransportDate =
+                      task.has_transport &&
+                      !task.transport_allocation?.allocation_date &&
+                      !task.transport_allocation?.canceled_at;
+                    const isOverdue =
+                      new Date(task.end_date) < new Date() &&
+                      task.status !== "completed";
+
+                    return (
+                      <div
+                        key={index}
+                        className={`group relative overflow-hidden rounded-2xl border transition-all duration-500 transform hover:scale-105 hover:shadow-xl ${
+                          task.status === "completed"
+                            ? "bg-gradient-to-r from-green-50 to-emerald-50 border-green-200"
+                            : task.status === "in_progress"
+                              ? "bg-gradient-to-r from-blue-50 to-cyan-50 border-blue-200"
+                              : needsTransportDate
+                                ? "bg-gradient-to-r from-orange-50 to-amber-50 border-orange-200"
+                                : isOverdue
+                                  ? "bg-gradient-to-r from-red-50 to-rose-50 border-red-200"
+                                  : "bg-gradient-to-r from-gray-50 to-slate-50 border-gray-200 hover:border-emerald-300 hover:from-emerald-50 hover:to-green-50"
+                        }`}
+                      >
+                        {/* Animated background effect */}
+                        <div className="absolute inset-0 bg-gradient-to-r from-white/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+
+                        <div className="relative p-6">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-2 mb-2">
+                                <Badge
+                                  className={
+                                    task.status === "completed"
+                                      ? "bg-green-100 text-green-800"
+                                      : task.status === "in_progress"
+                                        ? "bg-blue-100 text-blue-800"
+                                        : "bg-gray-100 text-gray-800"
+                                  }
+                                >
+                                  {task.status.toUpperCase()}
+                                </Badge>
+
+                                {task.has_transport && (
+                                  <Badge className="bg-green-100 text-green-800 border-green-200">
+                                    <DollarSign className="w-3 h-3 mr-1" />
+                                    Transport
+                                  </Badge>
+                                )}
+
+                                {needsTransportDate && (
+                                  <Badge className="bg-orange-100 text-orange-800 border-orange-200 animate-pulse">
+                                    <Clock className="w-3 h-3 mr-1" />
+                                    Date Needed
+                                  </Badge>
+                                )}
+
+                                {isOverdue && (
+                                  <Badge className="bg-red-100 text-red-800 border-red-200">
+                                    OVERDUE
+                                  </Badge>
+                                )}
+                              </div>
+
+                              <div
+                                className={`font-semibold mb-2 ${
+                                  task.status === "completed"
+                                    ? "text-green-800 line-through"
+                                    : task.status === "in_progress"
+                                      ? "text-blue-800"
+                                      : "text-gray-900"
+                                }`}
+                              >
+                                {task.title}
+                              </div>
+
+                              <div className="text-sm text-gray-600 mb-2">
+                                Project: {task.project_name}
+                              </div>
+
+                              <div className="text-sm text-gray-500">
+                                {new Date(task.start_date).toLocaleDateString(
+                                  "id-ID"
+                                )}{" "}
+                                -{" "}
+                                {new Date(task.end_date).toLocaleDateString(
+                                  "id-ID"
+                                )}
+                              </div>
+
+                              {task.response_pegawai && (
+                                <div className="text-sm text-gray-500 bg-white p-2 rounded border mt-2">
+                                  <strong>Response:</strong>{" "}
+                                  {task.response_pegawai}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="ml-4 flex flex-col space-y-2">
+                              {needsTransportDate ? (
+                                <Button
+                                  size="sm"
+                                  asChild
+                                  className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white animate-pulse"
+                                >
+                                  <Link
+                                    href={`/pegawai/tasks/${task.id}/transport`}
+                                  >
+                                    <MapPin className="w-3 h-3 mr-1" />
+                                    Select Date
+                                  </Link>
+                                </Button>
+                              ) : (
+                                task.has_transport && (
+                                  <Button
+                                    size="sm"
+                                    asChild
+                                    variant="outline"
+                                    className="border-green-300 text-green-700 hover:bg-green-50"
+                                  >
+                                    <Link
+                                      href={`/pegawai/tasks/${task.id}/transport`}
+                                    >
+                                      <Calendar className="w-3 h-3 mr-1" />
+                                      Edit Date
+                                    </Link>
+                                  </Button>
+                                )
+                              )}
+
+                              {task.status === "pending" && (
+                                <Button
+                                  size="sm"
+                                  onClick={() =>
+                                    handleTaskStatusUpdate(
+                                      task.id,
+                                      "in_progress"
+                                    )
+                                  }
+                                  disabled={updatingTask === task.id}
+                                  className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
+                                >
+                                  <Play className="w-3 h-3 mr-1" />
+                                  Start
+                                </Button>
+                              )}
+
+                              {task.status === "in_progress" && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    const response = prompt(
+                                      "Add your response (optional):"
+                                    );
+                                    handleTaskStatusUpdate(
+                                      task.id,
+                                      "completed",
+                                      response || undefined
+                                    );
+                                  }}
+                                  disabled={updatingTask === task.id}
+                                  className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white"
+                                >
+                                  <CheckSquare className="w-3 h-3 mr-1" />
+                                  Complete
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  <div className="pt-4">
+                    <Button
+                      asChild
+                      variant="outline"
+                      className="w-full border-2 border-green-200 text-green-600 hover:bg-green-50"
+                    >
+                      <Link href="/pegawai/tasks">
+                        View All My Tasks
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </Link>
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-8">
+                  <CheckCircle className="w-12 h-12 text-green-300 mx-auto mb-4" />
+                  <p className="text-gray-500 mb-2">No tasks for today!</p>
+                  <p className="text-sm text-gray-400">Enjoy your free time</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* My Projects */}
+          <div className="relative overflow-hidden rounded-3xl bg-white/80 backdrop-blur-sm border border-white/50 shadow-xl">
+            {/* Header with gradient */}
+            <div className="relative bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 p-6 md:p-8">
+              <div className="absolute inset-0 opacity-30">
+                <div className="absolute top-2 left-2 w-1.5 h-1.5 bg-white rounded-full"></div>
+                <div className="absolute top-4 right-4 w-1 h-1 bg-white rounded-full"></div>
+                <div className="absolute bottom-3 left-6 w-1.5 h-1.5 bg-white rounded-full"></div>
+                <div className="absolute bottom-6 right-2 w-1 h-1 bg-white rounded-full"></div>
+              </div>
+
+              <div className="relative flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
+                    <FolderOpen className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold text-white">
+                      My Projects
+                    </h3>
+                    <p className="text-blue-100 text-sm font-medium">
+                      Projects I&apos;m participating in
+                    </p>
+                  </div>
+                </div>
+                <Badge className="bg-white/20 backdrop-blur-sm text-white border-white/30 text-lg px-4 py-2">
+                  {assigned_projects.length}
+                </Badge>
+              </div>
+            </div>
+
+            <div className="p-6 md:p-8 space-y-4 md:space-y-6">
+              {assigned_projects.length > 0 ? (
+                <>
+                  {assigned_projects.map((project, index) => (
+                    <Link
+                      key={index}
+                      href={`/pegawai/projects/${project.id}`}
+                      prefetch
+                      onMouseEnter={() =>
+                        router.prefetch(`/pegawai/projects/${project.id}`)
+                      }
+                    >
+                      <div className="group flex items-center p-6 rounded-2xl hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50 transition-all duration-300 transform hover:scale-105 cursor-pointer border border-gray-100 hover:border-blue-200 hover:shadow-lg">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2 mb-2">
+                            <div className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+                              {project.nama_project}
+                            </div>
+                            <Badge
+                              className={
+                                project.user_role === "leader"
+                                  ? "bg-purple-100 text-purple-800"
+                                  : "bg-blue-100 text-blue-800"
+                              }
+                            >
+                              {project.user_role.toUpperCase()}
+                            </Badge>
+                          </div>
+
+                          <div className="text-sm text-gray-500 group-hover:text-blue-500 mt-1">
+                            Leader: {project.ketua_tim_name}
+                          </div>
+
+                          <div className="text-sm text-gray-400 mt-1">
+                            Deadline:{" "}
+                            {new Date(project.deadline).toLocaleDateString(
+                              "id-ID"
+                            )}
+                          </div>
+
+                          <div className="mt-2 flex items-center space-x-2">
+                            <div className="flex-1 bg-gray-200 rounded-full h-2">
+                              <div
+                                className="bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full transition-all duration-300"
+                                style={{ width: `${project.my_progress}%` }}
+                              ></div>
+                            </div>
+                            <span className="text-sm font-semibold text-gray-600">
+                              {project.my_progress}%
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="ml-4">
+                          <Badge
+                            className={
+                              project.status === "active"
+                                ? "bg-green-100 text-green-800"
+                                : project.status === "upcoming"
+                                  ? "bg-blue-100 text-blue-800"
+                                  : "bg-gray-100 text-gray-800"
+                            }
+                          >
+                            {project.status.toUpperCase()}
+                          </Badge>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+
+                  <div className="pt-4">
+                    <Button
+                      asChild
+                      variant="outline"
+                      className="w-full border-2 border-blue-200 text-blue-600 hover:bg-blue-50"
+                    >
+                      <Link
+                        href="/pegawai/projects"
+                        prefetch
+                        onMouseEnter={() =>
+                          router.prefetch("/pegawai/projects")
+                        }
+                      >
+                        View All My Projects
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </Link>
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-8">
+                  <FolderOpen className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500 mb-2">No projects assigned</p>
+                  <p className="text-sm text-gray-400">
+                    Wait for project assignments
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Performance Overview */}
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white shadow-2xl mt-8">
+          {/* Animated background pattern */}
+          <div className="absolute inset-0 opacity-30">
+            <div className="absolute top-4 left-4 w-2 h-2 bg-white rounded-full"></div>
+            <div className="absolute top-8 right-8 w-1 h-1 bg-white rounded-full"></div>
+            <div className="absolute bottom-6 left-12 w-1.5 h-1.5 bg-white rounded-full"></div>
+            <div className="absolute bottom-12 right-4 w-2 h-2 bg-white rounded-full"></div>
+            <div className="absolute top-1/2 left-1/4 w-1 h-1 bg-white rounded-full"></div>
+            <div className="absolute top-1/3 right-1/3 w-1.5 h-1.5 bg-white rounded-full"></div>
+          </div>
+
+          {/* Floating elements */}
+          <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -translate-y-20 translate-x-20 animate-pulse"></div>
+          <div
+            className="absolute bottom-0 left-0 w-32 h-32 bg-white/10 rounded-full translate-y-16 -translate-x-16 animate-pulse"
+            style={{ animationDelay: "1s" }}
+          ></div>
+          <div
+            className="absolute top-1/2 left-1/2 w-24 h-24 bg-white/5 rounded-full -translate-x-12 -translate-y-12 animate-pulse"
+            style={{ animationDelay: "2s" }}
+          ></div>
+
+          <div className="relative p-8 md:p-12">
+            <div className="text-center mb-8 md:mb-12">
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">
+                Performance Overview
+              </h2>
+              <p className="text-emerald-100 text-base md:text-lg">
+                Your productivity metrics at a glance
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8 text-center">
+              <div className="group space-y-4">
+                <div className="flex items-center justify-center mb-4">
+                  <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                    <Target className="w-8 h-8" />
+                  </div>
+                </div>
+                <div className="text-4xl font-bold group-hover:scale-110 transition-transform duration-300">
+                  {stats.completed_tasks > 0 && stats.pending_tasks > 0
+                    ? Math.round(
+                        (stats.completed_tasks /
+                          (stats.completed_tasks + stats.pending_tasks)) *
+                          100
+                      )
+                    : stats.completed_tasks > 0
+                      ? 100
+                      : 0}
+                  %
+                </div>
+                <div className="text-emerald-100 text-sm font-medium">
+                  Task completion rate
+                </div>
+              </div>
+
+              <div className="group space-y-4">
+                <div className="flex items-center justify-center mb-4">
+                  <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                    <TrendingUp className="w-8 h-8" />
+                  </div>
+                </div>
+                <div className="text-4xl font-bold group-hover:scale-110 transition-transform duration-300">
+                  {assigned_projects.length > 0
+                    ? Math.round(
+                        assigned_projects.reduce(
+                          (acc, p) => acc + p.my_progress,
+                          0
+                        ) / assigned_projects.length
+                      )
                     : 0}
-                %
+                  %
+                </div>
+                <div className="text-emerald-100 text-sm font-medium">
+                  Average project progress
+                </div>
               </div>
-              <div className="text-green-100 text-sm">Task completion rate</div>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-center mb-3">
-                <TrendingUp className="w-8 h-8" />
-              </div>
-              <div className="text-3xl font-bold">
-                {assigned_projects.length > 0
-                  ? Math.round(
-                      assigned_projects.reduce(
-                        (acc, p) => acc + p.progress,
-                        0
-                      ) / assigned_projects.length
-                    )
-                  : 0}
-                %
-              </div>
-              <div className="text-green-100 text-sm">
-                Average project progress
-              </div>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-center mb-3">
-                <Award className="w-8 h-8" />
-              </div>
-              <div className="text-3xl font-bold">
-                {stats.assigned_projects}
-              </div>
-              <div className="text-green-100 text-sm">Active projects</div>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-center mb-3">
-                <Calendar className="w-8 h-8" />
-              </div>
-              <div className="text-3xl font-bold">{today_tasks.length}</div>
-              <div className="text-green-100 text-sm">Today&apos;s tasks</div>
-            </div>
 
-            {/* Background decorations */}
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white bg-opacity-10 rounded-full -translate-y-16 translate-x-16"></div>
-            <div className="absolute bottom-0 left-0 w-24 h-24 bg-white bg-opacity-10 rounded-full translate-y-12 -translate-x-12"></div>
+              <div className="group space-y-4">
+                <div className="flex items-center justify-center mb-4">
+                  <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                    <Award className="w-8 h-8" />
+                  </div>
+                </div>
+                <div className="text-4xl font-bold group-hover:scale-110 transition-transform duration-300">
+                  {stats.total_projects}
+                </div>
+                <div className="text-emerald-100 text-sm font-medium">
+                  Active projects
+                </div>
+              </div>
+
+              <div className="group space-y-4">
+                <div className="flex items-center justify-center mb-4">
+                  <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                    <DollarSign className="w-8 h-8" />
+                  </div>
+                </div>
+                <div className="text-4xl font-bold group-hover:scale-110 transition-transform duration-300">
+                  {formatCurrency(stats.total_earnings)}
+                </div>
+                <div className="text-emerald-100 text-sm font-medium">
+                  Monthly transport
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

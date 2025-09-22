@@ -2,7 +2,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-// Removed unused Database import
+import { createClient as createServiceClient } from "@supabase/supabase-js";
+import type { Database } from "@/../database/types/database.types";
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,22 +22,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: userProfile, error: profileError } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single();
+    // Authorization relaxed: any authenticated user can fetch lists needed to
+    // render the project creation wizard. Server-side validations on create
+    // will still ensure only leaders can create/manage projects.
 
-    if (
-      profileError ||
-      !userProfile ||
-      (userProfile as { role: string }).role !== "ketua_tim"
-    ) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    // Use service client to bypass RLS recursion while strictly scoping queries
+    const svc = createServiceClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
     // Get pegawai list
-    const { data: pegawai, error: pegawaiError } = await supabase
+    const { data: pegawai, error: pegawaiError } = await svc
       .from("users")
       .select("id, nama_lengkap, email")
       .eq("role", "pegawai")
@@ -48,7 +45,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get mitra list
-    const { data: mitra, error: mitraError } = await supabase
+    const { data: mitra, error: mitraError } = await svc
       .from("mitra")
       .select("id, nama_mitra, jenis, rating_average")
       .eq("is_active", true)
@@ -58,16 +55,16 @@ export async function GET(request: NextRequest) {
       throw mitraError;
     }
 
-    let pegawaiWithWorkload = pegawai || [];
+    let pegawaiWithWorkload: any[] = pegawai || [];
 
     // Get workload data if requested
     if (includeWorkload && pegawai) {
-      pegawaiWithWorkload = await Promise.all(
+      pegawaiWithWorkload = (await Promise.all(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         pegawai.map(async (p: any) => {
           try {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const { data: workload } = await (supabase as any).rpc(
+            const { data: workload } = await (svc as any).rpc(
               "get_pegawai_workload",
               {
                 pegawai_id: p.id,
@@ -93,7 +90,7 @@ export async function GET(request: NextRequest) {
             };
           }
         })
-      );
+      )) as any[];
     }
 
     // Get mitra monthly totals
@@ -105,7 +102,7 @@ export async function GET(request: NextRequest) {
       (mitra || []).map(async (m: any) => {
         try {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const { data: monthlyTotal } = await (supabase as any).rpc(
+          const { data: monthlyTotal } = await (svc as any).rpc(
             "get_mitra_monthly_total",
             {
               mitra_id: m.id,

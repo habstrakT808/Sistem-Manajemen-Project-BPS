@@ -2,6 +2,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
+import type { Database } from "@/../database/types/database.types";
 
 interface TaskFormData {
   project_id: string;
@@ -22,8 +24,19 @@ export async function POST(request: NextRequest) {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const supabase = (await createClient()) as any;
+    const svc = createServiceClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
     const body = await request.json();
-    const taskData: TaskFormData = body;
+    // Accept both legacy and new task form shapes
+    const normalized: TaskFormData = {
+      project_id: body.project_id,
+      pegawai_id: body.pegawai_id || body.assignee_user_id,
+      tanggal_tugas: body.tanggal_tugas || body.start_date || body.end_date,
+      deskripsi_tugas:
+        body.deskripsi_tugas || body.description || body.title || "",
+    };
 
     // Check if user is ketua tim
     const {
@@ -35,26 +48,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: userProfile, error: profileError } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (
-      profileError ||
-      !userProfile ||
-      (userProfile as { role: string }).role !== "ketua_tim"
-    ) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    // Do not hard block by global role; we'll enforce ownership below
 
     // Validate required fields
     if (
-      !taskData.project_id ||
-      !taskData.pegawai_id ||
-      !taskData.tanggal_tugas ||
-      !taskData.deskripsi_tugas
+      !normalized.project_id ||
+      !normalized.pegawai_id ||
+      !normalized.tanggal_tugas ||
+      !normalized.deskripsi_tugas
     ) {
       return NextResponse.json(
         { error: "Missing required fields" },
@@ -63,14 +64,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify project belongs to this ketua tim
-    const { data: project, error: projectError } = await supabase
+    const { data: project, error: projectError } = await (svc as any)
       .from("projects")
-      .select("id")
-      .eq("id", taskData.project_id)
-      .eq("ketua_tim_id", user.id)
+      .select("id, ketua_tim_id, leader_user_id")
+      .eq("id", normalized.project_id)
       .single();
 
-    if (projectError || !project) {
+    if (
+      projectError ||
+      !project ||
+      ((project as any).ketua_tim_id !== user.id &&
+        (project as any).leader_user_id !== user.id)
+    ) {
       return NextResponse.json(
         { error: "Project not found or access denied" },
         { status: 404 }
@@ -78,12 +83,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify pegawai is assigned to this project
-    const { data: assignment, error: assignmentError } = await supabase
+    const { data: assignment, error: assignmentError } = await (svc as any)
       .from("project_assignments")
       .select("id")
-      .eq("project_id", taskData.project_id)
+      .eq("project_id", normalized.project_id)
       .eq("assignee_type", "pegawai")
-      .eq("assignee_id", taskData.pegawai_id)
+      .eq("assignee_id", normalized.pegawai_id)
       .single();
 
     if (assignmentError || !assignment) {
@@ -94,13 +99,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Create task
-    const { data: task, error: taskError } = await supabase
+    const { data: task, error: taskError } = await (svc as any)
       .from("tasks")
       .insert({
-        project_id: taskData.project_id,
-        pegawai_id: taskData.pegawai_id,
-        tanggal_tugas: taskData.tanggal_tugas,
-        deskripsi_tugas: taskData.deskripsi_tugas,
+        project_id: normalized.project_id,
+        pegawai_id: normalized.pegawai_id,
+        assignee_user_id: normalized.pegawai_id, // Support both fields
+        title: normalized.deskripsi_tugas,
+        start_date: normalized.tanggal_tugas,
+        end_date: normalized.tanggal_tugas,
+        tanggal_tugas: normalized.tanggal_tugas,
+        deskripsi_tugas: normalized.deskripsi_tugas,
+        has_transport: body.has_transport || false,
         status: "pending",
       })
       .select()
@@ -109,6 +119,8 @@ export async function POST(request: NextRequest) {
     if (taskError) {
       throw taskError;
     }
+
+    // Transport allocation will be created automatically by trigger when has_transport = true
 
     return NextResponse.json({
       message: "Task created successfully",
@@ -127,6 +139,10 @@ export async function GET(request: NextRequest) {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const supabase = (await createClient()) as any;
+    const svc = createServiceClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get("project_id");
     const status = searchParams.get("status");
@@ -144,78 +160,97 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: userProfile, error: profileError } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single();
+    // No global role gate; enforce ownership in queries
 
-    if (
-      profileError ||
-      !userProfile ||
-      (userProfile as { role: string }).role !== "ketua_tim"
-    ) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    // Build task list WITHOUT relying on implicit foreign joins (avoid schema FK requirement)
+    // 1) Find projects owned by the current user
+    const ownedProjectsBase = (svc as any)
+      .from("projects")
+      .select("id")
+      .or(`ketua_tim_id.eq.${user.id},leader_user_id.eq.${user.id}`);
+    const { data: ownedProjects, error: ownedErr } = projectId
+      ? await ownedProjectsBase.eq("id", projectId)
+      : await ownedProjectsBase;
+    if (ownedErr) throw ownedErr;
+    const ownedProjectIds = (ownedProjects || []).map(
+      (p: { id: string }) => p.id
+    );
+
+    if (ownedProjectIds.length === 0) {
+      return NextResponse.json({ data: [] });
     }
 
-    // Build query for tasks from projects owned by this ketua tim
-    let query = supabase
+    // 2) Fetch tasks for these projects
+    let taskQuery = (svc as any)
       .from("tasks")
       .select(
         `
         id,
         project_id,
         pegawai_id,
+        title,
         tanggal_tugas,
         deskripsi_tugas,
+        start_date,
+        end_date,
+        has_transport,
         status,
         response_pegawai,
         created_at,
-        updated_at,
-        projects!inner (
-          id,
-          nama_project,
-          ketua_tim_id
-        ),
-        users!inner (
-          id,
-          nama_lengkap,
-          email
-        )
+        updated_at
       `
       )
-      .eq("projects.ketua_tim_id", user.id)
+      .in("project_id", ownedProjectIds)
       .order("tanggal_tugas", { ascending: false })
       .order("created_at", { ascending: false });
 
-    // Apply filters
-    if (projectId) {
-      query = query.eq("projects.id", projectId);
-    }
+    if (status) taskQuery = taskQuery.eq("status", status);
+    if (pegawaiId) taskQuery = taskQuery.eq("pegawai_id", pegawaiId);
+    if (dateFrom) taskQuery = taskQuery.gte("tanggal_tugas", dateFrom);
+    if (dateTo) taskQuery = taskQuery.lte("tanggal_tugas", dateTo);
 
-    if (status) {
-      query = query.eq("status", status);
-    }
+    const { data: baseTasks, error: tasksErr } = await taskQuery;
+    if (tasksErr) throw tasksErr;
 
-    if (pegawaiId) {
-      query = query.eq("pegawai_id", pegawaiId);
-    }
+    // 3) Enrich with project and user info
+    const projectIds = Array.from(
+      new Set((baseTasks || []).map((t: any) => t.project_id))
+    );
+    const userIds = Array.from(
+      new Set((baseTasks || []).map((t: any) => t.pegawai_id))
+    );
 
-    if (dateFrom) {
-      query = query.gte("tanggal_tugas", dateFrom);
-    }
+    const [{ data: projRows }, { data: userRows }] = await Promise.all([
+      (svc as any)
+        .from("projects")
+        .select("id, nama_project")
+        .in("id", projectIds),
+      (svc as any)
+        .from("users")
+        .select("id, nama_lengkap, email")
+        .in("id", userIds),
+    ]);
+    const idToProject = new Map<string, any>(
+      (projRows || []).map((p: any) => [p.id, p])
+    );
+    const idToUser = new Map<string, any>(
+      (userRows || []).map((u: any) => [u.id, u])
+    );
 
-    if (dateTo) {
-      query = query.lte("tanggal_tugas", dateTo);
-    }
+    const enriched = (baseTasks || []).map((t: any) => ({
+      ...t,
+      projects: idToProject.get(t.project_id) || {
+        id: t.project_id,
+        nama_project: "",
+      },
+      users: idToUser.get(t.pegawai_id) || {
+        id: t.pegawai_id,
+        nama_lengkap: "",
+        email: "",
+      },
+    }));
 
-    const { data: tasks, error } = await query;
-
-    if (error) {
-      throw error;
-    }
-
-    return NextResponse.json({ data: tasks || [] });
+    return NextResponse.json({ data: enriched });
   } catch (error) {
     console.error("Tasks fetch error:", error);
     return NextResponse.json(
@@ -229,6 +264,10 @@ export async function PUT(request: NextRequest) {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const supabase = (await createClient()) as any;
+    const svc = createServiceClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
     const body = await request.json();
     const updateData: TaskUpdateData = body;
 
@@ -242,33 +281,24 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: userProfile, error: profileError } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (
-      profileError ||
-      !userProfile ||
-      (userProfile as { role: string }).role !== "ketua_tim"
-    ) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    // No global role gate; enforce ownership below
 
     // Verify task belongs to a project owned by this ketua tim
-    const { data: task, error: taskError } = await supabase
+    const { data: task, error: taskError } = await (svc as any)
       .from("tasks")
       .select(
         `
         id,
-        projects!inner (
-          ketua_tim_id
+        projects:projects!inner (
+          ketua_tim_id,
+          leader_user_id
         )
       `
       )
       .eq("id", updateData.id)
-      .eq("projects.ketua_tim_id", user.id)
+      .or(`ketua_tim_id.eq.${user.id},leader_user_id.eq.${user.id}`, {
+        foreignTable: "projects",
+      })
       .single();
 
     if (taskError || !task) {
@@ -299,7 +329,7 @@ export async function PUT(request: NextRequest) {
       updateFields.response_pegawai = updateData.response_pegawai;
     }
 
-    const { data: updatedTask, error: updateError } = await supabase
+    const { data: updatedTask, error: updateError } = await (svc as any)
       .from("tasks")
       .update(updateFields)
       .eq("id", updateData.id)
@@ -327,6 +357,10 @@ export async function DELETE(request: NextRequest) {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const supabase = (await createClient()) as any;
+    const svc = createServiceClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
     const { searchParams } = new URL(request.url);
     const taskId = searchParams.get("id");
 
@@ -347,33 +381,21 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: userProfile, error: profileError } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (
-      profileError ||
-      !userProfile ||
-      (userProfile as { role: string }).role !== "ketua_tim"
-    ) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    // No global role gate; enforce ownership below
 
     // Verify task belongs to a project owned by this ketua tim
-    const { data: task, error: taskError } = await supabase
+    const { data: task, error: taskError } = await (svc as any)
       .from("tasks")
       .select(
         `
         id,
-        projects!inner (
-          ketua_tim_id
-        )
+        projects:projects!inner (ketua_tim_id, leader_user_id)
       `
       )
       .eq("id", taskId)
-      .eq("projects.ketua_tim_id", user.id)
+      .or(
+        `projects.ketua_tim_id.eq.${user.id},projects.leader_user_id.eq.${user.id}`
+      )
       .single();
 
     if (taskError || !task) {
@@ -384,7 +406,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Delete task
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await (svc as any)
       .from("tasks")
       .delete()
       .eq("id", taskId);

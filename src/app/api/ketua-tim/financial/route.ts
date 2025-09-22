@@ -2,6 +2,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
+import type { Database } from "@/../database/types/database.types";
 
 interface FinancialStats {
   total_monthly_spending: number;
@@ -34,6 +36,10 @@ export async function GET(request: NextRequest) {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const supabase = (await createClient()) as any;
+    const svc = createServiceClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
     const { searchParams } = new URL(request.url);
     const period = searchParams.get("period") || "current_month";
 
@@ -46,20 +52,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Role validation
-    const { data: userProfile, error: profileError } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (
-      profileError ||
-      !userProfile ||
-      (userProfile as { role: string }).role !== "ketua_tim"
-    ) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    // Do not hard block by global role here; we enforce ownership below
 
     // Calculate date range based on period
     let startDate: Date;
@@ -83,21 +76,24 @@ export async function GET(request: NextRequest) {
     const currentMonth = startDate.getMonth() + 1;
     const currentYear = startDate.getFullYear();
 
-    // Get current project assignments for accurate budget calculation
-    const { data: currentAssignments } = await supabase
-      .from("project_assignments")
-      .select(
-        `
-        uang_transport,
-        honor,
-        assignee_type,
-        projects!inner (
-          ketua_tim_id,
-          tanggal_mulai
-        )
-      `
-      )
-      .eq("projects.ketua_tim_id", user.id);
+    // Determine owned projects (accept both ketua_tim_id and leader_user_id)
+    const { data: ownedProjectsRows } = await (svc as any)
+      .from("projects")
+      .select("id")
+      .or(`ketua_tim_id.eq.${user.id},leader_user_id.eq.${user.id}`);
+    const ownedIds = new Set<string>(
+      (ownedProjectsRows || []).map((p: { id: string }) => p.id)
+    );
+    const ownedIdArray = Array.from(ownedIds);
+
+    // Get current project assignments for accurate budget calculation (filtered by owned projects)
+    const { data: currentAssignments } =
+      ownedIdArray.length > 0
+        ? await (svc as any)
+            .from("project_assignments")
+            .select("project_id, uang_transport, honor, assignee_type")
+            .in("project_id", ownedIdArray)
+        : { data: [] };
 
     // Calculate spending based on current assignments (not historical financial_records)
     const totalSpending = (currentAssignments || []).reduce(
@@ -130,57 +126,50 @@ export async function GET(request: NextRequest) {
         0
       );
 
-    // Get projects (include completed so the card isn't empty after projects finish)
-    const { data: activeProjects } = await supabase
-      .from("projects")
-      .select(
-        `
-        id,
-        nama_project,
-        status,
-        deadline,
-        project_assignments (
-          uang_transport,
-          honor
-        )
-      `
-      )
-      .eq("ketua_tim_id", user.id)
-      .in("status", ["upcoming", "active", "completed"]);
+    // Build project budgets without relying on implicit relationship
+    const { data: projectRows } =
+      ownedIdArray.length > 0
+        ? await (svc as any)
+            .from("projects")
+            .select("id, nama_project, status, deadline")
+            .in("id", ownedIdArray)
+        : { data: [] };
 
-    const projectBudgets: ProjectBudget[] = (activeProjects || []).map(
-      (project: {
+    const budgetByProject = new Map<
+      string,
+      { transport: number; honor: number }
+    >();
+    for (const a of currentAssignments as Array<{
+      project_id: string;
+      uang_transport: number | null;
+      honor: number | null;
+    }>) {
+      const rec = budgetByProject.get(a.project_id) || {
+        transport: 0,
+        honor: 0,
+      };
+      rec.transport += a.uang_transport || 0;
+      rec.honor += a.honor || 0;
+      budgetByProject.set(a.project_id, rec);
+    }
+
+    const projectBudgets: ProjectBudget[] = (projectRows || []).map(
+      (p: {
         id: string;
         nama_project: string;
         status: string;
         deadline: string;
-        project_assignments: Array<{
-          uang_transport: number | null;
-          honor: number | null;
-        }>;
       }) => {
-        const transportBudget = (project.project_assignments || []).reduce(
-          (sum: number, assignment: { uang_transport: number | null }) =>
-            sum + (assignment.uang_transport || 0),
-          0
-        );
-
-        const honorBudget = (project.project_assignments || []).reduce(
-          (sum: number, assignment: { honor: number | null }) =>
-            sum + (assignment.honor || 0),
-          0
-        );
-
-        const totalBudget = transportBudget + honorBudget;
-
+        const b = budgetByProject.get(p.id) || { transport: 0, honor: 0 };
+        const totalBudget = b.transport + b.honor;
         return {
-          id: project.id,
-          nama_project: project.nama_project,
+          id: p.id,
+          nama_project: p.nama_project,
           total_budget: totalBudget,
-          transport_budget: transportBudget,
-          honor_budget: honorBudget,
-          status: project.status as "upcoming" | "active" | "completed",
-          deadline: project.deadline,
+          transport_budget: b.transport,
+          honor_budget: b.honor,
+          status: p.status as "upcoming" | "active" | "completed",
+          deadline: p.deadline,
           budget_percentage:
             totalSpending > 0
               ? Math.round((totalBudget / totalSpending) * 100)
@@ -239,19 +228,13 @@ export async function GET(request: NextRequest) {
 
     // Get top spenders from current assignments (avoid inner joins that may be blocked by RLS)
     // Aggregate Pegawai by assignee_id
-    const { data: pegawaiAssignments } = await supabase
+    const { data: pegawaiAssignments } = await (svc as any)
       .from("project_assignments")
       .select(`uang_transport, assignee_id, project_id, assignee_type`)
       .eq("assignee_type", "pegawai");
 
     // Restrict to projects owned by this ketua tim
-    const { data: ownedProjects } = await supabase
-      .from("projects")
-      .select("id")
-      .eq("ketua_tim_id", user.id);
-    const ownedProjectIds = new Set(
-      (ownedProjects || []).map((p: { id: string }) => p.id)
-    );
+    const ownedProjectIds = new Set(ownedIdArray);
 
     const pegawaiTotals = (pegawaiAssignments || [])
       .filter((a: { project_id: string }) => ownedProjectIds.has(a.project_id))
@@ -288,7 +271,7 @@ export async function GET(request: NextRequest) {
     const pegawaiIds = Object.keys(pegawaiTotals);
     let pegawaiNames: Record<string, string> = {};
     if (pegawaiIds.length > 0) {
-      const { data: usersRows } = await supabase
+      const { data: usersRows } = await (svc as any)
         .from("users")
         .select("id, nama_lengkap")
         .in("id", pegawaiIds);
@@ -299,8 +282,9 @@ export async function GET(request: NextRequest) {
       }
     }
     for (const [id, rec] of Object.entries(pegawaiTotals)) {
-      if (pegawaiNames[id]) rec.name = pegawaiNames[id];
-      else rec.name = `User ${id.slice(0, 6)}`;
+      const r = rec as { name?: string };
+      if (pegawaiNames[id]) r.name = pegawaiNames[id];
+      else r.name = `User ${id.slice(0, 6)}`;
     }
 
     const topPegawai = Object.values(pegawaiTotals)
@@ -322,7 +306,7 @@ export async function GET(request: NextRequest) {
       .slice(0, 5);
 
     // Aggregate Mitra by assignee_id
-    const { data: mitraAssignments } = await supabase
+    const { data: mitraAssignments } = await (svc as any)
       .from("project_assignments")
       .select(`honor, assignee_id, project_id, assignee_type`)
       .eq("assignee_type", "mitra");
@@ -362,7 +346,7 @@ export async function GET(request: NextRequest) {
     const mitraIds = Object.keys(mitraTotals);
     let mitraNames: Record<string, string> = {};
     if (mitraIds.length > 0) {
-      const { data: mitraRows } = await supabase
+      const { data: mitraRows } = await (svc as any)
         .from("mitra")
         .select("id, nama_mitra")
         .in("id", mitraIds);
@@ -373,8 +357,9 @@ export async function GET(request: NextRequest) {
       }
     }
     for (const [id, rec] of Object.entries(mitraTotals)) {
-      if (mitraNames[id]) rec.name = mitraNames[id];
-      else rec.name = `Mitra ${id.slice(0, 6)}`;
+      const r = rec as { name?: string };
+      if (mitraNames[id]) r.name = mitraNames[id];
+      else r.name = `Mitra ${id.slice(0, 6)}`;
     }
 
     const topMitra = Object.values(mitraTotals)

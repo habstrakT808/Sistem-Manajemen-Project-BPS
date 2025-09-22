@@ -2,6 +2,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
+import type { Database } from "@/../database/types/database.types";
 
 interface DashboardStats {
   my_projects: number;
@@ -46,36 +48,162 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Role validation
-    const { data: userProfile, error: profileError } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single();
+    // Use service client and enforce ownership manually to avoid RLS recursion
+    const svc = createServiceClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
-    if (
-      profileError ||
-      !userProfile ||
-      (userProfile as { role: string }).role !== "ketua_tim"
-    ) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    // Compute stats directly for consistency with projects endpoint
+    const [{ count: allProjectsCount }, { count: activeProjectsCount }] =
+      await Promise.all([
+        (svc as any)
+          .from("projects")
+          .select("id", { count: "exact", head: true })
+          .eq("ketua_tim_id", user.id),
+        (svc as any)
+          .from("projects")
+          .select("id", { count: "exact", head: true })
+          .eq("ketua_tim_id", user.id)
+          .eq("status", "active"),
+      ]);
 
-    // Get dashboard statistics using database function
-    const { data: statsResult } = await supabase.rpc("get_dashboard_stats", {
-      user_id: user.id,
-    });
+    // Team members: distinct user_ids in project_members for user's projects
+    const { data: memberRows } = await (svc as any)
+      .from("project_members")
+      .select("user_id, project_id")
+      .in(
+        "project_id",
+        (
+          await (svc as any)
+            .from("projects")
+            .select("id")
+            .eq("ketua_tim_id", user.id)
+        ).data?.map((p: { id: string }) => p.id) || []
+      );
+    const uniqueMemberIds = new Set<string>(
+      (memberRows || []).map((m: any) => m.user_id)
+    );
+
+    // Pending tasks within next 7 days for user's projects
+    const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split("T")[0];
+    const { count: pendingTasksCount } = await (svc as any)
+      .from("tasks")
+      .select("id", { count: "exact", head: true })
+      .in(
+        "project_id",
+        (
+          await (svc as any)
+            .from("projects")
+            .select("id")
+            .eq("ketua_tim_id", user.id)
+        ).data?.map((p: { id: string }) => p.id) || []
+      )
+      .eq("status", "pending")
+      .lte("tanggal_tugas", sevenDaysFromNow);
+
+    // Monthly budget: transport (earnings_ledger via allocation source) + mitra honor (financial_records)
+    const now = new Date();
+    const pad2 = (n: number) => (n < 10 ? `0${n}` : String(n));
+    const ymStart = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-01`;
+    const nextMonth = now.getMonth() === 11 ? 1 : now.getMonth() + 2;
+    const nextYear =
+      now.getMonth() === 11 ? now.getFullYear() + 1 : now.getFullYear();
+    const ymEndExclusive = `${nextYear}-${pad2(nextMonth)}-01`;
+
+    // Owned project ids (reuse computed above)
+    const ownedProjectIds =
+      (
+        await (svc as any)
+          .from("projects")
+          .select("id")
+          .eq("ketua_tim_id", user.id)
+      ).data?.map((p: { id: string }) => p.id) || [];
+
+    // Tasks in owned projects
+    const { data: ownedTasks } = await (svc as any)
+      .from("tasks")
+      .select("id")
+      .in("project_id", ownedProjectIds);
+    const taskIds = (ownedTasks || []).map((t: { id: string }) => t.id);
+
+    // Allocations for those tasks in current month
+    const { data: allocs } = taskIds.length
+      ? await (svc as any)
+          .from("task_transport_allocations")
+          .select("id")
+          .in("task_id", taskIds)
+          .gte("allocation_date", ymStart)
+          .lt("allocation_date", ymEndExclusive)
+          .is("canceled_at", null)
+      : { data: [] };
+    const allocationIds = (allocs || []).map((a: { id: string }) => a.id);
+
+    // Sum earnings_ledger for those allocations (transport)
+    const { data: transportLedger } = allocationIds.length
+      ? await (svc as any)
+          .from("earnings_ledger")
+          .select("amount")
+          .eq("type", "transport")
+          .in("source_id", allocationIds)
+          .gte("occurred_on", ymStart)
+          .lt("occurred_on", ymEndExclusive)
+      : { data: [] };
+    const transportTotal = (transportLedger || []).reduce(
+      (sum: number, r: { amount: number }) => sum + r.amount,
+      0
+    );
+
+    // Sum mitra honor from financial_records for owned projects and current month
+    const currentMonth = now.getMonth() + 1;
+    const currentYear = now.getFullYear();
+    const { data: mitraRows } = ownedProjectIds.length
+      ? await (svc as any)
+          .from("financial_records")
+          .select("amount, project_id, bulan, tahun, type")
+          .in("project_id", ownedProjectIds)
+          .eq("bulan", currentMonth)
+          .eq("tahun", currentYear)
+          .eq("type", "mitra_honor")
+      : { data: [] };
+    const mitraTotal = (mitraRows || []).reduce(
+      (sum: number, r: { amount: number }) => sum + r.amount,
+      0
+    );
+
+    // Alternatively, to match Financial Monthly Spending card semantics,
+    // use current project assignments (transport + honor) as the month budget view
+    const { data: currentAssignments } = ownedProjectIds.length
+      ? await (svc as any)
+          .from("project_assignments")
+          .select("project_id, uang_transport, honor")
+          .in("project_id", ownedProjectIds)
+      : { data: [] };
+    const totalSpendingFromAssignments = (currentAssignments || []).reduce(
+      (
+        sum: number,
+        a: { uang_transport: number | null; honor: number | null }
+      ) => sum + (a.uang_transport || 0) + (a.honor || 0),
+      0
+    );
+
+    const monthlyBudget =
+      totalSpendingFromAssignments > 0
+        ? totalSpendingFromAssignments
+        : transportTotal + mitraTotal;
 
     const stats: DashboardStats = {
-      my_projects: statsResult?.my_projects || 0,
-      active_projects: statsResult?.active_projects || 0,
-      team_members: statsResult?.team_members || 0,
-      pending_tasks: statsResult?.pending_tasks || 0,
-      monthly_budget: statsResult?.monthly_budget || 0,
+      my_projects: allProjectsCount || 0,
+      active_projects: activeProjectsCount || 0,
+      team_members: uniqueMemberIds.size || 0,
+      pending_tasks: pendingTasksCount || 0,
+      monthly_budget: monthlyBudget || 0,
     };
 
     // Get recent projects (last 5)
-    const { data: recentProjects } = await supabase
+    const { data: recentProjects } = await (svc as any)
       .from("projects")
       .select(
         `
@@ -90,12 +218,7 @@ export async function GET(request: NextRequest) {
       .order("created_at", { ascending: false })
       .limit(5);
 
-    // Get pending tasks (urgent ones - next 7 days)
-    const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .split("T")[0];
-
-    const { data: pendingTasks } = await supabase
+    const { data: pendingTasks } = await (svc as any)
       .from("tasks")
       .select(
         `
@@ -103,8 +226,8 @@ export async function GET(request: NextRequest) {
         deskripsi_tugas,
         tanggal_tugas,
         status,
-        users!inner (nama_lengkap),
-        projects!inner (nama_project, ketua_tim_id)
+        users:users!inner (nama_lengkap),
+        projects:projects!inner (nama_project, ketua_tim_id)
       `
       )
       .eq("projects.ketua_tim_id", user.id)
@@ -123,16 +246,16 @@ export async function GET(request: NextRequest) {
           deadline: string;
           created_at: string;
         }): Promise<ProjectSummary> => {
-          // Get team size
-          const { data: assignments } = await supabase
-            .from("project_assignments")
+          // Get team size from project_members
+          const { data: members } = await (svc as any)
+            .from("project_members")
             .select("id")
             .eq("project_id", project.id);
 
-          const team_size = (assignments || []).length;
+          const team_size = (members || []).length;
 
           // Calculate progress based on completed tasks vs total tasks
-          const { data: allTasks } = await supabase
+          const { data: allTasks } = await (svc as any)
             .from("tasks")
             .select("status")
             .eq("project_id", project.id);
