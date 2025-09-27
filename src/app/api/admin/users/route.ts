@@ -276,9 +276,86 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Delete user profile first
+    // Step 1: Clean up related records that reference this user
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error: profileError } = await (supabaseAdmin as any)
+    const supabase = supabaseAdmin as any;
+
+    // Update project_members.created_by to NULL where it references this user
+    const { error: updateProjectMembersError } = await supabase
+      .from("project_members")
+      .update({ created_by: null })
+      .eq("created_by", id);
+
+    if (updateProjectMembersError) {
+      console.error("Error updating project_members.created_by:", updateProjectMembersError);
+      return NextResponse.json(
+        { error: "Failed to clean up project member references" },
+        { status: 400 }
+      );
+    }
+
+    // Update projects.created_by to NULL where it references this user
+    const { error: updateProjectsCreatedByError } = await supabase
+      .from("projects")
+      .update({ created_by: null })
+      .eq("created_by", id);
+
+    if (updateProjectsCreatedByError) {
+      console.error("Error updating projects.created_by:", updateProjectsCreatedByError);
+    }
+
+    // Update projects.updated_by to NULL where it references this user
+    const { error: updateProjectsUpdatedByError } = await supabase
+      .from("projects")
+      .update({ updated_by: null })
+      .eq("updated_by", id);
+
+    if (updateProjectsUpdatedByError) {
+      console.error("Error updating projects.updated_by:", updateProjectsUpdatedByError);
+    }
+
+    // Update tasks.created_by to NULL where it references this user
+    const { error: updateTasksCreatedByError } = await supabase
+      .from("tasks")
+      .update({ created_by: null })
+      .eq("created_by", id);
+
+    if (updateTasksCreatedByError) {
+      console.error("Error updating tasks.created_by:", updateTasksCreatedByError);
+    }
+
+    // Update system_settings.updated_by to NULL where it references this user
+    const { error: updateSystemSettingsError } = await supabase
+      .from("system_settings")
+      .update({ updated_by: null })
+      .eq("updated_by", id);
+
+    if (updateSystemSettingsError) {
+      console.error("Error updating system_settings.updated_by:", updateSystemSettingsError);
+    }
+
+    // Update project_assignments.created_by to NULL where it references this user
+    const { error: updateAssignmentsError } = await supabase
+      .from("project_assignments")
+      .update({ created_by: null })
+      .eq("created_by", id);
+
+    if (updateAssignmentsError) {
+      console.error("Error updating project_assignments.created_by:", updateAssignmentsError);
+    }
+
+    // Update activity_logs.actor_user_id to NULL where it references this user
+    const { error: updateActivityLogsError } = await supabase
+      .from("activity_logs")
+      .update({ actor_user_id: null })
+      .eq("actor_user_id", id);
+
+    if (updateActivityLogsError) {
+      console.error("Error updating activity_logs.actor_user_id:", updateActivityLogsError);
+    }
+
+    // Step 2: Delete user profile
+    const { error: profileError } = await supabase
       .from("users")
       .delete()
       .eq("id", id);
@@ -291,7 +368,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Delete auth user
+    // Step 3: Delete auth user
     const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(id);
 
     if (authError) {
