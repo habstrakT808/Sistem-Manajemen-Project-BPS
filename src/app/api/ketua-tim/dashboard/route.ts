@@ -34,7 +34,6 @@ interface TaskSummary {
 
 export async function GET(request: NextRequest) {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const supabase = (await createClient()) as any;
     const { searchParams } = new URL(request.url);
     const period = searchParams.get("period") || "30"; // days
@@ -51,7 +50,7 @@ export async function GET(request: NextRequest) {
     // Use service client and enforce ownership manually to avoid RLS recursion
     const svc = createServiceClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
     // Compute stats directly for consistency with projects endpoint
@@ -79,10 +78,10 @@ export async function GET(request: NextRequest) {
             .from("projects")
             .select("id")
             .eq("ketua_tim_id", user.id)
-        ).data?.map((p: { id: string }) => p.id) || []
+        ).data?.map((p: { id: string }) => p.id) || [],
       );
     const uniqueMemberIds = new Set<string>(
-      (memberRows || []).map((m: any) => m.user_id)
+      (memberRows || []).map((m: any) => m.user_id),
     );
 
     // Pending tasks within next 7 days for user's projects
@@ -99,7 +98,7 @@ export async function GET(request: NextRequest) {
             .from("projects")
             .select("id")
             .eq("ketua_tim_id", user.id)
-        ).data?.map((p: { id: string }) => p.id) || []
+        ).data?.map((p: { id: string }) => p.id) || [],
       )
       .eq("status", "pending")
       .lte("tanggal_tugas", sevenDaysFromNow);
@@ -153,7 +152,7 @@ export async function GET(request: NextRequest) {
       : { data: [] };
     const transportTotal = (transportLedger || []).reduce(
       (sum: number, r: { amount: number }) => sum + r.amount,
-      0
+      0,
     );
 
     // Sum mitra honor from financial_records for owned projects and current month
@@ -170,7 +169,7 @@ export async function GET(request: NextRequest) {
       : { data: [] };
     const mitraTotal = (mitraRows || []).reduce(
       (sum: number, r: { amount: number }) => sum + r.amount,
-      0
+      0,
     );
 
     // Alternatively, to match Financial Monthly Spending card semantics,
@@ -184,9 +183,9 @@ export async function GET(request: NextRequest) {
     const totalSpendingFromAssignments = (currentAssignments || []).reduce(
       (
         sum: number,
-        a: { uang_transport: number | null; honor: number | null }
+        a: { uang_transport: number | null; honor: number | null },
       ) => sum + (a.uang_transport || 0) + (a.honor || 0),
-      0
+      0,
     );
 
     const monthlyBudget =
@@ -212,7 +211,7 @@ export async function GET(request: NextRequest) {
         status,
         deadline,
         created_at
-      `
+      `,
       )
       .eq("ketua_tim_id", user.id)
       .order("created_at", { ascending: false })
@@ -228,7 +227,7 @@ export async function GET(request: NextRequest) {
         status,
         users:users!inner (nama_lengkap),
         projects:projects!inner (nama_project, ketua_tim_id)
-      `
+      `,
       )
       .eq("projects.ketua_tim_id", user.id)
       .eq("status", "pending")
@@ -263,7 +262,7 @@ export async function GET(request: NextRequest) {
           let progress = 0;
           if (allTasks && allTasks.length > 0) {
             const completedTasks = allTasks.filter(
-              (task: { status: string }) => task.status === "completed"
+              (task: { status: string }) => task.status === "completed",
             ).length;
             progress = Math.round((completedTasks / allTasks.length) * 100);
           } else {
@@ -293,8 +292,8 @@ export async function GET(request: NextRequest) {
             team_size,
             created_at: project.created_at,
           };
-        }
-      )
+        },
+      ),
     );
 
     // Format pending tasks
@@ -313,7 +312,7 @@ export async function GET(request: NextRequest) {
         tanggal_tugas: task.tanggal_tugas,
         status: task.status as "pending" | "in_progress" | "completed",
         project_name: task.projects.nama_project,
-      })
+      }),
     );
 
     return NextResponse.json({
@@ -326,7 +325,7 @@ export async function GET(request: NextRequest) {
     console.error("Dashboard API Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

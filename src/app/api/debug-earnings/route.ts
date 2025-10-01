@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
-import type { Database } from "@/../database/types/database.types";
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     console.log("🔍 DEBUG: Debug earnings API called!");
 
     const serviceClient = createServiceClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
     // Get all earnings records
@@ -43,7 +42,7 @@ export async function GET(request: NextRequest) {
             nama_project
           )
         )
-      `
+      `,
       )
       .eq("user_id", userId);
 
@@ -64,7 +63,7 @@ export async function GET(request: NextRequest) {
     console.error("🔍 DEBUG: Debug earnings API error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -53,6 +53,7 @@ interface Task {
   end_date: string;
   tanggal_tugas: string; // Keep for backward compatibility
   has_transport: boolean;
+  transport_days: number;
   status: "pending" | "in_progress" | "completed";
   response_pegawai?: string;
   created_at: string;
@@ -65,12 +66,12 @@ interface Task {
       nama_lengkap: string;
     };
   };
-  transport_allocation: {
+  transport_allocations: Array<{
     id: string;
     allocation_date: string | null;
     allocated_at: string | null;
     canceled_at: string | null;
-  } | null;
+  }>;
 }
 
 interface TaskInterfaceProps {
@@ -93,6 +94,25 @@ export default function TaskInterface({
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
 
+  // Calculate transport days from task duration
+  const _calculateTransportDays = (startDate: string, endDate: string) => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays === 0 ? 1 : diffDays; // Minimum 1 day if same date
+  };
+
+  // Calculate total transport amount for a task
+  const calculateTransportAmount = (task: Task) => {
+    if (!task.has_transport) {
+      return 0;
+    }
+    // Use the actual transport_days from the task, not calculated from date range
+    const transportDays = task.transport_days || 0;
+    return 150000 * transportDays;
+  };
+
   const handleStartTask = async (task: Task) => {
     setUpdating(true);
     try {
@@ -112,7 +132,7 @@ export default function TaskInterface({
     } catch (error) {
       console.error("Error starting task:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to start task"
+        error instanceof Error ? error.message : "Failed to start task",
       );
     } finally {
       setUpdating(false);
@@ -157,7 +177,7 @@ export default function TaskInterface({
     } catch (error) {
       console.error("Error completing task:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to complete task"
+        error instanceof Error ? error.message : "Failed to complete task",
       );
     } finally {
       setUpdating(false);
@@ -194,7 +214,7 @@ export default function TaskInterface({
     } catch (error) {
       console.error("Error updating response:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to update response"
+        error instanceof Error ? error.message : "Failed to update response",
       );
     } finally {
       setUpdating(false);
@@ -326,17 +346,20 @@ export default function TaskInterface({
             const isOverdue =
               new Date(task.end_date) < new Date() &&
               task.status !== "completed";
-            const hasTransport =
-              task.has_transport && !task.transport_allocation?.canceled_at;
+            const hasTransport = task.has_transport;
+            const allocatedDays =
+              task.transport_allocations?.filter(
+                (alloc) => alloc.allocation_date && !alloc.canceled_at,
+              ).length || 0;
             const needsDateSelection =
-              hasTransport && !task.transport_allocation?.allocation_date;
+              hasTransport && allocatedDays < task.transport_days;
             const isTransportAllocated =
-              hasTransport && task.transport_allocation?.allocation_date;
+              hasTransport && allocatedDays >= task.transport_days;
 
             return (
               <div
                 key={task.id}
-                className={`border-0 shadow-xl rounded-xl overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 ${
+                className={`border-0 shadow-xl rounded-xl overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 bg-white ${
                   isOverdue ? "ring-2 ring-red-200" : ""
                 }`}
               >
@@ -354,9 +377,12 @@ export default function TaskInterface({
                         </Badge>
 
                         {hasTransport && (
-                          <Badge className="bg-green-100 text-green-800 border-green-200 flex items-center space-x-1">
+                          <Badge className="bg-white text-gray-800 border-gray-200 flex items-center space-x-1">
                             <DollarSign className="w-3 h-3" />
-                            <span>Transport: {formatCurrency(150000)}</span>
+                            <span>
+                              Transport:{" "}
+                              {formatCurrency(calculateTransportAmount(task))}
+                            </span>
                           </Badge>
                         )}
 
@@ -397,11 +423,11 @@ export default function TaskInterface({
                               className={`${isOverdue ? "text-red-600 font-semibold" : "text-gray-500"}`}
                             >
                               {new Date(task.start_date).toLocaleDateString(
-                                "id-ID"
+                                "id-ID",
                               )}{" "}
                               -{" "}
                               {new Date(task.end_date).toLocaleDateString(
-                                "id-ID"
+                                "id-ID",
                               )}
                             </div>
                           </div>
@@ -437,35 +463,27 @@ export default function TaskInterface({
                         <div
                           className={`mt-4 p-3 rounded-lg border ${
                             isTransportAllocated
-                              ? "bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200"
-                              : "bg-gradient-to-r from-green-50 to-teal-50 border-green-200"
+                              ? "bg-white border-gray-200"
+                              : "bg-white border-gray-200"
                           }`}
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-3">
-                              <MapPin
-                                className={`w-4 h-4 ${isTransportAllocated ? "text-blue-600" : "text-green-600"}`}
-                              />
+                              <MapPin className="w-4 h-4 text-gray-600" />
                               <div>
-                                <div
-                                  className={`text-sm font-medium ${isTransportAllocated ? "text-blue-900" : "text-green-900"}`}
-                                >
+                                <div className="text-sm font-medium text-gray-900">
                                   Transport Allowance
                                 </div>
-                                <div
-                                  className={`text-sm ${isTransportAllocated ? "text-blue-700" : "text-green-700"}`}
-                                >
-                                  {task.transport_allocation?.allocation_date
-                                    ? `Allocated for: ${new Date(task.transport_allocation.allocation_date).toLocaleDateString("id-ID")}`
-                                    : "Date selection required"}
+                                <div className="text-sm text-gray-700">
+                                  {isTransportAllocated
+                                    ? `All ${task.transport_days} days allocated`
+                                    : `${allocatedDays}/${task.transport_days} days allocated`}
                                 </div>
                               </div>
                             </div>
                             <div className="flex items-center space-x-2">
-                              <div
-                                className={`text-sm font-semibold ${isTransportAllocated ? "text-blue-600" : "text-green-600"}`}
-                              >
-                                {formatCurrency(150000)}
+                              <div className="text-sm font-semibold text-gray-600">
+                                {formatCurrency(calculateTransportAmount(task))}
                               </div>
                               {needsDateSelection && (
                                 <Button
@@ -546,7 +564,7 @@ export default function TaskInterface({
                           </div>
                           <div className="text-xs text-gray-500">
                             {new Date(task.updated_at).toLocaleDateString(
-                              "id-ID"
+                              "id-ID",
                             )}
                           </div>
                         </div>
@@ -569,9 +587,7 @@ export default function TaskInterface({
                             Transport Allocated
                           </div>
                           <div className="text-xs text-gray-500">
-                            {new Date(
-                              task.transport_allocation!.allocation_date!
-                            ).toLocaleDateString("id-ID")}
+                            {allocatedDays} of {task.transport_days} days
                           </div>
                         </div>
                       )}

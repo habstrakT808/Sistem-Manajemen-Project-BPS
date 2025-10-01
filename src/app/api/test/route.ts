@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     console.log("🔍 [TEST] Starting test API");
 
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

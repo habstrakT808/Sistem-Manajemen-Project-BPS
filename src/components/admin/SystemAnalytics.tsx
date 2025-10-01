@@ -55,16 +55,16 @@ export default function SystemAnalytics() {
     const [userTrends, projectAnalytics, financialAnalytics, systemMetrics] =
       await Promise.all([
         fetch(
-          `/api/admin/analytics?type=user_trends&days_back=${daysBack}`
+          `/api/admin/analytics?type=user_trends&days_back=${daysBack}`,
         ).then((res) => res.json()),
         fetch(
-          `/api/admin/analytics?type=project_analytics&days_back=${daysBack}`
+          `/api/admin/analytics?type=project_analytics&days_back=${daysBack}`,
         ).then((res) => res.json()),
         fetch(
-          `/api/admin/analytics?type=financial_analytics&months_back=12`
+          `/api/admin/analytics?type=financial_analytics&months_back=12`,
         ).then((res) => res.json()),
         fetch(`/api/admin/analytics?type=system_metrics`).then((res) =>
-          res.json()
+          res.json(),
         ),
       ]);
 
@@ -78,10 +78,7 @@ export default function SystemAnalytics() {
     return data;
   }, []);
 
-  const { data, isLoading, refetch, isFetching } = useQuery<
-    AnalyticsData,
-    Error
-  >({
+  const { data, isLoading } = useQuery<AnalyticsData, Error>({
     queryKey: ["admin", "analytics", { timeRange }],
     queryFn: () => fetchAnalyticsData(timeRange),
     staleTime: 5 * 60 * 1000,
@@ -91,9 +88,44 @@ export default function SystemAnalytics() {
     // trigger refetch when timeRange changes (React Query already does via key)
   }, [timeRange]);
 
-  if (isLoading && !data) {
+  if (isLoading || !data) {
     return (
       <div className="space-y-8">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+              System Analytics
+            </h1>
+            <p className="text-gray-600 text-lg mt-2">
+              Comprehensive insights and performance metrics
+            </p>
+          </div>
+
+          <div className="flex space-x-4">
+            <div className="flex items-center space-x-2">
+              <Calendar className="w-4 h-4 text-gray-500" />
+              <select
+                value={timeRange}
+                onChange={(e) => setTimeRange(e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="7">Last 7 days</option>
+                <option value="30">Last 30 days</option>
+                <option value="90">Last 90 days</option>
+              </select>
+            </div>
+            <Button
+              variant="outline"
+              className="border-2 border-green-200 text-green-600 hover:bg-green-50"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Export Report
+            </Button>
+          </div>
+        </div>
+
+        {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {[1, 2, 3, 4].map((i) => (
             <Card key={i} className="animate-pulse border-0 shadow-xl">
@@ -108,8 +140,6 @@ export default function SystemAnalytics() {
       </div>
     );
   }
-
-  if (!data) return null;
 
   const kpiCards = [
     {
@@ -135,7 +165,7 @@ export default function SystemAnalytics() {
     {
       title: "This Month Spending",
       value: formatCurrency(
-        (data.systemMetrics as any).this_month_spending ?? 0
+        (data.systemMetrics as any).this_month_spending ?? 0,
       ),
       description: "Monthly expenses",
       icon: DollarSign,
@@ -160,7 +190,7 @@ export default function SystemAnalytics() {
     ((data.systemMetrics as any).user_roles_distribution as Record<
       string,
       number
-    >) || {}
+    >) || {},
   ).map(([role, count]) => ({
     name: role.replace("_", " ").toUpperCase(),
     value: count,
@@ -170,7 +200,7 @@ export default function SystemAnalytics() {
     ((data.systemMetrics as any).project_status_distribution as Record<
       string,
       number
-    >) || {}
+    >) || {},
   ).map(([status, count]) => ({
     name: status.replace("_", " ").toUpperCase(),
     value: count,
@@ -386,7 +416,7 @@ export default function SystemAnalytics() {
                   <div className="text-2xl font-bold text-gray-900 mb-1">
                     {Math.round(
                       ((data.systemMetrics as any).avg_project_duration ??
-                        0) as number
+                        0) as number,
                     )}
                   </div>
                   <div className="text-sm text-gray-500">Avg Project Days</div>

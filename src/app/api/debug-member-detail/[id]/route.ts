@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
-import type { Database } from "@/../database/types/database.types";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     console.log("🔍 DEBUG: Debug member detail API called!");
 
     const serviceClient = createServiceClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
     const { id: memberId } = await params;
@@ -21,7 +20,7 @@ export async function GET(
     const { data: memberInfo, error: memberError } = await serviceClient
       .from("users")
       .select(
-        "id, nama_lengkap, email, no_telepon, alamat, is_active, created_at, role"
+        "id, nama_lengkap, email, no_telepon, alamat, is_active, created_at, role",
       )
       .eq("id", memberId)
       .single();
@@ -46,7 +45,7 @@ export async function GET(
           deadline,
           ketua_tim_id
         )
-      `
+      `,
       )
       .eq("user_id", memberId);
 
@@ -65,7 +64,7 @@ export async function GET(
         pegawai_id,
         project_id,
         deskripsi_tugas
-      `
+      `,
       )
       .or(`assignee_user_id.eq.${memberId},pegawai_id.eq.${memberId}`);
 
@@ -74,13 +73,13 @@ export async function GET(
     // Calculate task statistics
     const totalTasks = (allTasks || []).length;
     const pendingTasks = (allTasks || []).filter(
-      (t: { status: string }) => t.status === "pending"
+      (t: { status: string }) => t.status === "pending",
     ).length;
     const inProgressTasks = (allTasks || []).filter(
-      (t: { status: string }) => t.status === "in_progress"
+      (t: { status: string }) => t.status === "in_progress",
     ).length;
     const completedTasks = (allTasks || []).filter(
-      (t: { status: string }) => t.status === "completed"
+      (t: { status: string }) => t.status === "completed",
     ).length;
     const completionRate =
       totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
@@ -104,16 +103,16 @@ export async function GET(
       .eq("type", "transport")
       .gte(
         "occurred_on",
-        new Date(earningsYear, earningsMonth - 1, 1).toISOString()
+        new Date(earningsYear, earningsMonth - 1, 1).toISOString(),
       )
       .lt(
         "occurred_on",
-        new Date(earningsYear, earningsMonth, 1).toISOString()
+        new Date(earningsYear, earningsMonth, 1).toISOString(),
       );
 
     const currentMonthTotal = (currentMonthEarnings || []).reduce(
       (sum: number, record: { amount: number }) => sum + record.amount,
-      0
+      0,
     );
 
     console.log("🔍 DEBUG: Monthly earnings:", {
@@ -143,7 +142,7 @@ export async function GET(
         const key = `${d.getFullYear()}-${d.getMonth()}`; // month is 0-based
         const prev = earningsByMonthKey.get(key) || 0;
         earningsByMonthKey.set(key, prev + row.amount);
-      }
+      },
     );
 
     // Calculate real project data for each project
@@ -160,7 +159,7 @@ export async function GET(
 
         const projectTaskCount = (projectTasks || []).length;
         const projectCompletedTasks = (projectTasks || []).filter(
-          (t: { status: string }) => t.status === "completed"
+          (t: { status: string }) => t.status === "completed",
         ).length;
         const projectProgress =
           projectTaskCount > 0
@@ -183,22 +182,22 @@ export async function GET(
           .in("task_id", taskIds);
 
         const allocationIds = (transportAllocations || []).map(
-          (a: { id: string }) => a.id
+          (a: { id: string }) => a.id,
         );
 
         // Find earnings that match these allocation IDs
         const projectEarnings = (allUserEarnings || []).filter(
           (earning: { source_id: string }) =>
-            allocationIds.includes(earning.source_id)
+            allocationIds.includes(earning.source_id),
         );
 
         const projectTransport = (projectEarnings || []).reduce(
           (sum: number, record: { amount: number }) => sum + record.amount,
-          0
+          0,
         );
 
         console.log(
-          `🔍 DEBUG: Project ${project.nama_project} - Tasks: ${projectTaskCount}, Completed: ${projectCompletedTasks}, Progress: ${projectProgress}%, Transport: ${projectTransport}`
+          `🔍 DEBUG: Project ${project.nama_project} - Tasks: ${projectTaskCount}, Completed: ${projectCompletedTasks}, Progress: ${projectProgress}%, Transport: ${projectTransport}`,
         );
 
         return {
@@ -212,7 +211,7 @@ export async function GET(
           task_count: projectTaskCount,
           completed_tasks: projectCompletedTasks,
         };
-      })
+      }),
     );
 
     // Generate calendar data for the current month - only show real data
@@ -325,15 +324,15 @@ export async function GET(
     // Generate project participation data
     const projectParticipation = currentProjects.map((project: any) => {
       const projectTasks = (allTasks || []).filter(
-        (task: any) => task.project_id && task.project_id === project.id
+        (task: any) => task.project_id && task.project_id === project.id,
       );
       const completedProjectTasks = projectTasks.filter(
-        (task: any) => task.status === "completed"
+        (task: any) => task.status === "completed",
       );
       const participationPercentage =
         projectTasks.length > 0
           ? Math.round(
-              (completedProjectTasks.length / projectTasks.length) * 100
+              (completedProjectTasks.length / projectTasks.length) * 100,
             )
           : 0;
 
@@ -416,7 +415,7 @@ export async function GET(
     console.error("🔍 DEBUG: Debug member detail API error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -19,7 +19,7 @@ interface ProjectAssignment {
   honor: number | null;
 }
 
-interface Project {
+interface _Project {
   id: string;
   nama_project: string;
   deskripsi: string;
@@ -48,11 +48,10 @@ interface UpdateProjectRequest {
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const supabase = (await createClient()) as any;
     const svc = createServiceClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
     const { id: projectId } = await params;
 
@@ -79,7 +78,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           user_id,
           role
         )
-      `
+      `,
       )
       .eq("id", projectId)
       .single();
@@ -88,7 +87,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       if (projectError.code === "PGRST116") {
         return NextResponse.json(
           { error: "Project not found" },
-          { status: 404 }
+          { status: 404 },
         );
       }
       throw projectError;
@@ -119,7 +118,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
             .eq("id", m.user_id)
             .single();
           return { ...m, user: u || null };
-        })
+        }),
       );
       (project as any).project_members = enriched;
     }
@@ -146,7 +145,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           honor: null,
           users: u || null,
         };
-      })
+      }),
     );
 
     // Mitra assignments (honor)
@@ -170,7 +169,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           honor: a.honor ?? 0,
           mitra: m || null,
         };
-      })
+      }),
     );
 
     (project as any).project_assignments = [
@@ -183,18 +182,17 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     console.error("Project detail fetch error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const supabase = (await createClient()) as any;
     const svc = createServiceClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
     const { id: projectId } = await params;
 
@@ -222,7 +220,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     ) {
       return NextResponse.json(
         { error: "Missing required fields" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -289,7 +287,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         console.error("Error inserting new assignments:", insertError);
         return NextResponse.json(
           { error: "Failed to update project assignments" },
-          { status: 500 }
+          { status: 500 },
         );
       }
     }
@@ -303,7 +301,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         .eq("project_id", projectId);
 
       const currentMemberIds = new Set<string>(
-        (currentMembers || []).map((m: any) => m.user_id)
+        (currentMembers || []).map((m: any) => m.user_id),
       );
 
       // Desired members: leader + all pegawai assignees
@@ -338,7 +336,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       // Remove members no longer desired (but never remove leader)
       const toRemove = (currentMembers || [])
         .filter(
-          (m: any) => m.role !== "leader" && !desiredMemberIds.has(m.user_id)
+          (m: any) => m.role !== "leader" && !desiredMemberIds.has(m.user_id),
         )
         .map((m: any) => m.user_id);
       if (toRemove.length > 0) {
@@ -361,14 +359,13 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     console.error("Project update error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const supabase = (await createClient()) as any;
     const { id: projectId } = await params;
 
@@ -382,12 +379,16 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // No global role gate; enforce ownership instead
+    // Use service client to avoid RLS issues like in GET endpoint
+    const svc = createServiceClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    );
 
     // Ensure the project belongs to this ketua tim
-    const { data: project, error: projectError } = await supabase
+    const { data: project, error: projectError } = await (svc as any)
       .from("projects")
-      .select("id")
+      .select("id, ketua_tim_id, leader_user_id")
       .eq("id", projectId)
       .or(`ketua_tim_id.eq.${user.id},leader_user_id.eq.${user.id}`)
       .single();
@@ -395,12 +396,12 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     if (projectError || !project) {
       return NextResponse.json(
         { error: "Project not found or access denied" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     // Delete dependent rows first (assignments, tasks)
-    const { error: deleteAssignmentsError } = await supabase
+    const { error: deleteAssignmentsError } = await (svc as any)
       .from("project_assignments")
       .delete()
       .eq("project_id", projectId);
@@ -409,7 +410,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       console.error("Failed to delete assignments:", deleteAssignmentsError);
     }
 
-    const { error: deleteTasksError } = await supabase
+    const { error: deleteTasksError } = await (svc as any)
       .from("tasks")
       .delete()
       .eq("project_id", projectId);
@@ -418,8 +419,8 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       console.error("Failed to delete tasks:", deleteTasksError);
     }
 
-    // Delete the project
-    const { error: deleteProjectError } = await supabase
+    // Delete the project using OR condition to match ownership check
+    const { error: deleteProjectError } = await (svc as any)
       .from("projects")
       .delete()
       .eq("id", projectId)
@@ -434,7 +435,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     console.error("Project delete error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

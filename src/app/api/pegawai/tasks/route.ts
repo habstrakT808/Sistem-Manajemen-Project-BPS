@@ -17,6 +17,7 @@ interface TaskData {
   end_date: string;
   tanggal_tugas: string;
   has_transport: boolean;
+  transport_days: number;
   status: string;
   response_pegawai: string;
   created_at: string;
@@ -62,7 +63,7 @@ export async function GET(request: Request) {
     // Service client to avoid RLS issues
     const svc = createServiceClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
     // Build query for tasks assigned to this user
@@ -81,6 +82,7 @@ export async function GET(request: Request) {
         end_date,
         tanggal_tugas,
         has_transport,
+        transport_days,
         status,
         response_pegawai,
         created_at,
@@ -92,7 +94,7 @@ export async function GET(request: Request) {
           allocated_at,
           canceled_at
         )
-      `
+      `,
       )
       .or(`assignee_user_id.eq.${user.id},pegawai_id.eq.${user.id}`);
 
@@ -112,8 +114,8 @@ export async function GET(request: Request) {
     // Get project details separately to avoid FK relationship issues
     const projectIds = Array.from(
       new Set(
-        ((tasks as TaskData[]) || []).map((t) => t.project_id).filter(Boolean)
-      )
+        ((tasks as TaskData[]) || []).map((t) => t.project_id).filter(Boolean),
+      ),
     );
 
     const projectDetails: Record<
@@ -137,8 +139,8 @@ export async function GET(request: Request) {
         new Set(
           ((projects as ProjectData[]) || [])
             .map((p) => p.leader_user_id)
-            .filter(Boolean)
-        )
+            .filter(Boolean),
+        ),
       );
 
       const leaderNames: Record<string, string> = {};
@@ -168,18 +170,18 @@ export async function GET(request: Request) {
 
     // Fetch transport allocations for these tasks for the current user only
     const taskIds = Array.from(
-      new Set(((tasks as TaskData[]) || []).map((t) => t.id))
+      new Set(((tasks as TaskData[]) || []).map((t) => t.id)),
     );
 
-    const allocationByTaskId: Record<
+    const allocationsByTaskId: Record<
       string,
-      {
+      Array<{
         id: string;
         amount: number;
         allocation_date: string | null;
         allocated_at: string | null;
         canceled_at: string | null;
-      } | null
+      }>
     > = {};
 
     if (taskIds.length > 0) {
@@ -196,7 +198,7 @@ export async function GET(request: Request) {
       const { data: allocations, error: allocError } = await svc
         .from("task_transport_allocations")
         .select(
-          "id, task_id, user_id, amount, allocation_date, allocated_at, canceled_at"
+          "id, task_id, user_id, amount, allocation_date, allocated_at, canceled_at",
         )
         .in("task_id", taskIds)
         .eq("user_id", user.id)
@@ -207,13 +209,16 @@ export async function GET(request: Request) {
       }
 
       (allocations as Alloc[] | null)?.forEach((a) => {
-        allocationByTaskId[a.task_id] = {
+        if (!allocationsByTaskId[a.task_id]) {
+          allocationsByTaskId[a.task_id] = [];
+        }
+        allocationsByTaskId[a.task_id].push({
           id: a.id,
           amount: a.amount,
           allocation_date: a.allocation_date,
           allocated_at: a.allocated_at,
           canceled_at: a.canceled_at,
-        };
+        });
       });
     }
 
@@ -227,6 +232,7 @@ export async function GET(request: Request) {
       end_date: task.end_date,
       tanggal_tugas: task.tanggal_tugas, // Keep for backward compatibility
       has_transport: task.has_transport,
+      transport_days: task.transport_days || 0, // Add missing transport_days
       status: task.status,
       response_pegawai: task.response_pegawai,
       created_at: task.created_at,
@@ -237,23 +243,7 @@ export async function GET(request: Request) {
         status: "unknown",
         users: { nama_lengkap: "Unknown Leader" },
       },
-      transport_allocation:
-        allocationByTaskId[task.id] ??
-        (task.task_transport_allocations?.[0]
-          ? {
-              id: task.task_transport_allocations[0].id,
-              amount: task.task_transport_allocations[0].amount,
-              allocation_date:
-                (task.task_transport_allocations[0]
-                  .allocation_date as string) || null,
-              allocated_at:
-                (task.task_transport_allocations[0].allocated_at as string) ||
-                null,
-              canceled_at:
-                (task.task_transport_allocations[0].canceled_at as string) ||
-                null,
-            }
-          : null),
+      transport_allocations: allocationsByTaskId[task.id] || [],
     }));
 
     return NextResponse.json({
@@ -267,7 +257,7 @@ export async function GET(request: Request) {
     console.error("Pegawai Tasks API Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

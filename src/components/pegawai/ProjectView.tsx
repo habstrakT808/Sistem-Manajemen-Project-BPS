@@ -14,7 +14,6 @@ import {
   DollarSign,
   CheckCircle,
   Clock,
-  AlertTriangle,
   Target,
   User,
   ClipboardList,
@@ -216,7 +215,7 @@ export default function ProjectView({ projects, loading }: ProjectViewProps) {
                           className={`${showOverdue ? "text-red-600 font-semibold" : "text-gray-500"}`}
                         >
                           {new Date(project.deadline).toLocaleDateString(
-                            "id-ID"
+                            "id-ID",
                           )}
                         </div>
                       </div>

@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -91,7 +91,7 @@ export default function MitraReviews() {
       if (search) params.set("search", search);
       if (jenis) params.set("jenis", jenis);
       const res = await fetch(
-        `/api/ketua-tim/mitra-reviews?${params.toString()}`
+        `/api/ketua-tim/mitra-reviews?${params.toString()}`,
       );
       const result = await res.json();
       if (!res.ok)
@@ -100,7 +100,7 @@ export default function MitraReviews() {
     } catch (e) {
       console.error(e);
       toast.error(
-        e instanceof Error ? e.message : "Failed to load mitra reviews"
+        e instanceof Error ? e.message : "Failed to load mitra reviews",
       );
     } finally {
       setLoading(false);
@@ -120,7 +120,7 @@ export default function MitraReviews() {
     } catch (e) {
       console.error(e);
       toast.error(
-        e instanceof Error ? e.message : "Failed to load mitra detail"
+        e instanceof Error ? e.message : "Failed to load mitra detail",
       );
     }
   }, []);
@@ -138,7 +138,7 @@ export default function MitraReviews() {
             <Star key={i} className="w-4 h-4 text-yellow-500 fill-yellow-500" />
           ) : (
             <StarOff key={i} className="w-4 h-4 text-gray-300" />
-          )
+          ),
         )}
         <span className="text-xs text-gray-600">{rating.toFixed(1)}</span>
       </div>
@@ -434,7 +434,7 @@ export default function MitraReviews() {
                               </div>
                               <div className="text-xs text-gray-500">
                                 {new Date(r.created_at).toLocaleDateString(
-                                  "id-ID"
+                                  "id-ID",
                                 )}
                               </div>
                             </div>
@@ -474,7 +474,7 @@ export default function MitraReviews() {
                               <div className="text-xs text-gray-500">
                                 Due{" "}
                                 {new Date(p.deadline).toLocaleDateString(
-                                  "id-ID"
+                                  "id-ID",
                                 )}
                               </div>
                             </div>

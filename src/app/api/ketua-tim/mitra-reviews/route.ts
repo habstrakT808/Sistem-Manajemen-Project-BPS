@@ -32,11 +32,11 @@ export async function GET(request: NextRequest) {
     // Use service client to avoid RLS recursion issues
     const svc = createServiceClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
     // Check if user is ketua_tim in any team (team-specific role validation)
-    const { data: teamMemberships, error: membershipError } = await svc
+    const { data: teamMemberships, error: _membershipError } = await svc
       .from("project_members")
       .select(
         `
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
         projects!inner (
           ketua_tim_id
         )
-      `
+      `,
       )
       .eq("user_id", user.id)
       .eq("role", "leader");
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
           error: "Forbidden",
           details: "User must be a team leader to access this endpoint",
         },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
       .select("mitra_id, created_at")
       .in(
         "mitra_id",
-        mitraIds.length ? mitraIds : ["00000000-0000-0000-0000-000000000000"]
+        mitraIds.length ? mitraIds : ["00000000-0000-0000-0000-000000000000"],
       );
 
     // Projects count where mitra assigned
@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
       .eq("assignee_type", "mitra")
       .in(
         "assignee_id",
-        mitraIds.length ? mitraIds : ["00000000-0000-0000-0000-000000000000"]
+        mitraIds.length ? mitraIds : ["00000000-0000-0000-0000-000000000000"],
       );
 
     const reviewsByMitra = new Map<
@@ -101,14 +101,14 @@ export async function GET(request: NextRequest) {
             ? prev.last
             : r.created_at;
         reviewsByMitra.set(r.mitra_id, { total: prev.total + 1, last });
-      }
+      },
     );
 
     const projectsCountByMitra = new Map<string, number>();
     (assignments || []).forEach((a: { assignee_id: string }) => {
       projectsCountByMitra.set(
         a.assignee_id,
-        (projectsCountByMitra.get(a.assignee_id) || 0) + 1
+        (projectsCountByMitra.get(a.assignee_id) || 0) + 1,
       );
     });
 
@@ -126,7 +126,7 @@ export async function GET(request: NextRequest) {
         total_reviews: reviewsByMitra.get(m.id)?.total || 0,
         last_review_at: reviewsByMitra.get(m.id)?.last || null,
         projects_count: projectsCountByMitra.get(m.id) || 0,
-      })
+      }),
     );
 
     if (jenis && jenis !== "all") {
@@ -148,7 +148,7 @@ export async function GET(request: NextRequest) {
     console.error("KT Mitra Reviews List Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

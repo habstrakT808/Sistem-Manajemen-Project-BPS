@@ -46,12 +46,12 @@ export default function TransportCalendar({
   const firstDayOfMonth = new Date(
     currentDate.getFullYear(),
     currentDate.getMonth(),
-    1
+    1,
   );
   const lastDayOfMonth = new Date(
     currentDate.getFullYear(),
     currentDate.getMonth() + 1,
-    0
+    0,
   );
   const firstDayOfWeek = firstDayOfMonth.getDay();
   const daysInMonth = lastDayOfMonth.getDate();
@@ -71,6 +71,7 @@ export default function TransportCalendar({
 
   const fetchAllocations = async () => {
     try {
+      // Use real route for production data
       const response = await fetch("/api/pegawai/transport-allocations");
       if (!response.ok) throw new Error("Failed to fetch allocations");
 
@@ -98,7 +99,7 @@ export default function TransportCalendar({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ allocation_date: selectedDate }),
-        }
+        },
       );
 
       if (!response.ok) {
@@ -115,7 +116,7 @@ export default function TransportCalendar({
     } catch (error) {
       console.error("Error allocating transport:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to allocate transport"
+        error instanceof Error ? error.message : "Failed to allocate transport",
       );
     }
   };
@@ -130,7 +131,7 @@ export default function TransportCalendar({
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ allocation_date: selectedDate }),
-        }
+        },
       );
 
       if (!response.ok) {
@@ -149,7 +150,7 @@ export default function TransportCalendar({
       toast.error(
         error instanceof Error
           ? error.message
-          : "Failed to update transport allocation"
+          : "Failed to update transport allocation",
       );
     }
   };
@@ -157,21 +158,95 @@ export default function TransportCalendar({
   const isAllocated = (day: number) => {
     const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     return allocations.some(
-      (allocation) => allocation.allocation_date === dateStr
+      (allocation) => allocation.allocation_date === dateStr,
     );
   };
 
   const getAllocationForDate = (day: number) => {
     const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     return allocations.find(
-      (allocation) => allocation.allocation_date === dateStr
+      (allocation) => allocation.allocation_date === dateStr,
     );
   };
 
   const getPendingAllocations = () => {
-    return allocations.filter(
-      (allocation) => !allocation.allocation_date && !allocation.canceled_at
+    const pending = allocations.filter(
+      (allocation) => !allocation.allocation_date && !allocation.canceled_at,
     );
+    console.log("🔍 DEBUG: All allocations:", allocations);
+    console.log("🔍 DEBUG: Pending allocations:", pending);
+    return pending;
+  };
+
+  const getPendingAllocationsByTask = () => {
+    const _pendingAllocations = getPendingAllocations();
+    const groupedByTask = pendingAllocations.reduce(
+      (acc, allocation) => {
+        const taskId = allocation.task_id;
+        if (!acc[taskId]) {
+          acc[taskId] = {
+            task: allocation.task,
+            allocations: [],
+            totalAmount: 0,
+            requiredDays: 0,
+          };
+        }
+        acc[taskId].allocations.push(allocation);
+        acc[taskId].totalAmount += allocation.amount;
+        // Calculate required days based on total allocations for this task
+        acc[taskId].requiredDays = acc[taskId].allocations.length;
+        return acc;
+      },
+      {} as Record<
+        string,
+        {
+          task: any;
+          allocations: TransportAllocation[];
+          totalAmount: number;
+          requiredDays: number;
+        }
+      >,
+    );
+
+    return Object.values(groupedByTask);
+  };
+
+  const getAllocatedAllocationsByTask = () => {
+    const allocatedAllocations = allocations.filter(
+      (allocation) => allocation.allocation_date && !allocation.canceled_at,
+    );
+    const groupedByTask = allocatedAllocations.reduce(
+      (acc, allocation) => {
+        const taskId = allocation.task_id;
+        if (!acc[taskId]) {
+          acc[taskId] = {
+            task: allocation.task,
+            allocations: [],
+            totalAmount: 0,
+            requiredDays: 0,
+          };
+        }
+        acc[taskId].allocations.push(allocation);
+        acc[taskId].totalAmount += allocation.amount;
+        // Get total allocations for this task (including pending ones)
+        const totalAllocationsForTask = allocations.filter(
+          (a) => a.task_id === taskId && !a.canceled_at,
+        );
+        acc[taskId].requiredDays = totalAllocationsForTask.length;
+        return acc;
+      },
+      {} as Record<
+        string,
+        {
+          task: any;
+          allocations: TransportAllocation[];
+          totalAmount: number;
+          requiredDays: number;
+        }
+      >,
+    );
+
+    return Object.values(groupedByTask);
   };
 
   const navigateMonth = (direction: "prev" | "next") => {
@@ -194,6 +269,8 @@ export default function TransportCalendar({
   };
 
   const pendingAllocations = getPendingAllocations();
+  const pendingAllocationsByTask = getPendingAllocationsByTask();
+  const allocatedAllocationsByTask = getAllocatedAllocationsByTask();
 
   if (loading) {
     return (
@@ -216,7 +293,7 @@ export default function TransportCalendar({
   return (
     <div className="space-y-6">
       {/* Pending Allocations */}
-      {pendingAllocations.length > 0 && (
+      {pendingAllocationsByTask.length > 0 && (
         <Card className="border-orange-200 bg-orange-50">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2 text-orange-800">
@@ -226,29 +303,52 @@ export default function TransportCalendar({
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {pendingAllocations.map((allocation) => (
+              {pendingAllocationsByTask.map((taskGroup) => (
                 <div
-                  key={allocation.id}
-                  className="flex items-center justify-between p-4 bg-white rounded-lg border border-orange-200"
+                  key={taskGroup.task.title}
+                  className="p-4 bg-white rounded-lg border border-orange-200"
                 >
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-gray-900">
-                      {allocation.task.title}
-                    </h4>
-                    <p className="text-sm text-gray-600">
-                      {allocation.task.project_name}
-                    </p>
-                    <p className="text-sm font-medium text-orange-600">
-                      Amount: Rp {allocation.amount.toLocaleString()}
-                    </p>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-gray-900">
+                        {taskGroup.task.title}
+                      </h4>
+                      <p className="text-sm text-gray-600">
+                        {taskGroup.task.project_name}
+                      </p>
+                      <p className="text-sm font-medium text-orange-600">
+                        {taskGroup.allocations.length} of{" "}
+                        {taskGroup.requiredDays} transport days pending • Total:
+                        Rp {taskGroup.totalAmount.toLocaleString()}
+                      </p>
+                      <div className="w-full bg-orange-200 rounded-full h-2 mt-2">
+                        <div
+                          className="bg-orange-600 h-2 rounded-full transition-all duration-300"
+                          style={{
+                            width: `${((taskGroup.requiredDays - taskGroup.allocations.length) / taskGroup.requiredDays) * 100}%`,
+                          }}
+                        ></div>
+                      </div>
+                      <p className="text-xs text-orange-500 mt-1">
+                        {taskGroup.requiredDays - taskGroup.allocations.length}{" "}
+                        days allocated, {taskGroup.allocations.length} days
+                        remaining
+                      </p>
+                    </div>
                   </div>
-                  <Button
-                    onClick={() => setSelectedAllocation(allocation)}
-                    className="bg-orange-600 hover:bg-orange-700"
-                  >
-                    <MapPin className="w-4 h-4 mr-2" />
-                    Select Date
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    {taskGroup.allocations.map((allocation, index) => (
+                      <Button
+                        key={allocation.id}
+                        onClick={() => setSelectedAllocation(allocation)}
+                        size="sm"
+                        className="bg-orange-600 hover:bg-orange-700"
+                      >
+                        <MapPin className="w-3 h-3 mr-1" />
+                        Allocate Day {index + 1} of {taskGroup.requiredDays}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
@@ -257,9 +357,7 @@ export default function TransportCalendar({
       )}
 
       {/* Allocated Allocations */}
-      {allocations.filter(
-        (allocation) => allocation.allocation_date && !allocation.canceled_at
-      ).length > 0 && (
+      {allocatedAllocationsByTask.length > 0 && (
         <Card className="border-green-200 bg-green-50">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2 text-green-800">
@@ -269,47 +367,74 @@ export default function TransportCalendar({
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {allocations
-                .filter(
-                  (allocation) =>
-                    allocation.allocation_date && !allocation.canceled_at
-                )
-                .map((allocation) => (
-                  <div
-                    key={allocation.id}
-                    className="flex items-center justify-between p-4 bg-white rounded-lg border border-green-200"
-                  >
+              {allocatedAllocationsByTask.map((taskGroup) => (
+                <div
+                  key={taskGroup.task.title}
+                  className="p-4 bg-white rounded-lg border border-green-200"
+                >
+                  <div className="flex items-center justify-between mb-3">
                     <div className="flex-1">
                       <h4 className="font-semibold text-gray-900">
-                        {allocation.task.title}
+                        {taskGroup.task.title}
                       </h4>
                       <p className="text-sm text-gray-600">
-                        {allocation.task.project_name}
+                        {taskGroup.task.project_name}
                       </p>
                       <p className="text-sm font-medium text-green-600">
-                        Amount: Rp {allocation.amount.toLocaleString()}
+                        {taskGroup.allocations.length} of{" "}
+                        {taskGroup.requiredDays} transport days allocated •
+                        Total: Rp {taskGroup.totalAmount.toLocaleString()}
                       </p>
-                      <p className="text-sm text-green-700">
-                        Allocated:{" "}
-                        {new Date(
-                          allocation.allocation_date!
-                        ).toLocaleDateString("id-ID")}
+                      <div className="w-full bg-green-200 rounded-full h-2 mt-2">
+                        <div
+                          className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                          style={{
+                            width: `${(taskGroup.allocations.length / taskGroup.requiredDays) * 100}%`,
+                          }}
+                        ></div>
+                      </div>
+                      <p className="text-xs text-green-500 mt-1">
+                        {taskGroup.allocations.length === taskGroup.requiredDays
+                          ? "All transport days allocated!"
+                          : `${taskGroup.requiredDays - taskGroup.allocations.length} days remaining`}
                       </p>
                     </div>
-                    <Button
-                      onClick={() => {
-                        setSelectedAllocation(allocation);
-                        setSelectedDate(allocation.allocation_date!);
-                        setIsEditMode(true);
-                      }}
-                      variant="outline"
-                      className="border-green-600 text-green-600 hover:bg-green-50"
-                    >
-                      <Calendar className="w-4 h-4 mr-2" />
-                      Edit Date
-                    </Button>
                   </div>
-                ))}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {taskGroup.allocations.map((allocation, index) => (
+                      <div
+                        key={allocation.id}
+                        className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-100"
+                      >
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-green-700">
+                            Day {index + 1} of {taskGroup.requiredDays}:{" "}
+                            {new Date(
+                              allocation.allocation_date!,
+                            ).toLocaleDateString("id-ID")}
+                          </p>
+                          <p className="text-xs text-green-600">
+                            Rp {allocation.amount.toLocaleString()}
+                          </p>
+                        </div>
+                        <Button
+                          onClick={() => {
+                            setSelectedAllocation(allocation);
+                            setSelectedDate(allocation.allocation_date!);
+                            setIsEditMode(true);
+                          }}
+                          size="sm"
+                          variant="outline"
+                          className="border-green-600 text-green-600 hover:bg-green-50"
+                        >
+                          <Calendar className="w-3 h-3 mr-1" />
+                          Edit
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
@@ -366,7 +491,7 @@ export default function TransportCalendar({
                 new Date(
                   currentDate.getFullYear(),
                   currentDate.getMonth(),
-                  day
+                  day,
                 ).toDateString();
 
               return (
@@ -404,6 +529,19 @@ export default function TransportCalendar({
               <CardTitle>
                 {isEditMode ? "Edit Transport Date" : "Select Transport Date"}
               </CardTitle>
+              <p className="text-sm text-gray-600 mt-1">
+                {(() => {
+                  const taskAllocations = allocations.filter(
+                    (a) =>
+                      a.task_id === selectedAllocation.task_id &&
+                      !a.canceled_at,
+                  );
+                  const currentIndex = taskAllocations.findIndex(
+                    (a) => a.id === selectedAllocation.id,
+                  );
+                  return `Allocating day ${currentIndex + 1} of ${taskAllocations.length} transport days`;
+                })()}
+              </p>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
@@ -433,11 +571,11 @@ export default function TransportCalendar({
                 <p className="text-xs text-gray-500 mt-1">
                   Only dates between{" "}
                   {new Date(
-                    selectedAllocation.task.start_date
+                    selectedAllocation.task.start_date,
                   ).toLocaleDateString("id-ID")}{" "}
                   and{" "}
                   {new Date(
-                    selectedAllocation.task.end_date
+                    selectedAllocation.task.end_date,
                   ).toLocaleDateString("id-ID")}{" "}
                   are allowed
                 </p>

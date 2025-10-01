@@ -43,11 +43,13 @@ interface Project {
 
 interface ProjectWithProgress extends Project {
   progress?: number;
+  total_budget?: number;
+  transport_budget?: number;
+  honor_budget?: number;
 }
 
 export async function POST(request: NextRequest) {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const supabase = (await createClient()) as any;
     const body = await request.json();
     const formData: ProjectFormData = body;
@@ -75,7 +77,7 @@ export async function POST(request: NextRequest) {
     ) {
       return NextResponse.json(
         { error: "Missing required fields" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -86,7 +88,7 @@ export async function POST(request: NextRequest) {
     if (endDate <= startDate) {
       return NextResponse.json(
         { error: "Deadline must be after start date" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -97,18 +99,17 @@ export async function POST(request: NextRequest) {
     // Use service client for limit checks and writes to avoid RLS recursion
     const svc = createServiceClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
     for (const mitraAssignment of formData.mitra_assignments) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: currentTotal } = await (svc as any).rpc(
         "get_mitra_monthly_total",
         {
           mitra_id: mitraAssignment.mitra_id,
           month: currentMonth,
           year: currentYear,
-        }
+        },
       );
 
       const totalAmount =
@@ -120,7 +121,7 @@ export async function POST(request: NextRequest) {
             error: `Mitra monthly limit exceeded. Current total would be: ${totalAmount}`,
             mitra_id: mitraAssignment.mitra_id,
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -225,14 +226,13 @@ export async function POST(request: NextRequest) {
     console.error("Project creation error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 export async function GET(request: NextRequest) {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const supabase = (await createClient()) as any;
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1");
@@ -251,7 +251,7 @@ export async function GET(request: NextRequest) {
     // Use service client to avoid RLS recursion and strictly filter by ownership
     const svc = createServiceClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
     // Fetch projects; assignments will be fetched separately to avoid schema relationship constraints
@@ -297,15 +297,16 @@ export async function GET(request: NextRequest) {
     const { data: projects, error } = await query.range(from, to);
     if (error) throw error;
 
-    // Compute progress and attach assignments
+    // Compute progress and attach assignments with budget calculation
     const projectIds = (projects || []).map((p: { id: string }) => p.id);
+
     // Fetch assignments in bulk
     let assignmentsByProject = new Map<string, ProjectAssignment[]>();
     if (projectIds.length > 0) {
       const { data: assignments } = await (svc as any)
         .from("project_assignments")
         .select(
-          "project_id, id, assignee_type, assignee_id, uang_transport, honor"
+          "project_id, id, assignee_type, assignee_id, uang_transport, honor",
         )
         .in("project_id", projectIds);
       if (assignments && Array.isArray(assignments)) {
@@ -323,12 +324,89 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const enrichedProjects = (projects || []).map((p: any) => ({
-      ...p,
-      project_assignments: assignmentsByProject.get(p.id) || [],
-    })) as ProjectWithProgress[];
+    // Calculate budget from tasks table (same logic as financial API)
+    const budgetByProject = new Map<
+      string,
+      { transport: number; honor: number }
+    >();
     if (projectIds.length > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // Get transport budget from tasks (transport_days * 150,000)
+      const { data: transportTasks } = await (svc as any)
+        .from("tasks")
+        .select("project_id, transport_days")
+        .in("project_id", projectIds)
+        .not("transport_days", "is", null);
+
+      // Get honor budget from tasks
+      const { data: honorTasks } = await (svc as any)
+        .from("tasks")
+        .select("project_id, honor_amount")
+        .in("project_id", projectIds)
+        .not("assignee_mitra_id", "is", null);
+
+      // Calculate transport budget (150,000 per transport day)
+      for (const task of transportTasks || []) {
+        const rec = budgetByProject.get(task.project_id) || {
+          transport: 0,
+          honor: 0,
+        };
+        rec.transport += (task.transport_days || 0) * 150000;
+        budgetByProject.set(task.project_id, rec);
+      }
+
+      // Calculate honor budget
+      for (const task of honorTasks || []) {
+        const rec = budgetByProject.get(task.project_id) || {
+          transport: 0,
+          honor: 0,
+        };
+        rec.honor += task.honor_amount || 0;
+        budgetByProject.set(task.project_id, rec);
+      }
+    }
+
+    const enrichedProjects = (projects || []).map((p: any) => {
+      const assignments = assignmentsByProject.get(p.id) || [];
+      const budget = budgetByProject.get(p.id) || { transport: 0, honor: 0 };
+      const totalBudget = budget.transport + budget.honor;
+
+      console.log(`[DEBUG] Project ${p.nama_project} budget:`, {
+        transport: budget.transport,
+        honor: budget.honor,
+        total: totalBudget,
+      });
+
+      // Update assignments with calculated budget values for backward compatibility
+      const updatedAssignments = assignments.map((assignment) => ({
+        ...assignment,
+        // For display purposes, distribute budget across assignments
+        uang_transport:
+          assignment.assignee_type === "pegawai"
+            ? budget.transport /
+              Math.max(
+                assignments.filter((a) => a.assignee_type === "pegawai").length,
+                1,
+              )
+            : 0,
+        honor:
+          assignment.assignee_type === "mitra"
+            ? budget.honor /
+              Math.max(
+                assignments.filter((a) => a.assignee_type === "mitra").length,
+                1,
+              )
+            : 0,
+      }));
+
+      return {
+        ...p,
+        project_assignments: updatedAssignments,
+        total_budget: totalBudget,
+        transport_budget: budget.transport,
+        honor_budget: budget.honor,
+      };
+    }) as ProjectWithProgress[];
+    if (projectIds.length > 0) {
       const { data: tasks } = await (svc as any)
         .from("tasks")
         .select("id, project_id, status")
@@ -378,7 +456,7 @@ export async function GET(request: NextRequest) {
     console.error("Projects fetch error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

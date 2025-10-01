@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
-import { Shield, Users, User, ArrowRight } from "lucide-react";
+import { Shield, User, ArrowRight } from "lucide-react";
 
 const RoleSelection = () => {
   const router = useRouter();

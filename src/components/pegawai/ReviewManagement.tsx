@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -171,7 +171,7 @@ export function ReviewManagement() {
     } catch (error) {
       console.error("Error submitting review:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to submit review"
+        error instanceof Error ? error.message : "Failed to submit review",
       );
     } finally {
       setSubmitting(false);
@@ -213,7 +213,7 @@ export function ReviewManagement() {
     } catch (error) {
       console.error("Error updating review:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to update review"
+        error instanceof Error ? error.message : "Failed to update review",
       );
     } finally {
       setSubmitting(false);
@@ -244,7 +244,7 @@ export function ReviewManagement() {
     return {
       pending: filterByType(reviewsData.pending_reviews) as PendingReview[],
       completed: filterByType(
-        reviewsData.completed_reviews
+        reviewsData.completed_reviews,
       ) as CompletedReview[],
     };
   }, [reviewsData, filterType]);
@@ -426,9 +426,8 @@ export function ReviewManagement() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 cursor-pointer group overflow-hidden rounded-xl">
-          <div className="absolute inset-0 bg-gradient-to-br from-green-50 to-green-100 opacity-50"></div>
-          <div className="relative p-6">
+        <div className="bg-white border border-gray-100 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 cursor-pointer rounded-xl">
+          <div className="p-6">
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <p className="text-sm font-semibold text-gray-600 mb-2">
@@ -446,9 +445,8 @@ export function ReviewManagement() {
           </div>
         </div>
 
-        <div className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 cursor-pointer group overflow-hidden rounded-xl">
-          <div className="absolute inset-0 bg-gradient-to-br from-orange-50 to-orange-100 opacity-50"></div>
-          <div className="relative p-6">
+        <div className="bg-white border border-gray-100 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 cursor-pointer rounded-xl">
+          <div className="p-6">
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <p className="text-sm font-semibold text-gray-600 mb-2">
@@ -466,9 +464,8 @@ export function ReviewManagement() {
           </div>
         </div>
 
-        <div className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 cursor-pointer group overflow-hidden rounded-xl">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-blue-100 opacity-50"></div>
-          <div className="relative p-6">
+        <div className="bg-white border border-gray-100 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 cursor-pointer rounded-xl">
+          <div className="p-6">
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <p className="text-sm font-semibold text-gray-600 mb-2">
@@ -486,9 +483,8 @@ export function ReviewManagement() {
           </div>
         </div>
 
-        <div className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 cursor-pointer group overflow-hidden rounded-xl">
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-50 to-purple-100 opacity-50"></div>
-          <div className="relative p-6">
+        <div className="bg-white border border-gray-100 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 cursor-pointer rounded-xl">
+          <div className="p-6">
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <p className="text-sm font-semibold text-gray-600 mb-2">
@@ -509,17 +505,17 @@ export function ReviewManagement() {
 
       {/* Content based on current view */}
       {currentView === "pending" && (
-        <div className="border-0 shadow-xl rounded-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-orange-600 to-red-600 p-6">
-            <h2 className="text-xl font-bold text-white flex items-center">
-              <Clock className="w-6 h-6 mr-3" />
+        <div className="bg-white border border-gray-100 shadow-xl rounded-xl overflow-hidden">
+          <div className="p-6 border-b border-gray-100 bg-white">
+            <h2 className="text-xl font-bold text-gray-900 flex items-center">
+              <AlertCircle className="w-6 h-6 mr-3 text-orange-600" />
               Pending Reviews ({filteredData.pending.length})
             </h2>
-            <p className="text-orange-100 text-sm mt-2">
+            <p className="text-gray-700 text-sm mt-2">
               Reviews needed for completed projects
             </p>
           </div>
-          <div className="p-6">
+          <div className="p-6 bg-white">
             {filteredData.pending.length === 0 ? (
               <div className="text-center py-12">
                 <CheckCircle className="w-16 h-16 text-green-300 mx-auto mb-4" />
@@ -533,7 +529,7 @@ export function ReviewManagement() {
                 {filteredData.pending.map((review, index) => (
                   <div
                     key={index}
-                    className="group p-6 rounded-2xl border border-gray-200 hover:border-orange-300 hover:bg-gradient-to-r hover:from-gray-50 hover:to-orange-50 transition-all duration-300 hover:shadow-lg"
+                    className="group p-6 rounded-2xl border border-gray-200 bg-white hover:border-orange-300 hover:bg-orange-50 transition-all duration-300 hover:shadow-lg"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
@@ -581,7 +577,7 @@ export function ReviewManagement() {
                           <span>
                             Completed:{" "}
                             {new Date(
-                              review.project.deadline
+                              review.project.deadline,
                             ).toLocaleDateString("id-ID")}
                           </span>
                         </div>
@@ -596,7 +592,7 @@ export function ReviewManagement() {
                       <div className="ml-6">
                         <Button
                           onClick={() => openReviewDialog(review)}
-                          className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white"
+                          className="bg-orange-600 hover:bg-orange-700 text-white"
                         >
                           <Send className="w-4 h-4 mr-2" />
                           Submit Review
@@ -612,15 +608,15 @@ export function ReviewManagement() {
       )}
 
       {currentView === "completed" && (
-        <div className="border-0 shadow-xl rounded-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-green-600 to-teal-600 p-6">
-            <h2 className="text-xl font-bold text-white flex items-center">
-              <CheckCircle className="w-6 h-6 mr-3" />
+        <div className="bg-white border border-gray-100 shadow-xl rounded-xl overflow-hidden">
+          <div className="p-6 border-b border-gray-100 bg-white">
+            <h2 className="text-xl font-bold text-gray-900 flex items-center">
+              <CheckCircle className="w-6 h-6 mr-3 text-green-600" />
               Completed Reviews ({filteredData.completed.length})
             </h2>
-            <p className="text-green-100 text-sm mt-2">Your review history</p>
+            <p className="text-gray-700 text-sm mt-2">Your review history</p>
           </div>
-          <div className="p-6">
+          <div className="p-6 bg-white">
             {filteredData.completed.length === 0 ? (
               <div className="text-center py-12">
                 <History className="w-16 h-16 text-gray-300 mx-auto mb-4" />
@@ -636,7 +632,7 @@ export function ReviewManagement() {
                 {filteredData.completed.map((review, index) => (
                   <div
                     key={index}
-                    className="group p-6 rounded-2xl border border-gray-200 hover:border-green-300 hover:bg-gradient-to-r hover:from-gray-50 hover:to-green-50 transition-all duration-300 hover:shadow-lg"
+                    className="group p-6 rounded-2xl border border-gray-200 bg-white hover:border-green-300 hover:bg-green-50 transition-all duration-300 hover:shadow-lg"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
@@ -686,7 +682,7 @@ export function ReviewManagement() {
                               day: "numeric",
                               hour: "2-digit",
                               minute: "2-digit",
-                            }
+                            },
                           )}
                         </div>
                       </div>
@@ -713,17 +709,17 @@ export function ReviewManagement() {
       )}
 
       {currentView === "stats" && (
-        <div className="border-0 shadow-xl rounded-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-6">
-            <h2 className="text-xl font-bold text-white flex items-center">
-              <BarChart3 className="w-6 h-6 mr-3" />
+        <div className="bg-white border border-gray-100 shadow-xl rounded-xl overflow-hidden">
+          <div className="p-6 border-b border-gray-100 bg-white">
+            <h2 className="text-xl font-bold text-gray-900 flex items-center">
+              <BarChart3 className="w-6 h-6 mr-3 text-purple-600" />
               Review Statistics
             </h2>
-            <p className="text-purple-100 text-sm mt-2">
+            <p className="text-gray-700 text-sm mt-2">
               Your review analytics and insights
             </p>
           </div>
-          <div className="p-6">
+          <div className="p-6 bg-white">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {/* Rating Distribution */}
               <div className="space-y-4">
@@ -732,7 +728,7 @@ export function ReviewManagement() {
                 </h3>
                 {[5, 4, 3, 2, 1].map((rating) => {
                   const count = filteredData.completed.filter(
-                    (r) => r.rating === rating
+                    (r) => r.rating === rating,
                   ).length;
                   const percentage =
                     filteredData.completed.length > 0
@@ -767,7 +763,7 @@ export function ReviewManagement() {
                 <div className="space-y-4">
                   {["perusahaan", "individu"].map((type) => {
                     const count = filteredData.completed.filter(
-                      (r) => r.mitra.jenis === type
+                      (r) => r.mitra.jenis === type,
                     ).length;
                     const percentage =
                       filteredData.completed.length > 0
@@ -811,9 +807,9 @@ export function ReviewManagement() {
 
       {/* Review Submission Dialog */}
       <Dialog open={reviewDialog} onOpenChange={setReviewDialog}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="w-[92vw] max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl p-4">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-green-600 to-teal-600 bg-clip-text text-transparent">
+            <DialogTitle className="text-xl font-bold bg-gradient-to-r from-green-600 to-teal-600 bg-clip-text text-transparent">
               Submit Review
             </DialogTitle>
             <DialogDescription>
@@ -822,11 +818,11 @@ export function ReviewManagement() {
           </DialogHeader>
 
           {selectedReview && "mitra" in selectedReview && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               {/* Mitra Info */}
-              <div className="p-4 bg-gray-50 rounded-xl">
+              <div className="p-3 bg-gray-50 rounded-xl">
                 <div className="flex items-center space-x-3">
-                  <div className="font-semibold text-gray-900 text-lg">
+                  <div className="font-semibold text-gray-900 text-base">
                     {selectedReview.mitra.nama_mitra}
                   </div>
                   <Badge
@@ -867,7 +863,7 @@ export function ReviewManagement() {
                   onRatingChange={(rating) =>
                     setReviewForm((prev) => ({ ...prev, rating }))
                   }
-                  size="lg"
+                  size="md"
                 />
               </div>
 
@@ -885,13 +881,13 @@ export function ReviewManagement() {
                       komentar: e.target.value,
                     }))
                   }
-                  rows={4}
+                  rows={3}
                   className="resize-none"
                 />
               </div>
 
               {/* Actions */}
-              <div className="flex items-center justify-end space-x-4 pt-4">
+              <div className="flex items-center justify-end space-x-3 pt-2">
                 <Button
                   variant="outline"
                   onClick={() => setReviewDialog(false)}
@@ -962,7 +958,7 @@ export function ReviewManagement() {
                 <div className="text-sm text-gray-500">
                   Originally reviewed:{" "}
                   {new Date(selectedReview.created_at).toLocaleDateString(
-                    "id-ID"
+                    "id-ID",
                   )}
                 </div>
               </div>

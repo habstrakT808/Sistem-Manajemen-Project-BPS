@@ -2,11 +2,13 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import type { Database } from "@/../database/types/database.types";
 import { z } from "zod";
 
 // Validation schema
 const ProfileUpdateSchema = z.object({
+  email: z.string().email().optional(),
   nama_lengkap: z.string().min(1, "Name is required").max(100),
   no_telepon: z.string().optional(),
   alamat: z.string().optional(),
@@ -38,7 +40,11 @@ export async function GET() {
       error: unknown;
     };
 
-    if (profileError || !userProfile || (userProfile as any).role !== "pegawai") {
+    if (
+      profileError ||
+      !userProfile ||
+      (userProfile as any).role !== "pegawai"
+    ) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -54,7 +60,7 @@ export async function GET() {
         alamat,
         created_at,
         updated_at
-      `
+      `,
       )
       .eq("id", user.id)
       .single()) as {
@@ -122,7 +128,7 @@ export async function GET() {
     console.error("Profile API Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -152,7 +158,11 @@ export async function PUT(request: NextRequest) {
       error: unknown;
     };
 
-    if (profileError || !userProfile || (userProfile as any).role !== "pegawai") {
+    if (
+      profileError ||
+      !userProfile ||
+      (userProfile as any).role !== "pegawai"
+    ) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -160,36 +170,75 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     const validatedData = ProfileUpdateSchema.parse(body);
 
-    // Update profile in database
+    // Normalize phone and address
+    const normalizedPhone =
+      validatedData.no_telepon && validatedData.no_telepon.trim() !== ""
+        ? validatedData.no_telepon.trim()
+        : null;
+    const normalizedAlamat =
+      validatedData.alamat && validatedData.alamat.trim() !== ""
+        ? validatedData.alamat.trim()
+        : null;
+
+    // Update profile in database using service role to avoid RLS edge cases
     const updatePayload: Database["public"]["Tables"]["users"]["Update"] = {
+      email: validatedData.email || undefined,
       nama_lengkap: validatedData.nama_lengkap,
-      no_telepon: validatedData.no_telepon || null,
-      alamat: validatedData.alamat || null,
+      no_telepon: normalizedPhone,
+      alamat: normalizedAlamat,
       updated_at: new Date().toISOString(),
     };
 
-    const { data: updatedProfile, error: updateError } = await supabase
+    const svc = createServiceClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    );
+
+    const { data: updatedProfile, error: updateError } = (await (svc as any)
       .from("users")
       .update(updatePayload as never)
       .eq("id", user.id)
       .select()
-      .single();
+      .single()) as { data: any; error: any };
 
     if (updateError) {
       throw new Error(updateError.message);
     }
 
-    // Update bio in user metadata
+    // Update metadata mirror fields (bio, nama_lengkap, no_telepon, alamat)
     const { error: metadataError } = await supabase.auth.updateUser({
       data: {
         ...user.user_metadata,
         bio: validatedData.bio || "",
+        ...(validatedData.nama_lengkap
+          ? { nama_lengkap: validatedData.nama_lengkap }
+          : {}),
+        ...(normalizedPhone ? { no_telepon: normalizedPhone } : {}),
+        ...(normalizedAlamat ? { alamat: normalizedAlamat } : {}),
       },
     });
 
     if (metadataError) {
       console.error("Metadata update error:", metadataError);
       // Don't throw error for metadata update failure
+    }
+
+    // Force update auth email using service role (no verification)
+    if (validatedData.email) {
+      try {
+        const svc = createServiceClient<Database>(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        );
+        const { error: adminErr } = await (
+          svc as any
+        ).auth.admin.updateUserById(user.id, { email: validatedData.email });
+        if (adminErr) {
+          console.error("Admin email update error:", adminErr);
+        }
+      } catch (e) {
+        console.error("Service role email update failed:", e);
+      }
     }
 
     return NextResponse.json({
@@ -202,13 +251,13 @@ export async function PUT(request: NextRequest) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validation error", details: error.issues },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

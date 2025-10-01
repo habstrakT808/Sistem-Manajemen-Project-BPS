@@ -7,7 +7,6 @@ import type { Database } from "@/../database/types/database.types";
 
 export async function GET(request: NextRequest) {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const supabase = (await createClient()) as any;
     const { searchParams } = new URL(request.url);
     const period = searchParams.get("period") || "30"; // days
@@ -25,7 +24,7 @@ export async function GET(request: NextRequest) {
     // Use service client to avoid RLS recursion issues
     const svc = createServiceClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
     // Remove hard role gate; we'll rely on project ownership checks below
@@ -53,7 +52,7 @@ export async function GET(request: NextRequest) {
         assignee_user_id,
         pegawai_id,
         project_id
-      `
+      `,
       )
       .in("project_id", projectIds);
 
@@ -67,7 +66,7 @@ export async function GET(request: NextRequest) {
     const memberIdSet = new Set<string>(
       (teamMemberRows || [])
         .map((r: { user_id: string | null }) => r.user_id)
-        .filter(Boolean) as string[]
+        .filter(Boolean) as string[],
     );
     // Add from tasks assignees in owned projects as a safety net
     for (const t of teamTasks || []) {
@@ -101,7 +100,7 @@ export async function GET(request: NextRequest) {
                 id,
                 status
               )
-            `
+            `,
             )
             .eq("user_id", pegawai.id)
             .in("projects.status", ["upcoming", "active"]);
@@ -116,8 +115,8 @@ export async function GET(request: NextRequest) {
             project_count: projectCount,
             workload_level: workloadLevel,
           };
-        }
-      )
+        },
+      ),
     );
 
     // Calculate task completion trends (last 30 days)
@@ -133,19 +132,19 @@ export async function GET(request: NextRequest) {
             .toISOString()
             .split("T")[0];
           return taskDate === dateStr;
-        }
+        },
       );
 
       taskTrends.push({
         date: dateStr,
         completed: dayTasks.filter(
-          (t: { status: string }) => t.status === "completed"
+          (t: { status: string }) => t.status === "completed",
         ).length,
         in_progress: dayTasks.filter(
-          (t: { status: string }) => t.status === "in_progress"
+          (t: { status: string }) => t.status === "in_progress",
         ).length,
         pending: dayTasks.filter(
-          (t: { status: string }) => t.status === "pending"
+          (t: { status: string }) => t.status === "pending",
         ).length,
         total: dayTasks.length,
       });
@@ -157,11 +156,11 @@ export async function GET(request: NextRequest) {
         const memberTasks = (teamTasks || []).filter(
           (task: { assignee_user_id: string; pegawai_id: string }) =>
             task.assignee_user_id === pegawai.id ||
-            task.pegawai_id === pegawai.id
+            task.pegawai_id === pegawai.id,
         );
 
         const completedTasks = memberTasks.filter(
-          (t: { status: string }) => t.status === "completed"
+          (t: { status: string }) => t.status === "completed",
         );
         const totalTasks = memberTasks.length;
         const completionRate =
@@ -175,13 +174,13 @@ export async function GET(request: NextRequest) {
           completion_rate: Math.round(completionRate),
           avg_completion_time: 0, // Could be calculated if needed
         };
-      }
+      },
     );
 
     // Overall statistics
     const totalTasks = (teamTasks || []).length;
     const completedTasks = (teamTasks || []).filter(
-      (t: { status: string }) => t.status === "completed"
+      (t: { status: string }) => t.status === "completed",
     ).length;
     const overallCompletionRate =
       totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
@@ -204,7 +203,7 @@ export async function GET(request: NextRequest) {
     console.error("Team analytics fetch error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

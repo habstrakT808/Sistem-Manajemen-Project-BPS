@@ -87,15 +87,15 @@ interface MemberDetailData {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     console.log("🔍 DEBUG: Member detail API called!");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const supabase = (await createClient()) as any;
     const svc = createServiceClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
     const { id: memberId } = await params;
     console.log("🔍 DEBUG: Member ID:", memberId);
@@ -118,7 +118,7 @@ export async function GET(
     const { data: memberInfo, error: memberError } = await (svc as any)
       .from("users")
       .select(
-        "id, nama_lengkap, email, no_telepon, alamat, is_active, created_at, role"
+        "id, nama_lengkap, email, no_telepon, alamat, is_active, created_at, role",
       )
       .eq("id", memberId)
       .single();
@@ -142,7 +142,7 @@ export async function GET(
           deadline,
           ketua_tim_id
         )
-      `
+      `,
       )
       .eq("user_id", memberId);
 
@@ -171,7 +171,7 @@ export async function GET(
 
           const taskCount = (projectTasks || []).length;
           const completedTasks = (projectTasks || []).filter(
-            (t: { status: string }) => t.status === "completed"
+            (t: { status: string }) => t.status === "completed",
           ).length;
           const progress =
             taskCount > 0 ? Math.round((completedTasks / taskCount) * 100) : 0;
@@ -185,7 +185,7 @@ export async function GET(
 
           const uangTransport = (transportEarnings || []).reduce(
             (sum: number, record: { amount: number }) => sum + record.amount,
-            0
+            0,
           );
 
           return {
@@ -199,8 +199,8 @@ export async function GET(
             task_count: taskCount,
             completed_tasks: completedTasks,
           };
-        }
-      )
+        },
+      ),
     );
 
     // Get all tasks for this member (across all projects) - using assignee_user_id
@@ -213,7 +213,7 @@ export async function GET(
         created_at,
         updated_at,
         projects!inner (ketua_tim_id)
-      `
+      `,
       )
       .eq("assignee_user_id", memberId);
 
@@ -222,13 +222,13 @@ export async function GET(
     // Calculate task statistics
     const totalTasks = (allTasks || []).length;
     const pendingTasks = (allTasks || []).filter(
-      (t: { status: string }) => t.status === "pending"
+      (t: { status: string }) => t.status === "pending",
     ).length;
     const inProgressTasks = (allTasks || []).filter(
-      (t: { status: string }) => t.status === "in_progress"
+      (t: { status: string }) => t.status === "in_progress",
     ).length;
     const completedTasks = (allTasks || []).filter(
-      (t: { status: string }) => t.status === "completed"
+      (t: { status: string }) => t.status === "completed",
     ).length;
     const completionRate =
       totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
@@ -237,13 +237,13 @@ export async function GET(
     const completedTasksWithTime = (allTasks || [])
       .filter(
         (t: { status: string; created_at: string; updated_at: string }) =>
-          t.status === "completed"
+          t.status === "completed",
       )
       .map((t: { created_at: string; updated_at: string }) => {
         const created = new Date(t.created_at);
         const updated = new Date(t.updated_at);
         return Math.ceil(
-          (updated.getTime() - created.getTime()) / (1000 * 60 * 60 * 24)
+          (updated.getTime() - created.getTime()) / (1000 * 60 * 60 * 24),
         );
       });
 
@@ -252,8 +252,8 @@ export async function GET(
         ? Math.round(
             completedTasksWithTime.reduce(
               (sum: number, time: number) => sum + time,
-              0
-            ) / completedTasksWithTime.length
+              0,
+            ) / completedTasksWithTime.length,
           )
         : 0;
 
@@ -270,19 +270,19 @@ export async function GET(
         tasks!inner (
           projects!inner (nama_project, ketua_tim_id)
         )
-      `
+      `,
       )
       .eq("user_id", memberId)
       .eq("type", "transport")
       .gte(
         "occurred_on",
-        new Date(currentYear, currentMonth - 1, 1).toISOString()
+        new Date(currentYear, currentMonth - 1, 1).toISOString(),
       )
       .lt("occurred_on", new Date(currentYear, currentMonth, 1).toISOString());
 
     const currentMonthTotal = (currentMonthEarnings || []).reduce(
       (sum: number, record: { amount: number }) => sum + record.amount,
-      0
+      0,
     );
 
     const earningsBreakdown = (currentMonthEarnings || []).map(
@@ -294,7 +294,7 @@ export async function GET(
         project_name: record.tasks.projects.nama_project,
         amount: record.amount,
         date: record.occurred_on,
-      })
+      }),
     );
 
     // Get historical earnings (last 6 months)
@@ -313,7 +313,7 @@ export async function GET(
           tasks!inner (
             projects!inner (ketua_tim_id)
           )
-        `
+        `,
         )
         .eq("user_id", memberId)
         .eq("type", "transport")
@@ -322,7 +322,7 @@ export async function GET(
 
       const monthTotal = (monthEarnings || []).reduce(
         (sum: number, record: { amount: number }) => sum + record.amount,
-        0
+        0,
       );
 
       historicalEarnings.push({
@@ -348,7 +348,7 @@ export async function GET(
           deskripsi_tugas,
           status,
           projects!inner (nama_project, ketua_tim_id)
-        `
+        `,
         )
         .eq("assignee_user_id", memberId)
         .eq("tanggal_tugas", dateStr);
@@ -381,7 +381,7 @@ export async function GET(
             deskripsi_tugas: task.deskripsi_tugas,
             status: task.status,
             project_name: task.projects.nama_project,
-          })
+          }),
         ),
         projects: dateProjects,
       });
@@ -400,16 +400,16 @@ export async function GET(
           `
           status,
           projects!inner (ketua_tim_id)
-        `
+        `,
         )
         .eq("assignee_user_id", memberId)
         .eq("tanggal_tugas", dateStr);
 
       const completed = (dayTasks || []).filter(
-        (t: { status: string }) => t.status === "completed"
+        (t: { status: string }) => t.status === "completed",
       ).length;
       const pending = (dayTasks || []).filter(
-        (t: { status: string }) => t.status === "pending"
+        (t: { status: string }) => t.status === "pending",
       ).length;
 
       taskCompletionTrend.push({
@@ -441,7 +441,7 @@ export async function GET(
           `
           status,
           projects!inner (ketua_tim_id)
-        `
+        `,
         )
         .eq("assignee_user_id", memberId)
         .eq("status", "completed")
@@ -456,7 +456,7 @@ export async function GET(
           tasks!inner (
             projects!inner (ketua_tim_id)
           )
-        `
+        `,
         )
         .eq("user_id", memberId)
         .eq("type", "transport")
@@ -465,7 +465,7 @@ export async function GET(
 
       const monthEarningsTotal = (monthEarnings || []).reduce(
         (sum: number, record: { amount: number }) => sum + record.amount,
-        0
+        0,
       );
 
       monthlyProductivity.push({
@@ -510,7 +510,7 @@ export async function GET(
     console.error("Member Detail API Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

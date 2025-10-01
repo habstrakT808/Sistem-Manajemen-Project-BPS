@@ -1,12 +1,9 @@
 "use client";
 
 import React from "react";
-import { useRouter } from "next/navigation";
 import { Play, ArrowRight, CheckCircle } from "lucide-react";
 
 const HeroSection = () => {
-  const router = useRouter();
-
   const benefits = [
     "Real-time monitoring dan tracking",
     "Laporan otomatis untuk reimburse",

@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -16,15 +16,12 @@ import {
 } from "@/components/ui/select";
 import {
   BarChart3,
-  TrendingUp,
   Users,
   Clock,
   Target,
-  Award,
   RefreshCw,
   AlertCircle,
   Download,
-  Calendar,
   CheckCircle,
   Activity,
 } from "lucide-react";
@@ -70,11 +67,11 @@ interface AnalyticsData {
 }
 
 async function fetchAnalyticsData(
-  selectedPeriod: string
+  selectedPeriod: string,
 ): Promise<AnalyticsData> {
   const response = await fetch(
     `/api/ketua-tim/analytics?period=${selectedPeriod}`,
-    { cache: "no-store" }
+    { cache: "no-store" },
   );
   if (!response.ok) {
     const errorResult = await response.json();

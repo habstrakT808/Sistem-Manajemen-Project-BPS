@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,6 @@ import {
   FolderOpen,
   Download,
   FileText,
-  PieChart,
   BarChart3,
   RefreshCw,
   AlertCircle,
@@ -79,11 +78,11 @@ interface FinancialData {
 }
 
 async function fetchFinancialData(
-  selectedPeriod: string
+  selectedPeriod: string,
 ): Promise<FinancialData> {
   const response = await fetch(
     `/api/ketua-tim/financial?period=${selectedPeriod}`,
-    { cache: "no-store" }
+    { cache: "no-store" },
   );
   if (!response.ok) {
     const errorResult = await response.json();
@@ -96,7 +95,7 @@ async function fetchFinancialData(
 async function fetchDaily(month: number, year: number) {
   const res = await fetch(
     `/api/ketua-tim/financial/daily?month=${month}&year=${year}`,
-    { cache: "no-store" }
+    { cache: "no-store" },
   );
   const json = await res.json();
   if (!res.ok) throw new Error(json.error || "Failed to fetch daily data");
@@ -176,7 +175,7 @@ export default function FinancialDashboard() {
   async function fetchTransportDaily(m: number, y: number) {
     const res = await fetch(
       `/api/ketua-tim/financial/transport/daily?month=${m}&year=${y}`,
-      { cache: "no-store" }
+      { cache: "no-store" },
     );
     const json = await res.json();
     if (!res.ok)
@@ -191,7 +190,7 @@ export default function FinancialDashboard() {
   async function fetchTransportDayDetails(dateYmd: string) {
     const res = await fetch(
       `/api/ketua-tim/financial/transport/daily?day=${dateYmd}`,
-      { cache: "no-store" }
+      { cache: "no-store" },
     );
     const json = await res.json();
     if (!res.ok)
@@ -464,7 +463,7 @@ export default function FinancialDashboard() {
                         <div className="text-sm text-gray-400 mt-1">
                           Deadline:{" "}
                           {new Date(project.deadline).toLocaleDateString(
-                            "id-ID"
+                            "id-ID",
                           )}
                         </div>
                       </div>
@@ -679,7 +678,7 @@ export default function FinancialDashboard() {
                   hasEvents: (date) => {
                     const y = format(date, "yyyy-MM-dd");
                     return !!daily?.days.find(
-                      (d) => d.date === y && d.total > 0
+                      (d) => d.date === y && d.total > 0,
                     );
                   },
                 }}

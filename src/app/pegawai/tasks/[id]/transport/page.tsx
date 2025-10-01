@@ -29,6 +29,7 @@ interface TaskData {
   start_date: string;
   end_date: string;
   has_transport: boolean;
+  transport_days: number;
   status: string;
   response_pegawai: string | null;
   created_at: string;
@@ -57,6 +58,23 @@ export default function TransportAllocationPage({
 }: TransportPageProps) {
   const router = useRouter();
   const [taskId, setTaskId] = React.useState<string>("");
+
+  // Calculate transport days based on task duration
+  const _calculateTransportDays = (task: TaskData): number => {
+    if (!task.start_date || !task.end_date) return 0;
+    const startDate = new Date(task.start_date);
+    const endDate = new Date(task.end_date);
+    const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays === 0 ? 1 : diffDays; // Minimum 1 day if same date
+  };
+
+  // Calculate total transport amount
+  const calculateTransportAmount = (task: TaskData): number => {
+    // Use the actual transport_days from the task, not calculated from date range
+    const transportDays = task.transport_days || 0;
+    return 150000 * transportDays;
+  };
 
   React.useEffect(() => {
     params.then(({ id }) => setTaskId(id));
@@ -192,7 +210,7 @@ export default function TransportAllocationPage({
                   Transport Amount
                 </div>
                 <div className="text-green-600 font-semibold">
-                  {formatCurrency(150000)}
+                  {formatCurrency(calculateTransportAmount(task))}
                 </div>
               </div>
             </div>

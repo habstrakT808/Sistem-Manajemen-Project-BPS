@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     const supabase = await createClient();
     const serviceClient = createServiceClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
     // Auth check
@@ -44,9 +44,9 @@ export async function POST(request: NextRequest) {
     (allTasks || []).forEach(
       (task: { project_id: string; assignee_user_id: string }) => {
         validProjectUserCombinations.add(
-          `${task.project_id}-${task.assignee_user_id}`
+          `${task.project_id}-${task.assignee_user_id}`,
         );
-      }
+      },
     );
 
     // Find invalid project_members entries
@@ -54,13 +54,13 @@ export async function POST(request: NextRequest) {
       (member: { project_id: string; user_id: string }) => {
         const key = `${member.project_id}-${member.user_id}`;
         return !validProjectUserCombinations.has(key);
-      }
+      },
     );
 
     console.log(
       "Found",
       invalidProjectMembers.length,
-      "invalid project_members entries"
+      "invalid project_members entries",
     );
 
     // Delete invalid project_members entries
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
     console.error("Data cleanup error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

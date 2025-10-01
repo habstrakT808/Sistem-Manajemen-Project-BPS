@@ -7,7 +7,6 @@ import type { Database } from "@/../database/types/database.types";
 
 export async function GET(request: NextRequest) {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const supabase = (await createClient()) as any;
     const { searchParams } = new URL(request.url);
     const includeWorkload = searchParams.get("include_workload") === "true";
@@ -29,7 +28,7 @@ export async function GET(request: NextRequest) {
     // Use service client to bypass RLS recursion while strictly scoping queries
     const svc = createServiceClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
     // Get pegawai list
@@ -60,10 +59,8 @@ export async function GET(request: NextRequest) {
     // Get workload data if requested
     if (includeWorkload && pegawai) {
       pegawaiWithWorkload = (await Promise.all(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         pegawai.map(async (p: any) => {
           try {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const { data: workload } = await (svc as any).rpc(
               "get_pegawai_workload",
               {
@@ -72,7 +69,7 @@ export async function GET(request: NextRequest) {
                 end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
                   .toISOString()
                   .split("T")[0],
-              }
+              },
             );
 
             return {
@@ -89,7 +86,7 @@ export async function GET(request: NextRequest) {
               workload: { project_count: 0, workload_level: "low" },
             };
           }
-        })
+        }),
       )) as any[];
     }
 
@@ -98,17 +95,15 @@ export async function GET(request: NextRequest) {
     const currentYear = new Date().getFullYear();
 
     const mitraWithLimits = await Promise.all(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (mitra || []).map(async (m: any) => {
         try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const { data: monthlyTotal } = await (svc as any).rpc(
             "get_mitra_monthly_total",
             {
               mitra_id: m.id,
               month: currentMonth,
               year: currentYear,
-            }
+            },
           );
 
           const currentTotal = monthlyTotal?.[0]?.total_amount || 0;
@@ -125,7 +120,7 @@ export async function GET(request: NextRequest) {
         } catch (error) {
           console.error(
             `Error getting monthly total for mitra ${m.id}:`,
-            error
+            error,
           );
           return {
             ...m,
@@ -136,7 +131,7 @@ export async function GET(request: NextRequest) {
             },
           };
         }
-      })
+      }),
     );
 
     return NextResponse.json({
@@ -147,7 +142,7 @@ export async function GET(request: NextRequest) {
     console.error("Team data fetch error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

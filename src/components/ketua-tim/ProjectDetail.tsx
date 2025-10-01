@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useCallback } from "react";
+import React from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,6 @@ import {
   Loader2,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
-import { toast } from "sonner";
 import Link from "next/link";
 
 interface ProjectDetailData {
@@ -56,7 +55,7 @@ interface ProjectDetailProps {
 }
 
 async function fetchProjectDetailRequest(
-  projectId: string
+  projectId: string,
 ): Promise<ProjectDetailData> {
   const response = await fetch(`/api/ketua-tim/projects/${projectId}`, {
     cache: "no-store",
@@ -75,7 +74,7 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
     data: project,
     isLoading,
     error,
-    refetch,
+    refetch: _refetch,
   } = useQuery<ProjectDetailData, Error>({
     queryKey: ["ketua", "projects", "detail", projectId],
     queryFn: () => fetchProjectDetailRequest(projectId),
@@ -122,7 +121,7 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
       project.project_assignments.length > 0
     ) {
       return project.project_assignments.filter(
-        (a) => a.assignee_type === "pegawai"
+        (a) => a.assignee_type === "pegawai",
       );
     }
     // Fallback to project_members (new schema)
@@ -154,7 +153,7 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
       project.project_assignments.length > 0
     ) {
       return project.project_assignments.filter(
-        (a) => a.assignee_type === "mitra"
+        (a) => a.assignee_type === "mitra",
       );
     }
     // No direct mapping in new schema; return empty gracefully
@@ -266,18 +265,30 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
 
         <div className="flex space-x-4">
           <Button
-            asChild
+            asChild={project.status !== "completed"}
             variant="outline"
-            className="border-2 border-blue-200 text-blue-600 hover:bg-blue-50"
+            className={`border-2 ${
+              project.status === "completed"
+                ? "border-gray-200 text-gray-400 cursor-not-allowed"
+                : "border-blue-200 text-blue-600 hover:bg-blue-50"
+            }`}
+            disabled={project.status === "completed"}
           >
-            <Link
-              href={editHref}
-              prefetch
-              onMouseEnter={() => router.prefetch(editHref)}
-            >
-              <Edit className="w-4 h-4 mr-2" />
-              Edit Project
-            </Link>
+            {project.status === "completed" ? (
+              <span className="flex items-center">
+                <Edit className="w-4 h-4 mr-2" />
+                Edit Project
+              </span>
+            ) : (
+              <Link
+                href={editHref}
+                prefetch
+                onMouseEnter={() => router.prefetch(editHref)}
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                Edit Project
+              </Link>
+            )}
           </Button>
           <Button
             variant="outline"
@@ -324,7 +335,7 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
                   {Math.ceil(
                     (new Date(project.deadline).getTime() -
                       new Date(project.tanggal_mulai).getTime()) /
-                      (1000 * 60 * 60 * 24)
+                      (1000 * 60 * 60 * 24),
                   )}{" "}
                   days
                 </div>
@@ -387,8 +398,8 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
                   {formatCurrency(
                     pegawaiAssignments.reduce(
                       (sum, a) => sum + (a.uang_transport || 0),
-                      0
-                    )
+                      0,
+                    ),
                   )}
                 </div>
               </div>
@@ -396,7 +407,10 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
                 <div className="text-sm font-medium text-gray-600">Honor</div>
                 <div className="text-lg font-semibold text-gray-900">
                   {formatCurrency(
-                    mitraAssignments.reduce((sum, a) => sum + (a.honor || 0), 0)
+                    mitraAssignments.reduce(
+                      (sum, a) => sum + (a.honor || 0),
+                      0,
+                    ),
                   )}
                 </div>
               </div>

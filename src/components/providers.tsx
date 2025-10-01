@@ -31,7 +31,7 @@ export function useActiveProject() {
   const ctx = useContext(ActiveProjectContext);
   if (!ctx)
     throw new Error(
-      "useActiveProject must be used within ActiveProjectProvider"
+      "useActiveProject must be used within ActiveProjectProvider",
     );
   return ctx;
 }
@@ -56,7 +56,7 @@ function ActiveProjectProvider({ children }: { children: React.ReactNode }) {
         if (project)
           window.localStorage.setItem(
             "ACTIVE_PROJECT",
-            JSON.stringify(project)
+            JSON.stringify(project),
           );
         else window.localStorage.removeItem("ACTIVE_PROJECT");
       }
@@ -69,7 +69,7 @@ function ActiveProjectProvider({ children }: { children: React.ReactNode }) {
     () => ({ activeProject, setActiveProject, clearActiveProject }),
     // clearActiveProject is stable because it's derived from setActiveProject defined in this component
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [activeProject]
+    [activeProject],
   );
 
   return (
@@ -87,7 +87,7 @@ interface ActiveTeamContextValue {
   clearActiveTeam: () => void;
 }
 const ActiveTeamContext = createContext<ActiveTeamContextValue | undefined>(
-  undefined
+  undefined,
 );
 export function useActiveTeam() {
   const ctx = useContext(ActiveTeamContext);
@@ -117,10 +117,12 @@ function ActiveTeamProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   };
   const clearActiveTeam = () => setActiveTeam(null);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
   const value = useMemo(
     () => ({ activeTeam, setActiveTeam, clearActiveTeam }),
-    [activeTeam]
+    // clearActiveTeam is stable because it's derived from setActiveTeam defined in this component
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeTeam],
   );
   return (
     <ActiveTeamContext.Provider value={value}>

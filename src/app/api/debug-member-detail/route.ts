@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
-import type { Database } from "@/../database/types/database.types";
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     console.log("🔍 DEBUG: Debug member detail API called!");
 
     const serviceClient = createServiceClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
     // Test with specific member ID
@@ -19,7 +18,7 @@ export async function GET(request: NextRequest) {
     const { data: memberInfo, error: memberError } = await serviceClient
       .from("users")
       .select(
-        "id, nama_lengkap, email, no_telepon, alamat, is_active, created_at, role"
+        "id, nama_lengkap, email, no_telepon, alamat, is_active, created_at, role",
       )
       .eq("id", memberId)
       .single();
@@ -44,7 +43,7 @@ export async function GET(request: NextRequest) {
           deadline,
           ketua_tim_id
         )
-      `
+      `,
       )
       .eq("user_id", memberId);
 
@@ -60,7 +59,7 @@ export async function GET(request: NextRequest) {
         created_at,
         updated_at,
         assignee_user_id
-      `
+      `,
       )
       .eq("assignee_user_id", memberId);
 
@@ -69,13 +68,13 @@ export async function GET(request: NextRequest) {
     // Calculate task statistics
     const totalTasks = (allTasks || []).length;
     const pendingTasks = (allTasks || []).filter(
-      (t: { status: string }) => t.status === "pending"
+      (t: { status: string }) => t.status === "pending",
     ).length;
     const inProgressTasks = (allTasks || []).filter(
-      (t: { status: string }) => t.status === "in_progress"
+      (t: { status: string }) => t.status === "in_progress",
     ).length;
     const completedTasks = (allTasks || []).filter(
-      (t: { status: string }) => t.status === "completed"
+      (t: { status: string }) => t.status === "completed",
     ).length;
     const completionRate =
       totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
@@ -99,13 +98,13 @@ export async function GET(request: NextRequest) {
       .eq("type", "transport")
       .gte(
         "occurred_on",
-        new Date(currentYear, currentMonth - 1, 1).toISOString()
+        new Date(currentYear, currentMonth - 1, 1).toISOString(),
       )
       .lt("occurred_on", new Date(currentYear, currentMonth, 1).toISOString());
 
     const currentMonthTotal = (currentMonthEarnings || []).reduce(
       (sum: number, record: { amount: number }) => sum + record.amount,
-      0
+      0,
     );
 
     console.log("🔍 DEBUG: Monthly earnings:", {
@@ -127,7 +126,7 @@ export async function GET(request: NextRequest) {
 
         const projectTaskCount = (projectTasks || []).length;
         const projectCompletedTasks = (projectTasks || []).filter(
-          (t: { status: string }) => t.status === "completed"
+          (t: { status: string }) => t.status === "completed",
         ).length;
         const projectProgress =
           projectTaskCount > 0
@@ -150,22 +149,22 @@ export async function GET(request: NextRequest) {
           .in("task_id", taskIds);
 
         const allocationIds = (transportAllocations || []).map(
-          (a: { id: string }) => a.id
+          (a: { id: string }) => a.id,
         );
 
         // Find earnings that match these allocation IDs
         const projectEarnings = (allUserEarnings || []).filter(
           (earning: { source_id: string }) =>
-            allocationIds.includes(earning.source_id)
+            allocationIds.includes(earning.source_id),
         );
 
         const projectTransport = (projectEarnings || []).reduce(
           (sum: number, record: { amount: number }) => sum + record.amount,
-          0
+          0,
         );
 
         console.log(
-          `🔍 DEBUG: Project ${project.nama_project} - Tasks: ${projectTaskCount}, Completed: ${projectCompletedTasks}, Progress: ${projectProgress}%, Transport: ${projectTransport}`
+          `🔍 DEBUG: Project ${project.nama_project} - Tasks: ${projectTaskCount}, Completed: ${projectCompletedTasks}, Progress: ${projectProgress}%, Transport: ${projectTransport}`,
         );
 
         return {
@@ -179,7 +178,7 @@ export async function GET(request: NextRequest) {
           task_count: projectTaskCount,
           completed_tasks: projectCompletedTasks,
         };
-      })
+      }),
     );
 
     const memberDetail = {
@@ -214,7 +213,7 @@ export async function GET(request: NextRequest) {
     console.error("🔍 DEBUG: Debug member detail API error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

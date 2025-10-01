@@ -27,14 +27,14 @@ export async function GET() {
     // Use service role to avoid any RLS edge cases; strictly filter by current user
     const svc = createServiceClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
     // Always include teams where this user is leader
     const { data: leaderTeams } = await (svc as any)
       .from("teams")
       .select(
-        `id, name, description, leader_user_id, users!teams_leader_user_id_fkey(nama_lengkap, email)`
+        `id, name, description, leader_user_id, users!teams_leader_user_id_fkey(nama_lengkap, email)`,
       )
       .eq("leader_user_id", user.id as unknown as string);
 
@@ -57,68 +57,39 @@ export async function GET() {
         .select("project_id")
         .eq("user_id", user.id as unknown as string);
       assignmentProjectIds = (paRows || []).map(
-        (r: { project_id: string }) => r.project_id
+        (r: { project_id: string }) => r.project_id,
       );
     }
 
     const allMemberProjectIds = Array.from(
-      new Set([...(memberOnlyProjectIds || []), ...assignmentProjectIds])
+      new Set([...(memberOnlyProjectIds || []), ...assignmentProjectIds]),
     );
 
-    // Fetch teams for member-only projects
+    // Fetch teams ONLY for projects that are associated with a real team (team_id not null)
     const { data: memberTeams } = await (svc as any)
       .from("projects")
-      .select("id, team_id, leader_user_id")
+      .select("id, team_id")
       .in(
         "id",
-        allMemberProjectIds.length > 0 ? allMemberProjectIds : ["__none__"]
-      );
+        allMemberProjectIds.length > 0 ? allMemberProjectIds : ["__none__"],
+      )
+      .not("team_id", "is", null);
 
     const teamIds = Array.from(
       new Set(
         (memberTeams || [])
           .map((p: { team_id: string | null }) => p.team_id)
-          .filter((id: string | null) => Boolean(id))
-      )
+          .filter((id: string | null) => Boolean(id)),
+      ),
     ) as string[];
 
-    // Real team rows
+    // Real team rows (only existing team ids)
     const { data: teamRows } = await (svc as any)
       .from("teams")
       .select(
-        `id, name, description, leader_user_id, users!teams_leader_user_id_fkey(nama_lengkap, email)`
+        `id, name, description, leader_user_id, users!teams_leader_user_id_fkey(nama_lengkap, email)`,
       )
       .in("id", teamIds.length > 0 ? teamIds : ["__none__"]);
-
-    // Build synthetic teams ONLY for member-only projects without team_id (not for leader projects)
-    const leaderIdsNeedingVirtual = Array.from(
-      new Set(
-        (memberTeams || [])
-          .filter((p: { team_id: string | null }) => !p.team_id)
-          .map(
-            (p: { team_id: string | null; leader_user_id: string | null }) =>
-              p.leader_user_id
-          )
-      )
-    ).filter(Boolean) as string[];
-
-    let virtualTeams: TeamRow[] = [];
-    if (leaderIdsNeedingVirtual.length > 0) {
-      const { data: leaders } = await (svc as any)
-        .from("users")
-        .select("id, nama_lengkap, email")
-        .in("id", leaderIdsNeedingVirtual);
-      virtualTeams = (leaders || []).map(
-        (u: { id: string; nama_lengkap: string; email: string }) => ({
-          id: `virtual_${u.id}`,
-          name: `Tim - ${u.nama_lengkap}`,
-          description: null,
-          leader_user_id: u.id,
-          users: { nama_lengkap: u.nama_lengkap, email: u.email },
-          role: "member",
-        })
-      );
-    }
 
     const leaderSet = new Set((leaderTeams || []).map((t: any) => t.id));
     const merged: TeamRow[] = [
@@ -129,14 +100,13 @@ export async function GET() {
       ...((teamRows || [])
         .filter((t: any) => !leaderSet.has(t.id))
         .map((t: any) => ({ ...t, role: "member" as const })) as TeamRow[]),
-      ...virtualTeams,
     ];
 
     return NextResponse.json({ data: merged });
   } catch (e) {
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

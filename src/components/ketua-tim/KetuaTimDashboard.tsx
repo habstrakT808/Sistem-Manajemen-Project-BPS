@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -376,7 +376,7 @@ export default function KetuaTimDashboard() {
                         <div className="text-sm text-gray-500 group-hover:text-blue-500 mt-1">
                           Deadline:{" "}
                           {new Date(project.deadline).toLocaleDateString(
-                            "id-ID"
+                            "id-ID",
                           )}{" "}
                           • {project.team_size} members
                         </div>
@@ -493,7 +493,7 @@ export default function KetuaTimDashboard() {
                         >
                           {isOverdue ? "OVERDUE: " : "Due: "}
                           {new Date(task.tanggal_tugas).toLocaleDateString(
-                            "id-ID"
+                            "id-ID",
                           )}
                         </div>
                       </div>
@@ -549,7 +549,7 @@ export default function KetuaTimDashboard() {
                 {recent_projects.length > 0
                   ? Math.round(
                       recent_projects.reduce((acc, p) => acc + p.progress, 0) /
-                        recent_projects.length
+                        recent_projects.length,
                     )
                   : 0}
                 %
@@ -566,7 +566,7 @@ export default function KetuaTimDashboard() {
                 {stats.team_members > 0
                   ? Math.round(
                       (stats.team_members / Math.max(stats.my_projects, 1)) *
-                        100
+                        100,
                     )
                   : 0}
                 %

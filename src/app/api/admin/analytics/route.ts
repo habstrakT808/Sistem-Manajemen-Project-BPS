@@ -36,39 +36,39 @@ export async function GET(request: NextRequest) {
 
     switch (type) {
       case "user_trends":
-        const { data: userTrends, error: userError } =
-          await // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (supabase as any).rpc("get_user_registration_trends", {
-            days_back: daysBack,
-          });
+        const { data: userTrends, error: userError } = await (
+          supabase as any
+        ).rpc("get_user_registration_trends", {
+          days_back: daysBack,
+        });
 
         if (userError) throw userError;
         return NextResponse.json({ data: userTrends });
 
       case "project_analytics":
-        const { data: projectAnalytics, error: projectError } =
-          await // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (supabase as any).rpc("get_project_analytics", {
-            days_back: daysBack,
-          });
+        const { data: projectAnalytics, error: projectError } = await (
+          supabase as any
+        ).rpc("get_project_analytics", {
+          days_back: daysBack,
+        });
 
         if (projectError) throw projectError;
         return NextResponse.json({ data: projectAnalytics });
 
       case "financial_analytics":
-        const { data: financialAnalytics, error: financialError } =
-          await // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (supabase as any).rpc("get_financial_analytics", {
-            months_back: monthsBack,
-          });
+        const { data: financialAnalytics, error: financialError } = await (
+          supabase as any
+        ).rpc("get_financial_analytics", {
+          months_back: monthsBack,
+        });
 
         if (financialError) throw financialError;
         return NextResponse.json({ data: financialAnalytics });
 
       case "system_metrics":
-        const { data: systemMetrics, error: systemError } =
-          await // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (supabase as any).rpc("get_system_performance_metrics");
+        const { data: systemMetrics, error: systemError } = await (
+          supabase as any
+        ).rpc("get_system_performance_metrics");
 
         if (systemError) throw systemError;
         return NextResponse.json({ data: systemMetrics });
@@ -76,14 +76,14 @@ export async function GET(request: NextRequest) {
       default:
         return NextResponse.json(
           { error: "Invalid analytics type" },
-          { status: 400 }
+          { status: 400 },
         );
     }
   } catch (error) {
     console.error("Analytics API Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

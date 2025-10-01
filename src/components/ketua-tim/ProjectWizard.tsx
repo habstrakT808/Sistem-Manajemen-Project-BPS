@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 // Removed unused Card imports
@@ -18,11 +18,10 @@ import {
   Check,
   Users,
   // Removed unused Building2 import
-  DollarSign,
   Calendar,
-  AlertTriangle,
   CheckCircle,
   Loader2,
+  Search,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
@@ -84,11 +83,13 @@ export default function ProjectWizard() {
   const [submitting, setSubmitting] = useState(false);
   const [selectedPegawai, setSelectedPegawai] = useState<string[]>([]);
   const [selectedMitra, setSelectedMitra] = useState<string[]>([]);
+  const [pegawaiSearchTerm, setPegawaiSearchTerm] = useState("");
+  const [mitraSearchTerm, setMitraSearchTerm] = useState("");
 
   const fetchTeamData = useCallback(async () => {
     try {
       const response = await fetch(
-        "/api/ketua-tim/team-data?include_workload=true"
+        "/api/ketua-tim/team-data?include_workload=true",
       );
       const result = await response.json();
 
@@ -117,7 +118,7 @@ export default function ProjectWizard() {
         [field]: value,
       }));
     },
-    []
+    [],
   );
 
   const getWorkloadColor = (level: string) => {
@@ -146,6 +147,29 @@ export default function ProjectWizard() {
     }
   };
 
+  // Filtered data based on search terms
+  const filteredPegawaiData = useMemo(() => {
+    if (!pegawaiSearchTerm.trim()) return pegawaiData;
+
+    const searchLower = pegawaiSearchTerm.toLowerCase();
+    return pegawaiData.filter(
+      (pegawai) =>
+        pegawai.nama_lengkap.toLowerCase().includes(searchLower) ||
+        pegawai.email.toLowerCase().includes(searchLower),
+    );
+  }, [pegawaiData, pegawaiSearchTerm]);
+
+  const filteredMitraData = useMemo(() => {
+    if (!mitraSearchTerm.trim()) return mitraData;
+
+    const searchLower = mitraSearchTerm.toLowerCase();
+    return mitraData.filter(
+      (mitra) =>
+        mitra.nama_mitra.toLowerCase().includes(searchLower) ||
+        mitra.jenis.toLowerCase().includes(searchLower),
+    );
+  }, [mitraData, mitraSearchTerm]);
+
   const handlePegawaiSelection = (pegawaiId: string, checked: boolean) => {
     if (checked) {
       setSelectedPegawai((prev) => [...prev, pegawaiId]);
@@ -161,7 +185,7 @@ export default function ProjectWizard() {
       setFormData((prev) => ({
         ...prev,
         pegawai_assignments: prev.pegawai_assignments.filter(
-          (a) => a.pegawai_id !== pegawaiId
+          (a) => a.pegawai_id !== pegawaiId,
         ),
       }));
     }
@@ -174,7 +198,7 @@ export default function ProjectWizard() {
         ...prev,
         mitra_assignments: [
           ...prev.mitra_assignments,
-          { mitra_id: mitraId, honor: 500000 },
+          { mitra_id: mitraId, honor: 0 },
         ],
       }));
     } else {
@@ -182,7 +206,7 @@ export default function ProjectWizard() {
       setFormData((prev) => ({
         ...prev,
         mitra_assignments: prev.mitra_assignments.filter(
-          (a) => a.mitra_id !== mitraId
+          (a) => a.mitra_id !== mitraId,
         ),
       }));
     }
@@ -190,11 +214,11 @@ export default function ProjectWizard() {
 
   // Transport allowance removed - will be handled in task creation
 
-  const updateMitraHonor = (mitraId: string, amount: number) => {
+  const _updateMitraHonor = (mitraId: string, amount: number) => {
     setFormData((prev) => ({
       ...prev,
       mitra_assignments: prev.mitra_assignments.map((a) =>
-        a.mitra_id === mitraId ? { ...a, honor: amount } : a
+        a.mitra_id === mitraId ? { ...a, honor: amount } : a,
       ),
     }));
   };
@@ -275,19 +299,11 @@ export default function ProjectWizard() {
     } catch (error) {
       console.error("Error creating project:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to create project"
+        error instanceof Error ? error.message : "Failed to create project",
       );
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const calculateTotalBudget = () => {
-    const totalHonor = formData.mitra_assignments.reduce(
-      (sum, assignment) => sum + assignment.honor,
-      0
-    );
-    return totalHonor;
   };
 
   const steps = [
@@ -461,84 +477,145 @@ export default function ProjectWizard() {
             <div className="p-6 space-y-8">
               {/* Pegawai Selection */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Team Members (Pegawai)
-                </h3>
-                <div className="grid grid-cols-1 gap-4">
-                  {pegawaiData.map((pegawai) => (
-                    <div
-                      key={pegawai.id}
-                      className="flex items-center p-4 border border-gray-200 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-all duration-200"
-                    >
-                      <Checkbox
-                        id={`pegawai-${pegawai.id}`}
-                        checked={selectedPegawai.includes(pegawai.id)}
-                        onCheckedChange={(checked) =>
-                          handlePegawaiSelection(pegawai.id, checked as boolean)
-                        }
-                        className="mr-4"
-                      />
-                      <div className="flex-1">
-                        <div className="font-semibold text-gray-900">
-                          {pegawai.nama_lengkap}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {pegawai.email}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <Badge
-                          className={`${getWorkloadColor(pegawai.workload.workload_level)} border`}
-                        >
-                          {getWorkloadLabel(pegawai.workload.workload_level)} (
-                          {pegawai.workload.project_count})
-                        </Badge>
-                      </div>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Team Members (Pegawai)
+                  </h3>
+                  <div className="text-sm text-gray-500">
+                    {filteredPegawaiData.length} of {pegawaiData.length} members
+                  </div>
+                </div>
+
+                {/* Search Input for Pegawai */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <Input
+                    placeholder="Search team members by name or email..."
+                    value={pegawaiSearchTerm}
+                    onChange={(e) => setPegawaiSearchTerm(e.target.value)}
+                    className="pl-10 border-2 border-gray-200 focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 max-h-96 overflow-y-auto">
+                  {filteredPegawaiData.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <Users className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                      <p>
+                        {pegawaiSearchTerm.trim()
+                          ? "No team members found matching your search"
+                          : "No team members available"}
+                      </p>
                     </div>
-                  ))}
+                  ) : (
+                    filteredPegawaiData.map((pegawai) => (
+                      <div
+                        key={pegawai.id}
+                        className="flex items-center p-4 border border-gray-200 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-all duration-200"
+                      >
+                        <Checkbox
+                          id={`pegawai-${pegawai.id}`}
+                          checked={selectedPegawai.includes(pegawai.id)}
+                          onCheckedChange={(checked) =>
+                            handlePegawaiSelection(
+                              pegawai.id,
+                              checked as boolean,
+                            )
+                          }
+                          className="mr-4"
+                        />
+                        <div className="flex-1">
+                          <div className="font-semibold text-gray-900">
+                            {pegawai.nama_lengkap}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {pegawai.email}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <Badge
+                            className={`${getWorkloadColor(pegawai.workload.workload_level)} border`}
+                          >
+                            {getWorkloadLabel(pegawai.workload.workload_level)}{" "}
+                            ({pegawai.workload.project_count})
+                          </Badge>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
 
               {/* Mitra Selection */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Partners (Mitra)
-                </h3>
-                <div className="grid grid-cols-1 gap-4">
-                  {mitraData.map((mitra) => (
-                    <div
-                      key={mitra.id}
-                      className="flex items-center p-4 border border-gray-200 rounded-xl hover:border-purple-300 hover:bg-purple-50 transition-all duration-200"
-                    >
-                      <Checkbox
-                        id={`mitra-${mitra.id}`}
-                        checked={selectedMitra.includes(mitra.id)}
-                        onCheckedChange={(checked) =>
-                          handleMitraSelection(mitra.id, checked as boolean)
-                        }
-                        className="mr-4"
-                      />
-                      <div className="flex-1">
-                        <div className="font-semibold text-gray-900">
-                          {mitra.nama_mitra}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {mitra.jenis} • Rating:{" "}
-                          {mitra.rating_average.toFixed(1)}/5
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm font-semibold text-gray-900">
-                          {formatCurrency(mitra.monthly_usage.remaining_limit)}{" "}
-                          remaining
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {mitra.monthly_usage.limit_percentage.toFixed(1)}%
-                          used this month
-                        </div>
-                      </div>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Partners (Mitra)
+                  </h3>
+                  <div className="text-sm text-gray-500">
+                    {filteredMitraData.length} of {mitraData.length} partners
+                  </div>
+                </div>
+
+                {/* Search Input for Mitra */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <Input
+                    placeholder="Search partners by name or type..."
+                    value={mitraSearchTerm}
+                    onChange={(e) => setMitraSearchTerm(e.target.value)}
+                    className="pl-10 border-2 border-gray-200 focus:border-purple-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 max-h-96 overflow-y-auto">
+                  {filteredMitraData.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <Users className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                      <p>
+                        {mitraSearchTerm.trim()
+                          ? "No partners found matching your search"
+                          : "No partners available"}
+                      </p>
                     </div>
-                  ))}
+                  ) : (
+                    filteredMitraData.map((mitra) => (
+                      <div
+                        key={mitra.id}
+                        className="flex items-center p-4 border border-gray-200 rounded-xl hover:border-purple-300 hover:bg-purple-50 transition-all duration-200"
+                      >
+                        <Checkbox
+                          id={`mitra-${mitra.id}`}
+                          checked={selectedMitra.includes(mitra.id)}
+                          onCheckedChange={(checked) =>
+                            handleMitraSelection(mitra.id, checked as boolean)
+                          }
+                          className="mr-4"
+                        />
+                        <div className="flex-1">
+                          <div className="font-semibold text-gray-900">
+                            {mitra.nama_mitra}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {mitra.jenis} • Rating:{" "}
+                            {mitra.rating_average.toFixed(1)}/5
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-semibold text-gray-900">
+                            {formatCurrency(
+                              mitra.monthly_usage.remaining_limit,
+                            )}{" "}
+                            remaining
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {mitra.monthly_usage.limit_percentage.toFixed(1)}%
+                            used this month
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </div>
@@ -573,7 +650,7 @@ export default function ProjectWizard() {
                   <div>
                     <strong>Start Date:</strong>{" "}
                     {new Date(formData.tanggal_mulai).toLocaleDateString(
-                      "id-ID"
+                      "id-ID",
                     )}
                   </div>
                   <div>
@@ -597,7 +674,7 @@ export default function ProjectWizard() {
                       <ul className="space-y-1">
                         {formData.pegawai_assignments.map((assignment) => {
                           const pegawai = pegawaiData.find(
-                            (p) => p.id === assignment.pegawai_id
+                            (p) => p.id === assignment.pegawai_id,
                           );
                           return (
                             <li key={assignment.pegawai_id} className="text-sm">
@@ -614,29 +691,16 @@ export default function ProjectWizard() {
                       <ul className="space-y-1">
                         {formData.mitra_assignments.map((assignment) => {
                           const mitra = mitraData.find(
-                            (m) => m.id === assignment.mitra_id
+                            (m) => m.id === assignment.mitra_id,
                           );
                           return (
                             <li key={assignment.mitra_id} className="text-sm">
-                              {mitra?.nama_mitra} -{" "}
-                              {formatCurrency(assignment.honor)}
+                              {mitra?.nama_mitra}
                             </li>
                           );
                         })}
                       </ul>
                     </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Final Budget Summary */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Final Budget
-                </h3>
-                <div className="bg-blue-50 rounded-xl p-4">
-                  <div className="text-2xl font-bold text-blue-600 text-center">
-                    Total: {formatCurrency(calculateTotalBudget())}
                   </div>
                 </div>
               </div>

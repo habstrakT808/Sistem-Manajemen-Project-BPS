@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+
 import {
   Select,
   SelectContent,
@@ -15,14 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import {
-  ArrowLeft,
-  Save,
-  Building,
-  User,
-  Star,
-  DollarSign,
-} from "lucide-react";
+import { ArrowLeft, Save, Star, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 
 type MitraRow = Database["public"]["Tables"]["mitra"]["Row"];
@@ -38,10 +31,8 @@ interface FormData {
   jenis: "perusahaan" | "individu";
   kontak: string;
   alamat: string;
-  deskripsi: string;
   is_active: boolean;
   posisi_id?: string | null;
-  posisi_nama?: string;
   jeniskelamin?: "laki_laki" | "perempuan" | "";
   pendidikan?: "sma" | "d4s1" | "";
   pekerjaan_id?: string | null;
@@ -58,10 +49,9 @@ interface OptionItem {
 export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
   const [formData, setFormData] = useState<FormData>({
     nama_mitra: mitra?.nama_mitra || "",
-    jenis: mitra?.jenis || "perusahaan",
+    jenis: mitra?.jenis || "individu",
     kontak: mitra?.kontak || "",
     alamat: mitra?.alamat || "",
-    deskripsi: mitra?.deskripsi || "",
     is_active: mitra?.is_active ?? true,
 
     posisi_id: (mitra as any)?.posisi_id || null,
@@ -113,10 +103,8 @@ export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
             jenis: formData.jenis,
             kontak: formData.kontak || null,
             alamat: formData.alamat || null,
-            deskripsi: formData.deskripsi || null,
             is_active: formData.is_active,
             posisi_id: formData.posisi_id || null,
-            posisi_nama: formData.posisi_nama || undefined,
             jeniskelamin: formData.jeniskelamin || null,
             pendidikan: formData.pendidikan || null,
             pekerjaan_id: formData.pekerjaan_id || null,
@@ -146,10 +134,8 @@ export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
             jenis: formData.jenis,
             kontak: formData.kontak || null,
             alamat: formData.alamat || null,
-            deskripsi: formData.deskripsi || null,
             is_active: formData.is_active,
             posisi_id: formData.posisi_id || null,
-            posisi_nama: formData.posisi_nama || undefined,
             jeniskelamin: formData.jeniskelamin || null,
             pendidikan: formData.pendidikan || null,
             pekerjaan_id: formData.pekerjaan_id || null,
@@ -229,29 +215,6 @@ export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
                     />
                   </div>
 
-                  {/* Type */}
-                  <div className="space-y-2">
-                    <Label htmlFor="jenis">Partner Type *</Label>
-                    <Select
-                      value={formData.jenis}
-                      onValueChange={(value: "individu") =>
-                        setFormData({ ...formData, jenis: value })
-                      }
-                    >
-                      <SelectTrigger className="rounded-xl border-2 focus:border-purple-300">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-xl">
-                        <SelectItem value="individu">
-                          <div className="flex items-center">
-                            <User className="w-4 h-4 mr-2" />
-                            Individu - Individual
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
                   {/* Status */}
                   <div className="space-y-2">
                     <Label htmlFor="is_active">Partner Status</Label>
@@ -303,88 +266,27 @@ export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
                   </div>
                 </div>
 
-                {/* Description */}
-                <div className="space-y-2">
-                  <Label htmlFor="deskripsi">Description</Label>
-                  <Textarea
-                    id="deskripsi"
-                    value={formData.deskripsi}
-                    onChange={(e) =>
-                      setFormData({ ...formData, deskripsi: e.target.value })
-                    }
-                    placeholder="Brief description of services or expertise..."
-                    rows={4}
-                    className="rounded-xl border-2 focus:border-purple-300"
-                  />
-                </div>
-
                 {/* Extra Fields */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label>Posisi</Label>
-                    <div className="flex items-center gap-2">
-                      <Select
-                        value={formData.posisi_id || ""}
-                        onValueChange={(v) =>
-                          setFormData({ ...formData, posisi_id: v || null })
-                        }
-                      >
-                        <SelectTrigger className="rounded-xl border-2 focus:border-purple-300 w-full md:w-auto min-w-[220px]">
-                          <SelectValue placeholder="Pilih posisi" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {positions.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              {p.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-
-                      <Input
-                        placeholder="Or type new position"
-                        value={formData.posisi_nama || ""}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            posisi_nama: e.target.value,
-                          })
-                        }
-                        className="rounded-xl border-2 focus:border-purple-300"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="border-2"
-                        onClick={async () => {
-                          const name = (formData.posisi_nama || "").trim();
-                          if (!name) return;
-                          const res = await fetch(
-                            "/api/admin/mitra-positions",
-                            {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ name }),
-                            }
-                          );
-                          const json = await res.json();
-                          if (res.ok) {
-                            setPositions((prev) => [
-                              { id: json.data.id, name },
-                              ...prev,
-                            ]);
-                            setFormData({
-                              ...formData,
-                              posisi_id: json.data.id,
-                            });
-                            toast.success("Position added");
-                          } else
-                            toast.error(json.error || "Failed to add position");
-                        }}
-                      >
-                        +
-                      </Button>
-                    </div>
+                    <Select
+                      value={formData.posisi_id || ""}
+                      onValueChange={(v) =>
+                        setFormData({ ...formData, posisi_id: v || null })
+                      }
+                    >
+                      <SelectTrigger className="rounded-xl border-2 focus:border-purple-300">
+                        <SelectValue placeholder="Pilih posisi" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {positions.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="space-y-2">
@@ -468,7 +370,7 @@ export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
                               method: "POST",
                               headers: { "Content-Type": "application/json" },
                               body: JSON.stringify({ name }),
-                            }
+                            },
                           );
                           const json = await res.json();
                           if (res.ok) {
@@ -483,7 +385,7 @@ export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
                             toast.success("Occupation added");
                           } else
                             toast.error(
-                              json.error || "Failed to add occupation"
+                              json.error || "Failed to add occupation",
                             );
                         }}
                       >
@@ -557,28 +459,6 @@ export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
 
         {/* Info Panel */}
         <div className="space-y-6">
-          {/* Partner Type Info */}
-          <div className="border-0 shadow-xl rounded-xl overflow-hidden bg-white">
-            <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-6">
-              <div className="font-semibold text-lg flex items-center">
-                <User className="w-5 h-5 mr-2" />
-                Partner Type
-              </div>
-            </div>
-            <div className="p-6 space-y-4 bg-white">
-              <div className="p-4 bg-white rounded-xl">
-                <div className="flex items-center mb-2">
-                  <User className="w-5 h-5 text-green-600 mr-2" />
-                  <span className="font-semibold text-green-900">Individu</span>
-                </div>
-                <p className="text-sm text-green-700">
-                  Individual contractors, freelancers, and personal service
-                  providers.
-                </p>
-              </div>
-            </div>
-          </div>
-
           {/* Monthly Limit Info */}
           <div className="border-0 shadow-xl rounded-xl overflow-hidden bg-white">
             <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-6">

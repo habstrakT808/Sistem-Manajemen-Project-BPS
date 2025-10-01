@@ -56,10 +56,10 @@ interface TodayTask {
   status: "pending" | "in_progress" | "completed";
   project_name: string;
   response_pegawai?: string;
-  transport_allocation: {
+  transport_allocations: Array<{
     allocation_date: string | null;
     canceled_at: string | null;
-  } | null;
+  }>;
 }
 
 interface AssignedProject {
@@ -114,7 +114,7 @@ export default function PegawaiDashboard() {
   const handleTaskStatusUpdate = async (
     taskId: string,
     newStatus: "in_progress" | "completed",
-    response?: string
+    response?: string,
   ) => {
     setUpdatingTask(taskId);
     try {
@@ -135,13 +135,13 @@ export default function PegawaiDashboard() {
       }
 
       toast.success(
-        `Task ${newStatus === "completed" ? "completed" : "started"}!`
+        `Task ${newStatus === "completed" ? "completed" : "started"}!`,
       );
       await refetch();
     } catch (error) {
       console.error("Error updating task:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to update task"
+        error instanceof Error ? error.message : "Failed to update task",
       );
     } finally {
       setUpdatingTask(null);
@@ -351,7 +351,7 @@ export default function PegawaiDashboard() {
             </div>
           </div>
 
-          <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-xl border border-white/50 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+          <div className="bg-white rounded-3xl p-6 shadow-xl border border-gray-200 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">
@@ -370,14 +370,14 @@ export default function PegawaiDashboard() {
             </div>
           </div>
 
-          <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-xl border border-white/50 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+          <div className="bg-white rounded-3xl p-6 shadow-xl border border-gray-200 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">
                   Monthly Earnings
                 </p>
                 <p className="text-3xl font-bold text-gray-900">
-                  {formatCurrency(stats.total_earnings)}
+                  {formatCurrency(stats.total_earnings || 0)}
                 </p>
                 <p className="text-xs text-emerald-600 font-medium">
                   Transport fees
@@ -389,7 +389,7 @@ export default function PegawaiDashboard() {
             </div>
           </div>
 
-          <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-xl border border-white/50 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+          <div className="bg-white rounded-3xl p-6 shadow-xl border border-gray-200 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">
@@ -507,10 +507,12 @@ export default function PegawaiDashboard() {
               {today_tasks.length > 0 ? (
                 <>
                   {today_tasks.map((task, index) => {
+                    const allocatedDays =
+                      task.transport_allocations?.filter(
+                        (alloc) => alloc.allocation_date && !alloc.canceled_at,
+                      ).length || 0;
                     const needsTransportDate =
-                      task.has_transport &&
-                      !task.transport_allocation?.allocation_date &&
-                      !task.transport_allocation?.canceled_at;
+                      task.has_transport && allocatedDays === 0;
                     const isOverdue =
                       new Date(task.end_date) < new Date() &&
                       task.status !== "completed";
@@ -588,11 +590,11 @@ export default function PegawaiDashboard() {
 
                               <div className="text-sm text-gray-500">
                                 {new Date(task.start_date).toLocaleDateString(
-                                  "id-ID"
+                                  "id-ID",
                                 )}{" "}
                                 -{" "}
                                 {new Date(task.end_date).toLocaleDateString(
-                                  "id-ID"
+                                  "id-ID",
                                 )}
                               </div>
 
@@ -642,7 +644,7 @@ export default function PegawaiDashboard() {
                                   onClick={() =>
                                     handleTaskStatusUpdate(
                                       task.id,
-                                      "in_progress"
+                                      "in_progress",
                                     )
                                   }
                                   disabled={updatingTask === task.id}
@@ -658,12 +660,12 @@ export default function PegawaiDashboard() {
                                   size="sm"
                                   onClick={() => {
                                     const response = prompt(
-                                      "Add your response (optional):"
+                                      "Add your response (optional):",
                                     );
                                     handleTaskStatusUpdate(
                                       task.id,
                                       "completed",
-                                      response || undefined
+                                      response || undefined,
                                     );
                                   }}
                                   disabled={updatingTask === task.id}
@@ -770,7 +772,7 @@ export default function PegawaiDashboard() {
                           <div className="text-sm text-gray-400 mt-1">
                             Deadline:{" "}
                             {new Date(project.deadline).toLocaleDateString(
-                              "id-ID"
+                              "id-ID",
                             )}
                           </div>
 
@@ -881,7 +883,7 @@ export default function PegawaiDashboard() {
                     ? Math.round(
                         (stats.completed_tasks /
                           (stats.completed_tasks + stats.pending_tasks)) *
-                          100
+                          100,
                       )
                     : stats.completed_tasks > 0
                       ? 100
@@ -904,8 +906,8 @@ export default function PegawaiDashboard() {
                     ? Math.round(
                         assigned_projects.reduce(
                           (acc, p) => acc + p.my_progress,
-                          0
-                        ) / assigned_projects.length
+                          0,
+                        ) / assigned_projects.length,
                       )
                     : 0}
                   %
@@ -936,7 +938,7 @@ export default function PegawaiDashboard() {
                   </div>
                 </div>
                 <div className="text-4xl font-bold group-hover:scale-110 transition-transform duration-300">
-                  {formatCurrency(stats.total_earnings)}
+                  {formatCurrency(stats.transport_earnings || 0)}
                 </div>
                 <div className="text-emerald-100 text-sm font-medium">
                   Monthly transport

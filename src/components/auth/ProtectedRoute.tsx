@@ -47,17 +47,6 @@ export function ProtectedRoute({
   };
 
   useEffect(() => {
-    console.log("ProtectedRoute check:", {
-      loading,
-      user: !!user,
-      userProfile: userProfile?.role,
-      requireProjectRole,
-      activeProject,
-      activeTeam,
-      pathname: window.location.pathname,
-      timestamp: new Date().toISOString(),
-    });
-
     if (!loading) {
       if (requireAuth && !user) {
         router.prefetch("/auth/login");
@@ -115,7 +104,7 @@ export function ProtectedRoute({
               "Project role:",
               activeProject?.role,
               "Team role:",
-              activeTeam?.role
+              activeTeam?.role,
             );
             router.prefetch("/pegawai");
             router.push("/pegawai");
@@ -154,12 +143,8 @@ export function ProtectedRoute({
     router,
   ]);
 
-  // If we're still loading auth state but already have a session, allow rendering
-  // to avoid blocking on slow profile fetches. Only block when we require auth
-  // and no user session is present yet.
-  if (loading && !(requireAuth && !user)) {
-    // Proceed to render children while background loading continues
-  } else if (loading) {
+  // Show loading spinner while auth is initializing
+  if (loading) {
     return <LoadingSpinner />;
   }
 

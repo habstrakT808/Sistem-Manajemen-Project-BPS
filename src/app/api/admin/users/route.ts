@@ -10,7 +10,7 @@ const supabaseAdmin = createClient<Database>(
       autoRefreshToken: false,
       persistSession: false,
     },
-  }
+  },
 );
 
 export async function GET(request: NextRequest) {
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     const isActiveParam = searchParams.get("is_active");
 
     // Build query
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     let query: any = (supabaseAdmin as any)
       .from("users")
       .select("id, email, role, nama_lengkap, no_telepon, alamat, is_active");
@@ -43,10 +43,10 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ data });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
     if (!email || !password || !role || !nama_lengkap) {
       return NextResponse.json(
         { error: "Missing required fields" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
           error:
             "Role 'ketua_tim' is not allowed globally. Use 'pegawai' and assign leader per project.",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -90,12 +90,12 @@ export async function POST(request: NextRequest) {
     });
 
     const userExists = existingUser?.users?.some(
-      (user) => user.email === email
+      (user) => user.email === email,
     );
     if (userExists) {
       return NextResponse.json(
         { error: "User with this email already exists" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -118,14 +118,14 @@ export async function POST(request: NextRequest) {
       console.error("Auth error details:", JSON.stringify(authError, null, 2));
       return NextResponse.json(
         { error: "Failed to create user: " + authError.message },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!authData.user) {
       return NextResponse.json(
         { error: "No user data returned" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -176,7 +176,7 @@ export async function POST(request: NextRequest) {
       console.error("Error creating/updating user profile:", profileError);
       console.error(
         "Profile error details:",
-        JSON.stringify(profileError, null, 2)
+        JSON.stringify(profileError, null, 2),
       );
       // Try to delete the auth user if profile creation fails
       try {
@@ -186,7 +186,7 @@ export async function POST(request: NextRequest) {
       }
       return NextResponse.json(
         { error: "Failed to create user profile: " + profileError.message },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -207,7 +207,7 @@ export async function POST(request: NextRequest) {
     console.error("Full error details:", JSON.stringify(error, null, 2));
     return NextResponse.json(
       { error: "Internal server error: " + (error as Error).message },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -222,8 +222,20 @@ export async function PUT(request: NextRequest) {
     if (!id) {
       return NextResponse.json(
         { error: "User ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
+    }
+
+    // Get original user data for rollback if needed
+    let originalEmail = null;
+    if (email !== undefined) {
+      const { data: originalUser } = await (supabaseAdmin as any)
+        .from("users")
+        .select("email")
+        .eq("id", id)
+        .single();
+
+      originalEmail = originalUser?.email;
     }
 
     // Build partial update object only with provided fields
@@ -238,7 +250,8 @@ export async function PUT(request: NextRequest) {
     if (alamat !== undefined) updateData.alamat = alamat || null;
     if (typeof is_active === "boolean") updateData.is_active = is_active;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // Update public.users table
+
     const { error: profileError } = await (supabaseAdmin as any)
       .from("users")
       .update(updateData)
@@ -248,8 +261,30 @@ export async function PUT(request: NextRequest) {
       console.error("Error updating user profile:", profileError);
       return NextResponse.json(
         { error: "Failed to update user profile" },
-        { status: 400 }
+        { status: 400 },
       );
+    }
+
+    // If email is being updated, also update auth.users table
+    if (email !== undefined) {
+      const { error: authError } =
+        await supabaseAdmin.auth.admin.updateUserById(id, { email: email });
+
+      if (authError) {
+        console.error("Error updating auth user email:", authError);
+        // Rollback the public.users update if auth update fails
+        if (originalEmail) {
+          await (supabaseAdmin as any)
+            .from("users")
+            .update({ email: originalEmail })
+            .eq("id", id);
+        }
+
+        return NextResponse.json(
+          { error: "Failed to update user authentication email" },
+          { status: 400 },
+        );
+      }
     }
 
     return NextResponse.json({
@@ -259,7 +294,7 @@ export async function PUT(request: NextRequest) {
     console.error("Error in PUT /api/admin/users:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -272,12 +307,12 @@ export async function DELETE(request: NextRequest) {
     if (!id) {
       return NextResponse.json(
         { error: "User ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // Step 1: Clean up related records that reference this user
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const supabase = supabaseAdmin as any;
 
     // Update project_members.created_by to NULL where it references this user
@@ -287,10 +322,13 @@ export async function DELETE(request: NextRequest) {
       .eq("created_by", id);
 
     if (updateProjectMembersError) {
-      console.error("Error updating project_members.created_by:", updateProjectMembersError);
+      console.error(
+        "Error updating project_members.created_by:",
+        updateProjectMembersError,
+      );
       return NextResponse.json(
         { error: "Failed to clean up project member references" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -301,7 +339,10 @@ export async function DELETE(request: NextRequest) {
       .eq("created_by", id);
 
     if (updateProjectsCreatedByError) {
-      console.error("Error updating projects.created_by:", updateProjectsCreatedByError);
+      console.error(
+        "Error updating projects.created_by:",
+        updateProjectsCreatedByError,
+      );
     }
 
     // Update projects.updated_by to NULL where it references this user
@@ -311,7 +352,10 @@ export async function DELETE(request: NextRequest) {
       .eq("updated_by", id);
 
     if (updateProjectsUpdatedByError) {
-      console.error("Error updating projects.updated_by:", updateProjectsUpdatedByError);
+      console.error(
+        "Error updating projects.updated_by:",
+        updateProjectsUpdatedByError,
+      );
     }
 
     // Update tasks.created_by to NULL where it references this user
@@ -321,7 +365,10 @@ export async function DELETE(request: NextRequest) {
       .eq("created_by", id);
 
     if (updateTasksCreatedByError) {
-      console.error("Error updating tasks.created_by:", updateTasksCreatedByError);
+      console.error(
+        "Error updating tasks.created_by:",
+        updateTasksCreatedByError,
+      );
     }
 
     // Update system_settings.updated_by to NULL where it references this user
@@ -331,7 +378,10 @@ export async function DELETE(request: NextRequest) {
       .eq("updated_by", id);
 
     if (updateSystemSettingsError) {
-      console.error("Error updating system_settings.updated_by:", updateSystemSettingsError);
+      console.error(
+        "Error updating system_settings.updated_by:",
+        updateSystemSettingsError,
+      );
     }
 
     // Update project_assignments.created_by to NULL where it references this user
@@ -341,7 +391,10 @@ export async function DELETE(request: NextRequest) {
       .eq("created_by", id);
 
     if (updateAssignmentsError) {
-      console.error("Error updating project_assignments.created_by:", updateAssignmentsError);
+      console.error(
+        "Error updating project_assignments.created_by:",
+        updateAssignmentsError,
+      );
     }
 
     // Update activity_logs.actor_user_id to NULL where it references this user
@@ -351,7 +404,10 @@ export async function DELETE(request: NextRequest) {
       .eq("actor_user_id", id);
 
     if (updateActivityLogsError) {
-      console.error("Error updating activity_logs.actor_user_id:", updateActivityLogsError);
+      console.error(
+        "Error updating activity_logs.actor_user_id:",
+        updateActivityLogsError,
+      );
     }
 
     // Step 2: Delete user profile
@@ -364,7 +420,7 @@ export async function DELETE(request: NextRequest) {
       console.error("Error deleting user profile:", profileError);
       return NextResponse.json(
         { error: "Failed to delete user profile" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -375,7 +431,7 @@ export async function DELETE(request: NextRequest) {
       console.error("Error deleting auth user:", authError);
       return NextResponse.json(
         { error: "Failed to delete auth user" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -386,7 +442,7 @@ export async function DELETE(request: NextRequest) {
     console.error("Error in DELETE /api/admin/users:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -36,15 +35,12 @@ import {
   Building2,
   Plus,
   Search,
-  Filter,
   MoreHorizontal,
   Edit,
   Trash2,
   Star,
   Eye,
   EyeOff,
-  Building,
-  User,
   TrendingUp,
 } from "lucide-react";
 import {
@@ -55,6 +51,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { MitraForm } from "./MitraForm";
+import { MitraExcelImport } from "./MitraExcelImport";
 
 type MitraRow = Database["public"]["Tables"]["mitra"]["Row"];
 
@@ -65,28 +62,10 @@ interface MitraWithStats extends MitraRow {
   total_projects?: number;
 }
 
-const jenisConfig = {
-  perusahaan: {
-    label: "Perusahaan",
-    icon: Building,
-    color: "bg-gradient-to-r from-blue-500 to-blue-600 text-white",
-    description: "Corporate Partner",
-  },
-  individu: {
-    label: "Individu",
-    icon: User,
-    color: "bg-gradient-to-r from-green-500 to-green-600 text-white",
-    description: "Individual Partner",
-  },
-};
-
 export function MitraManagement() {
   const [mitra, setMitra] = useState<MitraWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [jenisFilter, setJenisFilter] = useState<
-    "perusahaan" | "individu" | "all"
-  >("all");
   const [statusFilter, setStatusFilter] = useState<
     "all" | "active" | "inactive"
   >("all");
@@ -96,14 +75,9 @@ export function MitraManagement() {
   const [deletingMitra, setDeletingMitra] = useState<MitraRow | null>(null);
   const [positionsMap, setPositionsMap] = useState<Record<string, string>>({});
   const [occupationsMap, setOccupationsMap] = useState<Record<string, string>>(
-    {}
+    {},
   );
-
-  const truncate = (value?: string | null, max = 48) => {
-    const s = (value || "").trim();
-    if (s.length <= max) return s || "-";
-    return s.slice(0, max).trimEnd() + "...";
-  };
+  const [showExcelImport, setShowExcelImport] = useState(false);
 
   const fetchMitra = useCallback(async () => {
     try {
@@ -192,7 +166,6 @@ export function MitraManagement() {
           jenis: mitraItem.jenis,
           kontak: mitraItem.kontak,
           alamat: mitraItem.alamat,
-          deskripsi: mitraItem.deskripsi,
           is_active: !mitraItem.is_active,
         }),
       });
@@ -205,7 +178,7 @@ export function MitraManagement() {
       }
 
       toast.success(
-        `Mitra ${mitraItem.is_active ? "deactivated" : "activated"} successfully`
+        `Mitra ${mitraItem.is_active ? "deactivated" : "activated"} successfully`,
       );
       fetchMitra();
     } catch (error) {
@@ -225,7 +198,7 @@ export function MitraManagement() {
           className={`w-4 h-4 ${
             i <= numRating ? "text-yellow-400 fill-yellow-400" : "text-gray-300"
           }`}
-        />
+        />,
       );
     }
 
@@ -242,14 +215,12 @@ export function MitraManagement() {
       mitraItem.nama_mitra.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (mitraItem.kontak &&
         mitraItem.kontak.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesJenis =
-      jenisFilter === "all" || mitraItem.jenis === jenisFilter;
     const matchesStatus =
       statusFilter === "all" ||
       (statusFilter === "active" && mitraItem.is_active) ||
       (statusFilter === "inactive" && !mitraItem.is_active);
 
-    return matchesSearch && matchesJenis && matchesStatus;
+    return matchesSearch && matchesStatus;
   });
 
   if (showMitraForm) {
@@ -283,17 +254,27 @@ export function MitraManagement() {
           </p>
         </div>
 
-        <Button
-          onClick={() => setShowMitraForm(true)}
-          className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Mitra
-        </Button>
+        <div className="flex gap-3">
+          <Button
+            onClick={() => setShowExcelImport(true)}
+            variant="outline"
+            className="border-2 border-purple-300 text-purple-700 hover:bg-purple-50 font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
+          >
+            <Building2 className="w-4 h-4 mr-2" />
+            Import Excel
+          </Button>
+          <Button
+            onClick={() => setShowMitraForm(true)}
+            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Mitra
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="border-0 shadow-xl rounded-xl overflow-hidden">
           <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-6">
             <div className="flex items-center justify-between">
@@ -329,42 +310,6 @@ export function MitraManagement() {
             </div>
           </div>
         </div>
-
-        <div className="border-0 shadow-xl rounded-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold text-gray-600 mb-1">
-                  Companies
-                </p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {mitra.filter((m) => m.jenis === "perusahaan").length}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-                <Building className="w-6 h-6 text-white" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="border-0 shadow-xl rounded-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold text-gray-600 mb-1">
-                  Individuals
-                </p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {mitra.filter((m) => m.jenis === "individu").length}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
-                <User className="w-6 h-6 text-white" />
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Filters */}
@@ -392,39 +337,6 @@ export function MitraManagement() {
             </div>
 
             <div className="flex gap-3">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="border-2 border-gray-200 hover:border-purple-300 hover:bg-purple-50 rounded-xl px-6"
-                  >
-                    <Filter className="w-4 h-4 mr-2" />
-                    Type:{" "}
-                    {jenisFilter === "all"
-                      ? "All"
-                      : jenisConfig[jenisFilter].label}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="rounded-xl shadow-xl">
-                  <DropdownMenuLabel>Filter by Type</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setJenisFilter("all")}>
-                    All Types
-                  </DropdownMenuItem>
-                  {Object.entries(jenisConfig).map(([jenis, config]) => (
-                    <DropdownMenuItem
-                      key={jenis}
-                      onClick={() =>
-                        setJenisFilter(jenis as "perusahaan" | "individu")
-                      }
-                    >
-                      <config.icon className="w-4 h-4 mr-2" />
-                      {config.label}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -479,9 +391,6 @@ export function MitraManagement() {
                     Partner
                   </TableHead>
                   <TableHead className="font-semibold text-gray-900">
-                    Type
-                  </TableHead>
-                  <TableHead className="font-semibold text-gray-900">
                     Rating
                   </TableHead>
                   <TableHead className="font-semibold text-gray-900">
@@ -500,9 +409,6 @@ export function MitraManagement() {
               </TableHeader>
               <TableBody>
                 {filteredMitra.map((mitraItem) => {
-                  const config = jenisConfig[mitraItem.jenis];
-                  const IconComponent = config.icon;
-
                   return (
                     <TableRow
                       key={mitraItem.id}
@@ -519,20 +425,8 @@ export function MitraManagement() {
                             <div className="font-semibold text-gray-900">
                               {mitraItem.nama_mitra}
                             </div>
-                            <div className="text-sm text-gray-500">
-                              {truncate(mitraItem.deskripsi, 48)}
-                            </div>
                           </div>
                         </div>
-                      </TableCell>
-
-                      <TableCell>
-                        <Badge
-                          className={`${config.color} border-0 font-semibold`}
-                        >
-                          <IconComponent className="w-3 h-3 mr-1" />
-                          {config.label}
-                        </Badge>
                       </TableCell>
 
                       <TableCell>
@@ -572,7 +466,7 @@ export function MitraManagement() {
                       <TableCell>
                         <span className="text-sm text-gray-500">
                           {new Date(mitraItem.created_at).toLocaleDateString(
-                            "id-ID"
+                            "id-ID",
                           )}
                         </span>
                       </TableCell>
@@ -682,7 +576,7 @@ export function MitraManagement() {
                   <div className="text-sm text-gray-500">
                     Created{" "}
                     {new Date(detailMitra.created_at).toLocaleDateString(
-                      "id-ID"
+                      "id-ID",
                     )}
                   </div>
                 </div>
@@ -788,15 +682,6 @@ export function MitraManagement() {
                   </div>
                 </div>
               </div>
-
-              <div className="bg-white rounded-xl border p-4 md:col-span-2 lg:col-span-3">
-                <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">
-                  Deskripsi
-                </div>
-                <div className="text-gray-900">
-                  {detailMitra.deskripsi || "-"}
-                </div>
-              </div>
             </div>
           )}
         </DialogContent>
@@ -827,6 +712,16 @@ export function MitraManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Excel Import Dialog */}
+      <MitraExcelImport
+        open={showExcelImport}
+        onClose={() => setShowExcelImport(false)}
+        onSuccess={() => {
+          fetchMitra();
+          setShowExcelImport(false);
+        }}
+      />
     </div>
   );
 }

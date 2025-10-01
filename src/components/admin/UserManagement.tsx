@@ -17,7 +17,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -32,7 +31,6 @@ import {
   AlertDialogTitle,
 } from "../ui/alert-dialog";
 import {
-  Users,
   UserPlus,
   Search,
   Filter,
@@ -50,7 +48,6 @@ import { UserForm } from "./UserForm";
 import { useQuery } from "@tanstack/react-query";
 
 type UserRow = Database["public"]["Tables"]["users"]["Row"];
-type UserRole = Database["public"]["Enums"]["user_role"];
 
 type UserWithMeta = UserRow & {
   project_count?: number;
@@ -99,7 +96,7 @@ export function UserManagement() {
     data: users = [],
     isLoading,
     refetch,
-    isFetching,
+    isFetching: _isFetching,
   } = useQuery<UserWithMeta[], Error>({
     queryKey: ["admin", "users"],
     queryFn: fetchUsers,
@@ -237,7 +234,7 @@ export function UserManagement() {
                 </TableRow>
               ) : (
                 filteredUsers.map((user) => {
-                  const RoleIcon =
+                  const _RoleIcon =
                     roleConfig[user.role as keyof typeof roleConfig].icon;
                   const roleColor =
                     roleConfig[user.role as keyof typeof roleConfig].color;

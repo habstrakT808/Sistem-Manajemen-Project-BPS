@@ -32,7 +32,6 @@ import {
   Loader2,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
-import { toast } from "sonner";
 import { LineChart, BarChart, PieChart } from "@/components/charts";
 import Link from "next/link";
 
@@ -102,11 +101,11 @@ async function fetchTeamData(): Promise<TeamMember[]> {
 }
 
 async function fetchTeamAnalytics(
-  analyticsPeriod: string
+  analyticsPeriod: string,
 ): Promise<TeamAnalytics> {
   const response = await fetch(
     `/api/ketua-tim/team/analytics?period=${analyticsPeriod}`,
-    { cache: "no-store" }
+    { cache: "no-store" },
   );
   const result = await response.json();
   if (!response.ok)
@@ -131,7 +130,27 @@ export default function TeamManagement() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Aggressively prefetch top visible member details and routes to eliminate loading on navigation
+  const prefetchMemberDetail = useCallback(
+    (memberId: string) => {
+      const key = ["ketua", "team", "member", memberId];
+      queryClient.prefetchQuery({
+        queryKey: key,
+        queryFn: async () => {
+          const res = await fetch(`/api/ketua-tim/team/${memberId}`, {
+            cache: "no-store",
+          });
+          const json = await res.json();
+          if (!res.ok)
+            throw new Error(json.error || "Failed to fetch member data");
+          return json.data;
+        },
+        staleTime: 5 * 60 * 1000,
+      });
+    },
+    [queryClient],
+  );
+
+  // Prefetch member details for better UX
   useEffect(() => {
     if (!teamMembers || teamMembers.length === 0) return;
     const topMembers = teamMembers.slice(0, 10);
@@ -141,24 +160,7 @@ export default function TeamManagement() {
       // Warm React Query cache
       prefetchMemberDetail(m.id);
     });
-  }, [teamMembers, router]);
-
-  const prefetchMemberDetail = (memberId: string) => {
-    const key = ["ketua", "team", "member", memberId];
-    queryClient.prefetchQuery({
-      queryKey: key,
-      queryFn: async () => {
-        const res = await fetch(`/api/ketua-tim/team/${memberId}`, {
-          cache: "no-store",
-        });
-        const json = await res.json();
-        if (!res.ok)
-          throw new Error(json.error || "Failed to fetch member data");
-        return json.data;
-      },
-      staleTime: 5 * 60 * 1000,
-    });
-  };
+  }, [teamMembers, router, prefetchMemberDetail]);
 
   const {
     data: analytics,
@@ -255,10 +257,10 @@ export default function TeamManagement() {
     low: (teamMembers || []).filter((m) => m.workload.workload_level === "low")
       .length,
     medium: (teamMembers || []).filter(
-      (m) => m.workload.workload_level === "medium"
+      (m) => m.workload.workload_level === "medium",
     ).length,
     high: (teamMembers || []).filter(
-      (m) => m.workload.workload_level === "high"
+      (m) => m.workload.workload_level === "high",
     ).length,
   };
 
@@ -435,14 +437,14 @@ export default function TeamManagement() {
             ) : (
               uniqueFilteredMembers.map((member) => {
                 const WorkloadIcon = getWorkloadIcon(
-                  member.workload.workload_level
+                  member.workload.workload_level,
                 );
                 const completionRate =
                   member.task_stats.total > 0
                     ? Math.round(
                         (member.task_stats.completed /
                           member.task_stats.total) *
-                          100
+                          100,
                       )
                     : 0;
 
@@ -482,7 +484,7 @@ export default function TeamManagement() {
                                 <WorkloadIcon className="w-3 h-3" />
                                 <span>
                                   {getWorkloadLabel(
-                                    member.workload.workload_level
+                                    member.workload.workload_level,
                                   )}
                                 </span>
                               </Badge>
@@ -580,7 +582,7 @@ export default function TeamManagement() {
                                   <span className="text-gray-500 ml-2">
                                     • Due:{" "}
                                     {new Date(
-                                      project.deadline
+                                      project.deadline,
                                     ).toLocaleDateString("id-ID")}
                                   </span>
                                 </div>

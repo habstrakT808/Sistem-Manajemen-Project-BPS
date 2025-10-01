@@ -31,7 +31,6 @@ interface TeamMemberData {
 
 export async function GET(request: NextRequest) {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const supabase = (await createClient()) as any;
     const { searchParams } = new URL(request.url);
     const includeStats = searchParams.get("include_stats") === "true";
@@ -49,7 +48,7 @@ export async function GET(request: NextRequest) {
     // Use service client to avoid RLS recursion and select only members of leader's projects
     const svc = createServiceClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
     // Check if user is ketua_tim in any team (team-specific role validation)
@@ -61,7 +60,7 @@ export async function GET(request: NextRequest) {
         projects!inner (
           ketua_tim_id
         )
-      `
+      `,
       )
       .eq("user_id", user.id)
       .eq("role", "leader");
@@ -75,7 +74,7 @@ export async function GET(request: NextRequest) {
           error: "Forbidden",
           details: "User must be a team leader to access this endpoint",
         },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -83,7 +82,7 @@ export async function GET(request: NextRequest) {
     const { data: memberRows, error: memberErr } = await svc
       .from("project_members")
       .select(
-        `user_id, users:users!project_members_user_id_fkey(id, nama_lengkap, email, is_active), projects:projects!inner(id, ketua_tim_id)`
+        `user_id, users:users!project_members_user_id_fkey(id, nama_lengkap, email, is_active), projects:projects!inner(id, ketua_tim_id)`,
       )
       .eq("projects.ketua_tim_id", user.id);
 
@@ -96,7 +95,7 @@ export async function GET(request: NextRequest) {
         if (r.users && r.users.is_active && !uniqueUsers.has(r.users.id)) {
           uniqueUsers.set(r.users.id, r.users);
         }
-      }
+      },
     );
     const pegawai = Array.from(uniqueUsers.values());
 
@@ -133,7 +132,7 @@ export async function GET(request: NextRequest) {
                   tanggal_mulai,
                   deadline
                 )
-              `
+              `,
               )
               .eq("user_id", member.id)
               .in("projects.status", ["upcoming", "active"]);
@@ -154,7 +153,7 @@ export async function GET(request: NextRequest) {
                   deadline,
                   ketua_tim_id
                 )
-              `
+              `,
               )
               .eq("user_id", member.id)
               .eq("projects.ketua_tim_id", user.id)
@@ -168,7 +167,7 @@ export async function GET(request: NextRequest) {
                   status: string;
                   deadline: string;
                 };
-              }) => assignment.projects
+              }) => assignment.projects,
             );
 
             // Get task statistics - get tasks for this member in projects led by this ketua tim
@@ -183,7 +182,7 @@ export async function GET(request: NextRequest) {
               projects!inner (
                 ketua_tim_id
               )
-            `
+            `,
               )
               .eq("assignee_user_id", member.id)
               .eq("projects.ketua_tim_id", user.id);
@@ -191,13 +190,13 @@ export async function GET(request: NextRequest) {
             const filteredTasks = allTasks || [];
             const taskStats = {
               pending: filteredTasks.filter(
-                (t: { status: string }) => t.status === "pending"
+                (t: { status: string }) => t.status === "pending",
               ).length,
               in_progress: filteredTasks.filter(
-                (t: { status: string }) => t.status === "in_progress"
+                (t: { status: string }) => t.status === "in_progress",
               ).length,
               completed: filteredTasks.filter(
-                (t: { status: string }) => t.status === "completed"
+                (t: { status: string }) => t.status === "completed",
               ).length,
               total: filteredTasks.length,
             };
@@ -213,16 +212,16 @@ export async function GET(request: NextRequest) {
               .eq("type", "transport")
               .gte(
                 "occurred_on",
-                new Date(currentYear, currentMonth - 1, 1).toISOString()
+                new Date(currentYear, currentMonth - 1, 1).toISOString(),
               )
               .lt(
                 "occurred_on",
-                new Date(currentYear, currentMonth, 1).toISOString()
+                new Date(currentYear, currentMonth, 1).toISOString(),
               );
 
             const monthlyEarnings = (earningsRecords || []).reduce(
               (sum: number, record: { amount: number }) => sum + record.amount,
-              0
+              0,
             );
 
             return {
@@ -238,7 +237,7 @@ export async function GET(request: NextRequest) {
           } catch (error) {
             console.error(
               `Error getting stats for member ${member.id}:`,
-              error
+              error,
             );
             return {
               ...member,
@@ -253,8 +252,8 @@ export async function GET(request: NextRequest) {
               monthly_earnings: 0,
             };
           }
-        }
-      )
+        },
+      ),
     );
 
     return NextResponse.json({ data: enrichedTeamMembers });
@@ -262,7 +261,7 @@ export async function GET(request: NextRequest) {
     console.error("Team data fetch error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

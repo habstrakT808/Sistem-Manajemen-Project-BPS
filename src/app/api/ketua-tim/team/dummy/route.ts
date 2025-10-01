@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const supabase = await createClient();
 
@@ -33,13 +33,17 @@ export async function GET(request: NextRequest) {
               id: "project-1",
               nama_project: "Project Survey Kelapa",
               status: "active",
-              deadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+              deadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+                .toISOString()
+                .split("T")[0],
             },
             {
-              id: "project-2", 
+              id: "project-2",
               nama_project: "Project Analisis Data",
               status: "active",
-              deadline: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+              deadline: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000)
+                .toISOString()
+                .split("T")[0],
             },
           ],
           task_stats: {
@@ -64,7 +68,9 @@ export async function GET(request: NextRequest) {
               id: "project-3",
               nama_project: "Project Monitoring",
               status: "active",
-              deadline: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+              deadline: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000)
+                .toISOString()
+                .split("T")[0],
             },
           ],
           task_stats: {
@@ -85,7 +91,7 @@ export async function GET(request: NextRequest) {
     console.error("Dummy data error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

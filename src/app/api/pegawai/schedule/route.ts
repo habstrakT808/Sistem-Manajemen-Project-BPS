@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
     const scheduleData = await getComprehensiveScheduleData(
       user.id,
       parseInt(month),
-      parseInt(year)
+      parseInt(year),
     );
 
     return NextResponse.json(scheduleData);
@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
     console.error("Schedule API Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -143,14 +143,14 @@ export async function POST(request: NextRequest) {
     if (!body.title || !body.start_date || !body.end_date) {
       return NextResponse.json(
         { error: "Missing required fields" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // Check if personal_events table exists
     const serviceClient = createServiceClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
     try {
@@ -207,7 +207,7 @@ export async function POST(request: NextRequest) {
       }
       mockEventsStorage.get(user.id)!.push(mockEvent);
       console.log(
-        `Stored event in memory for user ${user.id}, total events: ${mockEventsStorage.get(user.id)!.length}`
+        `Stored event in memory for user ${user.id}, total events: ${mockEventsStorage.get(user.id)!.length}`,
       );
 
       return NextResponse.json({
@@ -220,7 +220,7 @@ export async function POST(request: NextRequest) {
     console.error("Create Event Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -246,7 +246,7 @@ export async function PUT(request: NextRequest) {
     // Update personal event via service client
     const serviceClient = createServiceClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
     try {
@@ -283,7 +283,7 @@ export async function PUT(request: NextRequest) {
     } catch (tableError) {
       console.warn(
         "Personal events table not available for update:",
-        tableError
+        tableError,
       );
 
       // Update in memory storage
@@ -309,7 +309,7 @@ export async function PUT(request: NextRequest) {
     console.error("Update Event Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -349,7 +349,7 @@ export async function DELETE(request: NextRequest) {
     } catch (tableError) {
       console.warn(
         "Personal events table not available for delete:",
-        tableError
+        tableError,
       );
 
       // Delete from memory storage
@@ -366,7 +366,7 @@ export async function DELETE(request: NextRequest) {
     console.error("Delete Event Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -374,11 +374,11 @@ export async function DELETE(request: NextRequest) {
 async function getComprehensiveScheduleData(
   userId: string,
   month: number,
-  year: number
+  year: number,
 ) {
   const serviceClient = createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
   );
 
   const startDate = `${year}-${month.toString().padStart(2, "0")}-01`;
@@ -398,7 +398,7 @@ async function getComprehensiveScheduleData(
       project_id,
       assignee_user_id,
       pegawai_id
-    `
+    `,
     )
     .or(`assignee_user_id.eq.${userId},pegawai_id.eq.${userId}`)
     .gte("tanggal_tugas", startDate)
@@ -411,7 +411,7 @@ async function getComprehensiveScheduleData(
 
   // Get project details separately
   const projectIds = Array.from(
-    new Set((tasks || []).map((t: any) => t.project_id).filter(Boolean))
+    new Set((tasks || []).map((t: any) => t.project_id).filter(Boolean)),
   );
 
   let projectDetails: Record<string, { nama_project: string; status: string }> =
@@ -445,7 +445,7 @@ async function getComprehensiveScheduleData(
       // If there's an error (like table not found), use in-memory storage
       const userEvents = mockEventsStorage.get(userId) || [];
       console.log(
-        `Using in-memory storage for user ${userId}, found ${userEvents.length} events`
+        `Using in-memory storage for user ${userId}, found ${userEvents.length} events`,
       );
       events = userEvents.filter((event) => {
         const eventStart = new Date(event.start_date);
@@ -455,7 +455,7 @@ async function getComprehensiveScheduleData(
         return eventStart <= monthEnd && eventEnd >= monthStart;
       });
       console.log(
-        `Filtered to ${events.length} events for month ${month}/${year}`
+        `Filtered to ${events.length} events for month ${month}/${year}`,
       );
     } else {
       events = eventsData || [];
@@ -491,7 +491,7 @@ async function getComprehensiveScheduleData(
     }
   } catch (error) {
     console.warn(
-      "Workload indicator function not found, skipping workload data"
+      "Workload indicator function not found, skipping workload data",
     );
   }
 
@@ -542,7 +542,7 @@ async function getComprehensiveScheduleData(
       serviceClient,
       userId,
       startDate,
-      endDate
+      endDate,
     );
   } catch (error) {
     console.warn("Project spans calculation error:", error);
@@ -561,11 +561,10 @@ async function getComprehensiveScheduleData(
 
 // Helpers
 async function getProjectSpansForUser(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   serviceClient: any,
   userId: string,
   monthStart: string,
-  monthEnd: string
+  monthEnd: string,
 ): Promise<ProjectSpanDay[]> {
   // Fetch assigned projects for the user (using project_members table)
   const { data: assignments, error: assignError } = await serviceClient
@@ -579,7 +578,7 @@ async function getProjectSpansForUser(
   }
 
   const projectIds = (assignments || []).map(
-    (a: { project_id: string }) => a.project_id
+    (a: { project_id: string }) => a.project_id,
   );
   if (projectIds.length === 0) return [];
 
@@ -620,12 +619,12 @@ async function getProjectSpansForUser(
     const cursor = new Date(
       spanStart.getFullYear(),
       spanStart.getMonth(),
-      spanStart.getDate()
+      spanStart.getDate(),
     );
     const endInclusive = new Date(
       spanEnd.getFullYear(),
       spanEnd.getMonth(),
-      spanEnd.getDate()
+      spanEnd.getDate(),
     );
 
     while (cursor <= endInclusive) {
@@ -636,7 +635,7 @@ async function getProjectSpansForUser(
   }
 
   const results: ProjectSpanDay[] = Array.from(counts.entries()).map(
-    ([date, project_count]) => ({ date, project_count })
+    ([date, project_count]) => ({ date, project_count }),
   );
   // Sort ascending by date for consistency
   results.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));

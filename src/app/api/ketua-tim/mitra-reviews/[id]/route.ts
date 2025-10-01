@@ -5,7 +5,7 @@ import type { Database } from "@/../database/types/database.types";
 
 export async function GET(
   _request: NextRequest,
-  ctx: { params: Promise<{ id: string }> }
+  ctx: { params: Promise<{ id: string }> },
 ) {
   try {
     const supabase = await createClient();
@@ -23,11 +23,11 @@ export async function GET(
     // Use service client to avoid RLS recursion issues
     const svc = createServiceClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
     // Check if user is ketua_tim in any team (team-specific role validation)
-    const { data: teamMemberships, error: membershipError } = await svc
+    const { data: teamMemberships, error: _membershipError } = await svc
       .from("project_members")
       .select(
         `
@@ -35,7 +35,7 @@ export async function GET(
         projects!inner (
           ketua_tim_id
         )
-      `
+      `,
       )
       .eq("user_id", user.id)
       .eq("role", "leader");
@@ -49,7 +49,7 @@ export async function GET(
           error: "Forbidden",
           details: "User must be a team leader to access this endpoint",
         },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -57,7 +57,7 @@ export async function GET(
     const { data: mitra, error: mitraErr } = await svc
       .from("mitra")
       .select(
-        "id, nama_mitra, jenis, kontak, alamat, deskripsi, rating_average"
+        "id, nama_mitra, jenis, kontak, alamat, deskripsi, rating_average",
       )
       .eq("id", mitraId)
       .single();
@@ -71,7 +71,7 @@ export async function GET(
       .select(
         `id, rating, komentar, created_at, project_id, pegawai_id,
          projects!inner (id, nama_project, deadline, status, ketua_tim_id),
-         users!inner (id, nama_lengkap)`
+         users!inner (id, nama_lengkap)`,
       )
       .eq("mitra_id", mitraId)
       .order("created_at", { ascending: false });
@@ -81,7 +81,7 @@ export async function GET(
     const avgRating = total
       ? (reviews || []).reduce(
           (s: number, r: { rating: number }) => s + r.rating,
-          0
+          0,
         ) / total
       : 0;
 
@@ -166,7 +166,7 @@ export async function GET(
     console.error("KT Mitra Review Detail Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

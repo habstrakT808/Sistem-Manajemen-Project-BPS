@@ -5,11 +5,10 @@ import type { Database } from "@/../database/types/database.types";
 
 export async function GET(request: NextRequest) {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const supabase = (await createClient()) as any;
     const svc = createServiceClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
     const { searchParams } = new URL(request.url);
 
@@ -61,14 +60,14 @@ export async function GET(request: NextRequest) {
       if (allocErr) throw allocErr;
 
       const filtered = (allocations || []).filter((a: any) =>
-        taskIdSet.has(a.task_id)
+        taskIdSet.has(a.task_id),
       );
       const allocTaskIds = Array.from(
-        new Set(filtered.map((a: any) => a.task_id))
+        new Set(filtered.map((a: any) => a.task_id)),
       );
 
       const taskMap = new Map<string, any>(
-        (taskRows || []).map((t: any) => [t.id, t])
+        (taskRows || []).map((t: any) => [t.id, t]),
       );
       const userIds = Array.from(
         new Set(
@@ -79,8 +78,8 @@ export async function GET(request: NextRequest) {
                 | undefined;
               return row?.assignee_user_id;
             })
-            .filter((v): v is string => Boolean(v))
-        )
+            .filter((v): v is string => Boolean(v)),
+        ),
       );
       const projectIds = Array.from(
         new Set(
@@ -91,8 +90,8 @@ export async function GET(request: NextRequest) {
                 | undefined;
               return row?.project_id;
             })
-            .filter((v): v is string => Boolean(v))
-        )
+            .filter((v): v is string => Boolean(v)),
+        ),
       );
 
       const [{ data: users }, { data: projects }] = await Promise.all([
@@ -103,10 +102,10 @@ export async function GET(request: NextRequest) {
           .in("id", projectIds),
       ]);
       const userMap = new Map<string, any>(
-        (users || []).map((u: any) => [u.id, u])
+        (users || []).map((u: any) => [u.id, u]),
       );
       const projectMap = new Map<string, any>(
-        (projects || []).map((p: any) => [p.id, p])
+        (projects || []).map((p: any) => [p.id, p]),
       );
 
       const details = filtered.map((a: any) => {
@@ -132,7 +131,7 @@ export async function GET(request: NextRequest) {
     if (!month || !year) {
       return NextResponse.json(
         { error: "month and year are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
     const pad2 = (n: number) => (n < 10 ? `0${n}` : String(n));
@@ -150,7 +149,7 @@ export async function GET(request: NextRequest) {
     if (allocErr) throw allocErr;
 
     const filtered = (allocations || []).filter((a: any) =>
-      taskIdSet.has(a.task_id)
+      taskIdSet.has(a.task_id),
     );
     const byDate = new Map<string, number>();
     filtered.forEach((a: any) => {
@@ -171,7 +170,7 @@ export async function GET(request: NextRequest) {
     console.error("Transport daily API error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

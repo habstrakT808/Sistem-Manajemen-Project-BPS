@@ -5,7 +5,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import type { Database } from "@/../database/types/database.types";
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
 interface TaskData {
   id: string;
@@ -27,11 +26,15 @@ type TasksUpdate = Database["public"]["Tables"]["tasks"]["Update"];
 type KetuaTimTaskUpdateData = TasksUpdate & {
   project_id?: string;
   assignee_user_id?: string;
+  assignee_mitra_id?: string;
+  assignee_type?: "member" | "mitra";
   description?: string;
   title?: string;
   start_date?: string;
   end_date?: string;
   has_transport?: boolean;
+  transport_days?: number;
+  honor_amount?: number;
 };
 
 export async function PUT(request: NextRequest, { params }: RouteParams) {
@@ -39,7 +42,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const supabase = await createClient();
     const svc = createServiceClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
     const { id: taskId } = await params;
     const body: KetuaTimTaskUpdateData = await request.json();
@@ -80,23 +83,39 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     ) {
       return NextResponse.json(
         { error: "Task not found or access denied" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     if (taskError || !task) {
       return NextResponse.json(
         { error: "Task not found or access denied" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
-    // Validate date range if provided
-    if (body.start_date && body.end_date) {
-      if (new Date(body.start_date) > new Date(body.end_date)) {
+    // Validate and process date fields
+    let processedStartDate = null;
+    let processedEndDate = null;
+
+    if (body.start_date !== undefined) {
+      if (body.start_date && body.start_date.trim() !== "") {
+        processedStartDate = body.start_date;
+      }
+    }
+
+    if (body.end_date !== undefined) {
+      if (body.end_date && body.end_date.trim() !== "") {
+        processedEndDate = body.end_date;
+      }
+    }
+
+    // Validate date range if both dates are provided
+    if (processedStartDate && processedEndDate) {
+      if (new Date(processedStartDate) > new Date(processedEndDate)) {
         return NextResponse.json(
           { error: "Start date cannot be after end date" },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -110,10 +129,36 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     if (body.description !== undefined)
       (updateFields as any).deskripsi_tugas = body.description;
     if (body.start_date !== undefined)
-      (updateFields as any).start_date = body.start_date;
+      (updateFields as any).start_date = processedStartDate;
     if (body.end_date !== undefined)
-      (updateFields as any).end_date = body.end_date;
+      (updateFields as any).end_date = processedEndDate;
     if (body.status !== undefined) (updateFields as any).status = body.status;
+    if (body.transport_days !== undefined)
+      (updateFields as any).transport_days = body.transport_days;
+
+    // Handle Mitra-specific fields
+    if (body.assignee_type !== undefined) {
+      // Note: assignee_type is not stored in tasks table, it's determined by which ID is set
+
+      // Clear opposite assignee field based on type
+      if (body.assignee_type === "mitra") {
+        (updateFields as any).assignee_user_id = null;
+        (updateFields as any).pegawai_id = null;
+        if (body.assignee_mitra_id !== undefined) {
+          (updateFields as any).assignee_mitra_id = body.assignee_mitra_id;
+        }
+      } else {
+        (updateFields as any).assignee_mitra_id = null;
+        if (body.assignee_user_id !== undefined) {
+          (updateFields as any).assignee_user_id = body.assignee_user_id;
+          (updateFields as any).pegawai_id = body.assignee_user_id;
+        }
+      }
+    }
+
+    if (body.honor_amount !== undefined) {
+      (updateFields as any).honor_amount = body.honor_amount;
+    }
 
     // Handle transport changes
     if (
@@ -123,7 +168,20 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       (updateFields as any).has_transport = body.has_transport;
 
       if (body.has_transport) {
-        // Create transport allocation
+        // Create transport allocations based on transport_days
+        // Only pegawai can have transport, not Mitra
+        const currentAssigneeType =
+          body.assignee_type ||
+          ((task as unknown as { assignee_mitra_id?: string }).assignee_mitra_id
+            ? "mitra"
+            : "member");
+        if (currentAssigneeType === "mitra") {
+          return NextResponse.json(
+            { error: "Transport allocation is not available for Mitra tasks" },
+            { status: 400 },
+          );
+        }
+
         const userIdParam =
           body.assignee_user_id ||
           (task as unknown as { assignee_user_id?: string }).assignee_user_id ||
@@ -132,25 +190,111 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         if (!userIdParam) {
           return NextResponse.json(
             { error: "Task has no assigned user; cannot enable transport" },
-            { status: 400 }
+            { status: 400 },
           );
         }
-        await supabase.rpc("create_transport_allocation", {
-          task_id_param: taskId,
-          user_id_param: userIdParam,
-        } as never);
+
+        // Get transport_days value (from body or existing task)
+        const transportDays =
+          body.transport_days !== undefined
+            ? body.transport_days
+            : (task as unknown as { transport_days?: number }).transport_days ||
+              1;
+
+        // First, cancel any existing allocations
+        await (svc as any)
+          .from("task_transport_allocations")
+          .update({ canceled_at: new Date().toISOString() })
+          .eq("task_id", taskId)
+          .is("canceled_at", null);
+
+        // Create new allocations based on transport_days
+        if (transportDays > 0) {
+          const transportAllocations = [];
+          for (let i = 0; i < transportDays; i++) {
+            transportAllocations.push({
+              task_id: taskId,
+              user_id: userIdParam,
+              amount: 150000,
+              created_by: user.id,
+              created_at: new Date().toISOString(),
+            });
+          }
+
+          const { error: transportError } = await (svc as any)
+            .from("task_transport_allocations")
+            .insert(transportAllocations);
+
+          if (transportError) {
+            console.error("Transport allocation error:", transportError);
+          }
+        }
       } else {
         // Cancel existing transport allocation
-        const { data: allocation } = await supabase
+        const { error: cancelError } = await (svc as any)
           .from("task_transport_allocations")
-          .select("id")
+          .update({ canceled_at: new Date().toISOString() })
           .eq("task_id", taskId)
-          .single();
+          .is("canceled_at", null);
 
-        if (allocation) {
-          await supabase.rpc("cancel_transport_allocation", {
-            allocation_id_param: (allocation as AllocationData).id,
-          } as never);
+        if (cancelError) {
+          console.error("Transport cancellation error:", cancelError);
+        }
+      }
+    }
+
+    // Handle transport_days changes when transport is already enabled
+    if (
+      body.transport_days !== undefined &&
+      (task as TaskData).has_transport &&
+      body.transport_days !==
+        (task as unknown as { transport_days?: number }).transport_days
+    ) {
+      // Only pegawai can have transport, not Mitra
+      const currentAssigneeType =
+        body.assignee_type ||
+        ((task as unknown as { assignee_mitra_id?: string }).assignee_mitra_id
+          ? "mitra"
+          : "member");
+      if (currentAssigneeType === "mitra") {
+        return NextResponse.json(
+          { error: "Transport allocation is not available for Mitra tasks" },
+          { status: 400 },
+        );
+      }
+
+      const userIdParam =
+        body.assignee_user_id ||
+        (task as unknown as { assignee_user_id?: string }).assignee_user_id ||
+        (task as unknown as { pegawai_id?: string }).pegawai_id ||
+        null;
+
+      if (userIdParam && body.transport_days > 0) {
+        // Cancel existing allocations
+        await (svc as any)
+          .from("task_transport_allocations")
+          .update({ canceled_at: new Date().toISOString() })
+          .eq("task_id", taskId)
+          .is("canceled_at", null);
+
+        // Create new allocations based on new transport_days value
+        const transportAllocations = [];
+        for (let i = 0; i < body.transport_days; i++) {
+          transportAllocations.push({
+            task_id: taskId,
+            user_id: userIdParam,
+            amount: 150000,
+            created_by: user.id,
+            created_at: new Date().toISOString(),
+          });
+        }
+
+        const { error: transportError } = await (svc as any)
+          .from("task_transport_allocations")
+          .insert(transportAllocations);
+
+        if (transportError) {
+          console.error("Transport allocation error:", transportError);
         }
       }
     }
@@ -185,7 +329,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     console.error("Task Update API Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -193,7 +337,12 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const supabase = await createClient();
+    const svc = createServiceClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    );
     const { id: taskId } = await params;
+    console.log("DELETE request for task ID:", taskId);
 
     // Auth check
     const {
@@ -201,48 +350,76 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       error: authError,
     } = await supabase.auth.getUser();
     if (authError || !user) {
+      console.log("Auth error:", authError);
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Verify task ownership through project leadership
-    const { data: task, error: taskError } = await supabase
+    console.log("User ID:", user.id);
+
+    // Use service client to bypass RLS policies
+    console.log("Querying task with service client:", taskId);
+    const { data: queryResult, error: queryError } = await (svc as any)
       .from("tasks")
-      .select(
-        `
-        id,
-        title,
-        projects!inner (
-          leader_user_id
-        )
-      `
-      )
+      .select("id, title, project_id")
       .eq("id", taskId)
-      .eq("projects.leader_user_id", user.id)
       .single();
 
-    if (taskError || !task) {
-      return NextResponse.json(
-        { error: "Task not found or access denied" },
-        { status: 404 }
-      );
+    console.log("Task query result:", { queryResult, queryError });
+
+    if (queryError || !queryResult) {
+      console.log("Task not found or error:", queryError);
+      return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    }
+
+    const task = queryResult;
+
+    // Get project info separately
+    console.log("Querying project with ID:", task.project_id);
+    const { data: projectResult, error: projectError } = await (svc as any)
+      .from("projects")
+      .select("id, leader_user_id, ketua_tim_id")
+      .eq("id", task.project_id)
+      .single();
+
+    console.log("Project query result:", { projectResult, projectError });
+
+    if (projectError || !projectResult) {
+      console.log("Project not found or error:", projectError);
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+
+    const project = projectResult;
+
+    // Check if user has access to this project
+    console.log("Project info:", project);
+    console.log("User ID:", user.id);
+    console.log("Project leader_user_id:", project.leader_user_id);
+    console.log("Project ketua_tim_id:", project.ketua_tim_id);
+
+    const hasAccess =
+      project.leader_user_id === user.id || project.ketua_tim_id === user.id;
+    console.log("Has access:", hasAccess);
+
+    if (!hasAccess) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
     // Cancel any transport allocations first
-    const { data: allocations } = await supabase
+    const { data: allocations } = await (svc as any)
       .from("task_transport_allocations")
       .select("id")
       .eq("task_id", taskId);
 
     if (allocations && allocations.length > 0) {
       for (const allocation of allocations) {
-        await supabase.rpc("cancel_transport_allocation", {
+        await (svc as any).rpc("cancel_transport_allocation", {
           allocation_id_param: (allocation as AllocationData).id,
         } as never);
       }
     }
 
     // Delete task
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await (svc as any)
       .from("tasks")
       .delete()
       .eq("id", taskId);
@@ -267,7 +444,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     console.error("Task Delete API Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

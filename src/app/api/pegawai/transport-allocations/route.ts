@@ -8,7 +8,7 @@ export async function GET() {
     const supabase = await createClient();
     const serviceClient = createServiceClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
     const {
@@ -31,7 +31,7 @@ export async function GET() {
         allocation_date,
         allocated_at,
         canceled_at
-      `
+      `,
       )
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
@@ -40,7 +40,7 @@ export async function GET() {
       console.error("Error fetching allocations:", allocationsError);
       return NextResponse.json(
         { error: "Failed to fetch transport allocations" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -67,7 +67,7 @@ export async function GET() {
         console.error("Error fetching tasks:", tasksError);
         return NextResponse.json(
           { error: "Failed to fetch task details" },
-          { status: 500 }
+          { status: 500 },
         );
       }
 
@@ -82,23 +82,24 @@ export async function GET() {
       });
     }
 
-    // Get project details separately
-    const projectIds = Object.values(taskDetails).map(
-      (task) => task.project_id
-    );
+    // Get project details separately (filter to real teams only)
+    const projectIds = Object.values(taskDetails)
+      .map((task) => task.project_id)
+      .filter(Boolean);
     let projectDetails: Record<string, { nama_project: string }> = {};
 
     if (projectIds.length > 0) {
       const { data: projects, error: projectsError } = await serviceClient
         .from("projects")
-        .select("id, nama_project")
-        .in("id", projectIds);
+        .select("id, nama_project, team_id")
+        .in("id", projectIds)
+        .not("team_id", "is", null);
 
       if (projectsError) {
         console.error("Error fetching projects:", projectsError);
         return NextResponse.json(
           { error: "Failed to fetch project details" },
-          { status: 500 }
+          { status: 500 },
         );
       }
 
@@ -112,25 +113,31 @@ export async function GET() {
 
     // Transform the data to match our interface
     const transformedAllocations =
-      allocations?.map((allocation: any) => {
-        const task = taskDetails[allocation.task_id];
-        const project = task ? projectDetails[task.project_id] : null;
+      allocations
+        ?.filter((allocation: any) => {
+          const task = taskDetails[allocation.task_id];
+          // keep only allocations whose task.project is still in projectDetails (team still exists)
+          return task && projectDetails[task.project_id];
+        })
+        .map((allocation: any) => {
+          const task = taskDetails[allocation.task_id];
+          const project = task ? projectDetails[task.project_id] : null;
 
-        return {
-          id: allocation.id,
-          task_id: allocation.task_id,
-          amount: allocation.amount,
-          allocation_date: allocation.allocation_date,
-          allocated_at: allocation.allocated_at,
-          canceled_at: allocation.canceled_at,
-          task: {
-            title: task?.title || "Unknown Task",
-            project_name: project?.nama_project || "Unknown Project",
-            start_date: task?.start_date || "",
-            end_date: task?.end_date || "",
-          },
-        };
-      }) || [];
+          return {
+            id: allocation.id,
+            task_id: allocation.task_id,
+            amount: allocation.amount,
+            allocation_date: allocation.allocation_date,
+            allocated_at: allocation.allocated_at,
+            canceled_at: allocation.canceled_at,
+            task: {
+              title: task?.title || "Unknown Task",
+              project_name: project?.nama_project || "Unknown Project",
+              start_date: task?.start_date || "",
+              end_date: task?.end_date || "",
+            },
+          };
+        }) || [];
 
     return NextResponse.json({
       allocations: transformedAllocations,
@@ -139,7 +146,7 @@ export async function GET() {
     console.error("Transport allocations error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

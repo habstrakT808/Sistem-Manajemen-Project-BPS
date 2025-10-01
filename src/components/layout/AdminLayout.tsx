@@ -21,29 +21,47 @@ import {
   MapPin,
   ChevronDown,
 } from "lucide-react";
-import { useAuth } from "@/lib/hooks/useAuth";
+import { useAuthContext } from "@/components/auth/AuthProvider";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
 }
 
 export function AdminLayout({ children }: AdminLayoutProps) {
-  const { user, signOut } = useAuth();
+  const { user, userProfile, loading, signOut } = useAuthContext();
   const router = useRouter();
 
+  const toTitleCase = (value: string) =>
+    value
+      .split(" ")
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
+
+  const derivedNameFromEmail = user?.email
+    ? toTitleCase(user.email.split("@")[0].replace(/[._-]/g, " "))
+    : undefined;
+
   const handleSignOut = async () => {
-    router.prefetch("/");
-    router.push("/");
-    await signOut();
+    try {
+      // First sign out to clear auth state
+      await signOut();
+      // Then navigate after signout is complete
+      router.push("/");
+    } catch (error) {
+      console.error("Error during logout:", error);
+      // Force navigation even if signOut fails
+      router.push("/");
+    }
   };
 
-  const [openManagement, setOpenManagement] = React.useState(true);
-  const [openAnalytics, setOpenAnalytics] = React.useState(true);
+  const [openManagement, setOpenManagement] = React.useState(false);
+  const [openAnalytics, setOpenAnalytics] = React.useState(false);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50">
       {/* Sidebar */}
-      <div className="fixed inset-y-0 left-0 z-50 w-72 bg-white shadow-2xl border-r border-gray-200">
+      <div className="fixed inset-y-0 left-0 z-50 w-72 bg-white shadow-2xl border-r border-gray-200 flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-center h-20 px-6 bg-gradient-to-r from-red-600 to-orange-600">
           <div className="flex items-center space-x-3">
@@ -60,14 +78,17 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         {/* User Info */}
         <div className="p-6 border-b border-gray-100">
           <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 bg-gradient-to-r from-red-500 to-orange-500 rounded-full flex items-center justify-center">
-              <span className="text-white font-bold text-lg">
-                {user?.email?.charAt(0).toUpperCase()}
-              </span>
-            </div>
             <div className="flex-1">
               <div className="font-semibold text-gray-900">
-                {user?.user_metadata?.nama_lengkap || "Administrator"}
+                {(() => {
+                  const displayName =
+                    userProfile?.nama_lengkap ||
+                    user?.user_metadata?.nama_lengkap ||
+                    derivedNameFromEmail ||
+                    user?.email ||
+                    "";
+                  return displayName || (loading ? "Loading..." : "-");
+                })()}
               </div>
               <div className="text-sm text-gray-500">{user?.email}</div>
             </div>
@@ -76,7 +97,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         </div>
 
         {/* Navigation */}
-        <div className="p-4 space-y-2">
+        <div className="flex-1 p-4 space-y-2 overflow-y-auto">
           <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-3 mb-4">
             Navigation
           </div>
@@ -255,7 +276,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         </div>
 
         {/* Bottom Actions */}
-        <div className="p-4 border-t border-gray-100 mt-auto">
+        <div className="p-4 border-t border-gray-100">
           <div className="flex space-x-2">
             <Button
               variant="outline"
@@ -267,9 +288,12 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             <Button
               variant="outline"
               size="sm"
+              asChild
               className="flex-1 border-gray-200 hover:bg-gray-50"
             >
-              <Settings className="w-4 h-4" />
+              <Link href="/admin/settings">
+                <Settings className="w-4 h-4" />
+              </Link>
             </Button>
             <Button
               variant="outline"

@@ -34,10 +34,9 @@ export function useAuth(): UseAuthReturn {
 
   const fetchUserProfile = useCallback(
     async (
-      userId: string
+      userId: string,
     ): Promise<Database["public"]["Tables"]["users"]["Row"] | null> => {
       try {
-        console.log("Fetching user profile for:", userId);
         const { data, error } = await supabase
           .from("users")
           .select("*")
@@ -45,52 +44,42 @@ export function useAuth(): UseAuthReturn {
           .single<Database["public"]["Tables"]["users"]["Row"]>();
 
         if (error) {
-          console.error("Error fetching user profile:", error);
           return null;
         }
 
-        console.log("User profile fetched:", (data as any)?.role);
         return data;
-      } catch (error) {
-        console.error("Error fetching user profile:", error);
+      } catch {
         return null;
       }
     },
-    [supabase]
+    [supabase],
   );
 
   const refreshUser = useCallback(async () => {
     try {
-      console.log("RefreshUser started");
       const {
         data: { user },
         error,
       } = await supabase.auth.getUser();
 
       if (error) {
-        console.error("Error getting user:", error);
         setUser(null);
         setUserProfile(null);
         setLoading(false);
         return;
       }
 
-      console.log("RefreshUser - user found:", user?.id);
       setUser(user as AuthUser);
 
       if (user) {
         const profile = await fetchUserProfile(user.id);
-        console.log("Setting userProfile:", profile?.role);
         setUserProfile(profile);
       } else {
-        console.log("No user, setting userProfile to null");
         setUserProfile(null);
       }
 
-      console.log("RefreshUser completed, setting loading to false");
       setLoading(false);
-    } catch (error) {
-      console.error("Error refreshing user:", error);
+    } catch {
       setUser(null);
       setUserProfile(null);
       setLoading(false);
@@ -98,159 +87,174 @@ export function useAuth(): UseAuthReturn {
   }, [supabase.auth, fetchUserProfile]);
 
   const signOut = async () => {
-    try {
-      console.log("Signing out user");
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error("Error signing out:", error);
-      }
-      setUser(null);
-      setUserProfile(null);
+    console.log("Signing out user - starting logout process");
+    setLoading(true);
 
-      // Clear all user-related data from localStorage and React Query cache
-      if (typeof window !== "undefined") {
-        window.localStorage.removeItem("ACTIVE_PROJECT");
-        window.localStorage.removeItem("ACTIVE_TEAM");
-        window.localStorage.removeItem("REACT_QUERY_OFFLINE_CACHE");
-        // Clear any other user-specific data
-        const keysToRemove = [];
-        for (let i = 0; i < window.localStorage.length; i++) {
-          const key = window.localStorage.key(i);
-          if (
-            key &&
-            (key.startsWith("REACT_QUERY_") || key.startsWith("ACTIVE_"))
-          ) {
-            keysToRemove.push(key);
-          }
+    // Start cleanup immediately while trying to sign out from Supabase
+    const performCleanup = async () => {
+      try {
+        // Clear React state immediately
+        setUser(null);
+        setUserProfile(null);
+        setLoading(false);
+
+        // Clear all browser storage
+        if (typeof window !== "undefined") {
+          console.log("Clearing browser storage...");
+
+          // Clear localStorage and sessionStorage
+          window.localStorage.clear();
+          window.sessionStorage.clear();
+
+          // Clear auth-related cookies
+          document.cookie.split(";").forEach((cookie) => {
+            const eqPos = cookie.indexOf("=");
+            const name =
+              eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+            if (
+              name.includes("supabase") ||
+              name.includes("auth") ||
+              name.includes("session")
+            ) {
+              document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=${window.location.hostname}`;
+              document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+            }
+          });
+
+          console.log("Browser storage cleared successfully");
         }
-        keysToRemove.forEach((key) => window.localStorage.removeItem(key));
+
+        // Clear React Query cache
+        try {
+          console.log("Clearing React Query cache...");
+          queryClient.clear();
+          queryClient.invalidateQueries();
+          queryClient.removeQueries();
+          console.log("React Query cache cleared successfully");
+        } catch (err) {
+          console.warn("Error clearing React Query cache:", err);
+        }
+
+        console.log("Logout cleanup completed, navigating to home page...");
+
+        // Force navigation to home page
+        if (typeof window !== "undefined") {
+          window.location.href = "/";
+        }
+      } catch (cleanupError) {
+        console.error("Error during cleanup:", cleanupError);
+
+        // Final fallback - force navigation even if cleanup fails
+        if (typeof window !== "undefined") {
+          window.location.href = "/";
+        }
+      }
+    };
+
+    // Try to sign out from Supabase with a shorter timeout
+    try {
+      console.log("Calling supabase.auth.signOut()...");
+
+      // Create a timeout promise with shorter duration
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Logout timeout")), 2000); // 2 second timeout
+      });
+
+      // Create the signOut promise
+      const signOutPromise = supabase.auth.signOut({
+        scope: "global",
+      });
+
+      // Race between signOut and timeout
+      const result = (await Promise.race([
+        signOutPromise,
+        timeoutPromise,
+      ])) as any;
+
+      if (result?.error) {
+        console.warn("Supabase signOut error:", result.error);
+      } else {
+        console.log("Supabase signOut completed successfully");
       }
 
-      // Clear React Query cache and invalidate all queries
-      queryClient.clear();
-      queryClient.invalidateQueries();
-
-      console.log("Sign out completed, setting loading to false");
-      setLoading(false);
+      // Perform cleanup regardless of signOut result
+      await performCleanup();
     } catch (error) {
-      console.error("Error signing out:", error);
-      setLoading(false);
+      console.warn("Supabase signOut failed or timed out:", error);
+
+      // Perform cleanup even if signOut fails
+      await performCleanup();
     }
   };
 
   useEffect(() => {
     let mounted = true;
 
-    const initializeAuth = async () => {
+    const initAuth = async () => {
       try {
-        console.log("InitializeAuth started, mounted:", mounted);
         // Get initial session
         const {
           data: { session },
-          error,
         } = await supabase.auth.getSession();
 
-        if (error) {
-          console.error("Error getting session:", error);
-          if (mounted) {
-            setUser(null);
-            setUserProfile(null);
-            setLoading(false);
-          }
-          return;
-        }
+        if (!mounted) return;
 
-        console.log("InitializeAuth - session found:", !!session?.user);
-        if (session?.user && mounted) {
+        if (session?.user) {
           setUser(session.user as AuthUser);
           const profile = await fetchUserProfile(session.user.id);
           if (mounted) {
             setUserProfile(profile);
           }
-        } else if (mounted) {
-          setUser(null);
-          setUserProfile(null);
         }
 
         if (mounted) {
-          console.log("Setting loading to false after initializeAuth");
           setLoading(false);
         }
-      } catch (error) {
-        console.error("Error initializing auth:", error);
+      } catch {
         if (mounted) {
-          console.log("Setting loading to false after initializeAuth error");
-          setUser(null);
-          setUserProfile(null);
           setLoading(false);
         }
       }
     };
 
-    initializeAuth();
+    // Force loading to false after 2 seconds
+    const forceTimeout = setTimeout(() => {
+      if (mounted) {
+        setLoading(false);
+      }
+    }, 2000);
 
-    // Listen for auth changes
+    // Listen for auth state changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log(
-        "Auth state change:",
-        event,
-        "mounted:",
-        mounted,
-        "session:",
-        !!session?.user
-      );
       if (!mounted) return;
 
       if (event === "SIGNED_IN" && session?.user) {
-        console.log("SIGNED_IN event, setting user and profile");
         setUser(session.user as AuthUser);
         const profile = await fetchUserProfile(session.user.id);
-        console.log("SIGNED_IN profile:", profile?.role);
         if (mounted) {
           setUserProfile(profile);
+          setLoading(false);
         }
       } else if (event === "SIGNED_OUT") {
-        console.log("SIGNED_OUT event, clearing user and profile");
-        setUser(null);
-        setUserProfile(null);
-
-        // Clear all user-related data when signed out
-        if (typeof window !== "undefined") {
-          window.localStorage.removeItem("ACTIVE_PROJECT");
-          window.localStorage.removeItem("ACTIVE_TEAM");
-          window.localStorage.removeItem("REACT_QUERY_OFFLINE_CACHE");
-          // Clear any other user-specific data
-          const keysToRemove = [];
-          for (let i = 0; i < window.localStorage.length; i++) {
-            const key = window.localStorage.key(i);
-            if (
-              key &&
-              (key.startsWith("REACT_QUERY_") || key.startsWith("ACTIVE_"))
-            ) {
-              keysToRemove.push(key);
-            }
-          }
-          keysToRemove.forEach((key) => window.localStorage.removeItem(key));
+        if (mounted) {
+          setUser(null);
+          setUserProfile(null);
+          setLoading(false);
+          queryClient.clear();
         }
-
-        // Clear React Query cache and invalidate all queries
-        queryClient.clear();
-        queryClient.invalidateQueries();
-      }
-
-      if (mounted) {
-        console.log("Setting loading to false after auth state change:", event);
-        setLoading(false);
       }
     });
 
+    initAuth();
+
     return () => {
       mounted = false;
+      clearTimeout(forceTimeout);
       subscription.unsubscribe();
     };
-  }, [fetchUserProfile, supabase.auth]);
+  }, [supabase.auth, fetchUserProfile, queryClient]);
 
   return {
     user,

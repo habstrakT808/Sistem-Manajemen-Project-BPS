@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { useQuery } from "@tanstack/react-query";
+
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,35 +22,143 @@ import {
   Zap,
 } from "lucide-react";
 import Link from "next/link";
+import { useAuthContext } from "@/components/auth/AuthProvider";
 
 interface DashboardStats {
   total_users: number;
+  total_projects: number;
   active_projects: number;
   completed_projects: number;
+  total_teams: number;
   total_mitra: number;
-  monthly_spending: number;
+  monthly_transport: number;
 }
 
 export default function AdminDashboard() {
+  console.log("AdminDashboard component is rendering");
+  const { user, userProfile, loading: authLoading } = useAuthContext();
+  console.log("Auth state:", {
+    user: user?.id,
+    userProfile: userProfile?.role,
+    authLoading,
+  });
+  const [stats, setStats] = useState<DashboardStats>({
+    total_users: 0,
+    total_projects: 0,
+    active_projects: 0,
+    completed_projects: 0,
+    total_teams: 0,
+    total_mitra: 0,
+    monthly_transport: 0,
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const supabase = createClient();
 
-  const fetchDashboardStats = useCallback(async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user?.id) return null;
+  // Force loading to false after 5 seconds as a fallback
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      console.log("TIMEOUT: Forcing loading to false after 5 seconds");
+      setIsLoading(false);
+    }, 5000);
 
-    const { data } = await (supabase as any).rpc("get_dashboard_stats", {
-      user_id: user.id,
-    });
-    return data as DashboardStats;
-  }, [supabase]);
+    return () => clearTimeout(timeout);
+  }, []);
 
-  const { data: stats, isLoading } = useQuery<DashboardStats | null, Error>({
-    queryKey: ["admin", "dashboard", "stats"],
-    queryFn: fetchDashboardStats,
-    staleTime: 5 * 60 * 1000,
+  // Add detailed logging for all state changes
+  useEffect(() => {
+    console.log("=== AdminDashboard State Debug ===");
+    console.log("authLoading:", authLoading);
+    console.log("isLoading:", isLoading);
+    console.log("user:", user?.id || "null");
+    console.log("userProfile:", userProfile?.role || "null");
+    console.log("error:", error);
+    console.log("stats:", stats);
+    console.log(
+      "showLoading condition (isLoading || authLoading):",
+      isLoading || authLoading,
+    );
+    console.log("=== End Debug ===");
+  });
+
+  useEffect(() => {
+    console.log("=== AdminDashboard useEffect triggered ===");
+    console.log("user:", user?.id || "null");
+    console.log("authLoading:", authLoading);
+    console.log("userProfile:", userProfile?.role || "null");
+
+    const fetchRealStats = async () => {
+      console.log("=== fetchRealStats started ===");
+
+      // Don't fetch if auth is still loading
+      if (authLoading) {
+        console.log("Auth still loading, waiting...");
+        return;
+      }
+
+      // Don't fetch if no user or auth is still loading
+      if (!user || authLoading) {
+        console.log("No user found or auth loading, skipping stats fetch");
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        console.log("Fetching dashboard stats from API for user:", user.id);
+
+        const response = await fetch("/api/admin/dashboard", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(
+            `API request failed: ${response.status} ${response.statusText}`,
+          );
+        }
+
+        const newStats = await response.json();
+        console.log("Dashboard stats loaded successfully from API:", newStats);
+
+        setStats(newStats);
+      } catch (err) {
+        console.error("Error fetching dashboard stats:", err);
+        setError(err instanceof Error ? err.message : "Unknown error");
+        // Always set fallback stats to prevent infinite loading
+        setStats({
+          total_users: 0,
+          total_projects: 0,
+          active_projects: 0,
+          completed_projects: 0,
+          total_teams: 0,
+          total_mitra: 0,
+          monthly_transport: 0,
+        });
+      } finally {
+        console.log(
+          "=== fetchRealStats finally block - setting isLoading to false ===",
+        );
+        setIsLoading(false);
+      }
+    };
+
+    console.log("=== About to call fetchRealStats ===");
+    fetchRealStats();
+  }, [user, authLoading, userProfile?.role]); // Re-run when user, authLoading, or role changes
+
+  // Debug logging
+  console.log("AdminDashboard render:", {
+    isLoading,
+    authLoading,
+    user: user?.id,
+    stats,
+    error,
+    showLoading: isLoading || authLoading,
   });
 
   const formatCurrency = (amount: number) => {
@@ -65,7 +172,7 @@ export default function AdminDashboard() {
   const statsCards = [
     {
       title: "Total Users",
-      value: stats?.total_users || 0,
+      value: stats.total_users,
       description: "Active users in system",
       icon: Users,
       color: "from-blue-500 to-blue-600",
@@ -76,9 +183,9 @@ export default function AdminDashboard() {
       changeType: "neutral",
     },
     {
-      title: "Active Projects",
-      value: stats?.active_projects || 0,
-      description: "Currently running projects",
+      title: "Total Projects",
+      value: stats.total_projects,
+      description: "All projects in system",
       icon: FolderOpen,
       color: "from-green-500 to-green-600",
       bgColor: "from-green-50 to-green-100",
@@ -89,7 +196,7 @@ export default function AdminDashboard() {
     },
     {
       title: "Total Mitra",
-      value: stats?.total_mitra || 0,
+      value: stats.total_mitra,
       description: "Registered partners",
       icon: Building2,
       color: "from-purple-500 to-purple-600",
@@ -100,9 +207,9 @@ export default function AdminDashboard() {
       changeType: "neutral",
     },
     {
-      title: "Monthly Spending",
-      value: formatCurrency(stats?.monthly_spending || 0),
-      description: "This month expenses",
+      title: "Monthly Transport",
+      value: formatCurrency(stats.monthly_transport),
+      description: "This month transport costs",
       icon: DollarSign,
       color: "from-orange-500 to-orange-600",
       bgColor: "from-orange-50 to-orange-100",
@@ -176,7 +283,8 @@ export default function AdminDashboard() {
     },
   ];
 
-  if (isLoading) {
+  // Show loading when either data is loading or auth is still loading
+  if (isLoading || authLoading) {
     return (
       <div className="space-y-8">
         <div className="flex items-center justify-between">
@@ -196,6 +304,35 @@ export default function AdminDashboard() {
               </CardContent>
             </Card>
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if there's an error and all stats are zero (indicating failed fetch)
+  if (
+    error &&
+    stats.total_users === 0 &&
+    stats.total_mitra === 0 &&
+    stats.active_projects === 0
+  ) {
+    return (
+      <div className="space-y-8">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center space-y-4">
+            <AlertCircle className="w-16 h-16 text-red-500 mx-auto" />
+            <h2 className="text-2xl font-bold text-gray-900">
+              Failed to Load Dashboard
+            </h2>
+            <p className="text-gray-600 max-w-md">{error}</p>
+            <Button
+              onClick={() => window.location.reload()}
+              className="bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700"
+            >
+              <Activity className="w-4 h-4 mr-2" />
+              Retry
+            </Button>
+          </div>
         </div>
       </div>
     );

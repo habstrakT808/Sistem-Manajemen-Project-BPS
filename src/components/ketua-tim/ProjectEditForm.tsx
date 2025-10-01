@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
@@ -21,17 +21,14 @@ import {
   ArrowLeft,
   Save,
   Users,
-  DollarSign,
-  Calendar,
   FileText,
   Loader2,
   AlertTriangle,
   CheckCircle,
   Clock,
   X,
-  Plus,
 } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+
 import { toast } from "sonner";
 import Link from "next/link";
 
@@ -149,7 +146,7 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
             mitraIds.push(assignment.assignee_id);
             honorData[assignment.assignee_id] = assignment.honor || 0;
           }
-        }
+        },
       );
 
       setSelectedPegawai(pegawaiIds);
@@ -222,17 +219,15 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
     switch (step) {
       case 1:
         return !!(
-          formData.nama_project.trim() &&
-          formData.deskripsi.trim() &&
+          formData.nama_project &&
+          formData.deskripsi &&
           formData.tanggal_mulai &&
           formData.deadline
         );
       case 2:
-        return selectedPegawai.length > 0 || selectedMitra.length > 0;
+        return selectedPegawai.length > 0;
       case 3:
-        return true; // Financial step always valid (amounts can be 0)
-      case 4:
-        return true; // Review step always valid
+        return true; // Review step is always valid
       default:
         return false;
     }
@@ -357,9 +352,10 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
   }
 
   const StatusIcon = getStatusIcon(formData.status);
-  const totalBudget =
-    Object.values(pegawaiTransport).reduce((sum, amount) => sum + amount, 0) +
-    Object.values(mitraHonor).reduce((sum, amount) => sum + amount, 0);
+  // Remove budget calculation since we're removing the budget tab
+  // const totalBudget =
+  //   Object.values(pegawaiTransport).reduce((sum, amount) => sum + amount, 0) +
+  //   Object.values(mitraHonor).reduce((sum, amount) => sum + amount, 0);
 
   return (
     <div className="space-y-8">
@@ -408,10 +404,10 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
         </div>
       </div>
 
-      {/* Progress Steps */}
+      {/* Progress Steps - Updated to 3 steps */}
       <div className="bg-white rounded-xl shadow-lg p-6">
         <div className="flex items-center justify-between">
-          {[1, 2, 3, 4].map((step) => (
+          {[1, 2, 3].map((step) => (
             <div key={step} className="flex items-center">
               <div
                 className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold ${
@@ -426,11 +422,10 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
                 <div className="text-sm font-medium text-gray-900">
                   {step === 1 && "Basic Info"}
                   {step === 2 && "Team & Partners"}
-                  {step === 3 && "Budget"}
-                  {step === 4 && "Review"}
+                  {step === 3 && "Review"}
                 </div>
               </div>
-              {step < 4 && (
+              {step < 3 && (
                 <div
                   className={`w-16 h-1 mx-4 ${
                     step < currentStep
@@ -444,16 +439,15 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
         </div>
       </div>
 
-      {/* Form Content */}
+      {/* Form Content - Updated to 3 tabs */}
       <Tabs
         value={currentStep.toString()}
         onValueChange={(value) => setCurrentStep(parseInt(value))}
       >
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="1">Basic Info</TabsTrigger>
           <TabsTrigger value="2">Team & Partners</TabsTrigger>
-          <TabsTrigger value="3">Budget</TabsTrigger>
-          <TabsTrigger value="4">Review</TabsTrigger>
+          <TabsTrigger value="3">Review</TabsTrigger>
         </TabsList>
 
         {/* Step 1: Basic Information */}
@@ -488,7 +482,7 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
                   <Select
                     value={formData.status}
                     onValueChange={(
-                      value: "upcoming" | "active" | "completed"
+                      value: "upcoming" | "active" | "completed",
                     ) => setFormData({ ...formData, status: value })}
                   >
                     <SelectTrigger className="border-2 border-gray-200 focus:border-blue-500">
@@ -695,123 +689,8 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
           </div>
         </TabsContent>
 
-        {/* Step 3: Budget */}
+        {/* Step 3: Review */}
         <TabsContent value="3" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Team Member Transport */}
-            <div className="border-0 shadow-xl rounded-xl overflow-hidden">
-              <div className="bg-gradient-to-r from-orange-600 to-red-600 text-white p-6">
-                <div className="leading-none font-semibold flex items-center">
-                  <DollarSign className="w-5 h-5 mr-2" />
-                  Team Member Transport
-                </div>
-              </div>
-              <div className="p-6 space-y-4">
-                {selectedPegawai.map((userId) => {
-                  const user = users.find((u) => u.id === userId);
-                  return (
-                    <div key={userId} className="space-y-2">
-                      <Label className="text-sm font-medium">
-                        {user?.nama_lengkap}
-                      </Label>
-                      <Input
-                        type="number"
-                        value={pegawaiTransport[userId] || 0}
-                        onChange={(e) =>
-                          setPegawaiTransport({
-                            ...pegawaiTransport,
-                            [userId]: parseInt(e.target.value) || 0,
-                          })
-                        }
-                        placeholder="Enter transport amount"
-                        className="border-2 border-gray-200 focus:border-orange-500"
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Partner Honor */}
-            <div className="border-0 shadow-xl rounded-xl overflow-hidden">
-              <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6">
-                <div className="leading-none font-semibold flex items-center">
-                  <DollarSign className="w-5 h-5 mr-2" />
-                  Partner Honor
-                </div>
-              </div>
-              <div className="p-6 space-y-4">
-                {selectedMitra.map((mitraId) => {
-                  const m = mitra.find((mit) => mit.id === mitraId);
-                  return (
-                    <div key={mitraId} className="space-y-2">
-                      <Label className="text-sm font-medium">
-                        {m?.nama_mitra}
-                      </Label>
-                      <Input
-                        type="number"
-                        value={mitraHonor[mitraId] || 0}
-                        onChange={(e) =>
-                          setMitraHonor({
-                            ...mitraHonor,
-                            [mitraId]: parseInt(e.target.value) || 0,
-                          })
-                        }
-                        placeholder="Enter honor amount"
-                        className="border-2 border-gray-200 focus:border-indigo-500"
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* Budget Summary */}
-          <div className="border-0 shadow-xl rounded-xl overflow-hidden">
-            <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-6">
-              <div className="leading-none font-semibold flex items-center">
-                <DollarSign className="w-5 h-5 mr-2" />
-                Budget Summary
-              </div>
-            </div>
-            <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="text-center p-4 bg-orange-50 rounded-xl">
-                  <div className="text-2xl font-bold text-orange-600 mb-1">
-                    {formatCurrency(
-                      Object.values(pegawaiTransport).reduce(
-                        (sum, amount) => sum + amount,
-                        0
-                      )
-                    )}
-                  </div>
-                  <div className="text-sm text-orange-700">Total Transport</div>
-                </div>
-                <div className="text-center p-4 bg-indigo-50 rounded-xl">
-                  <div className="text-2xl font-bold text-indigo-600 mb-1">
-                    {formatCurrency(
-                      Object.values(mitraHonor).reduce(
-                        (sum, amount) => sum + amount,
-                        0
-                      )
-                    )}
-                  </div>
-                  <div className="text-sm text-indigo-700">Total Honor</div>
-                </div>
-                <div className="text-center p-4 bg-emerald-50 rounded-xl">
-                  <div className="text-2xl font-bold text-emerald-600 mb-1">
-                    {formatCurrency(totalBudget)}
-                  </div>
-                  <div className="text-sm text-emerald-700">Total Budget</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </TabsContent>
-
-        {/* Step 4: Review */}
-        <TabsContent value="4" className="space-y-6">
           <div className="border-0 shadow-xl rounded-xl overflow-hidden">
             <div className="bg-gradient-to-r from-gray-600 to-slate-600 text-white p-6">
               <div className="leading-none font-semibold flex items-center">
@@ -821,6 +700,26 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
             </div>
             <div className="p-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Team Assignment
+                  </h3>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Team Members:</span>
+                      <span className="font-medium">
+                        {selectedPegawai.length}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Partners:</span>
+                      <span className="font-medium">
+                        {selectedMitra.length}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold text-gray-900">
                     Project Details
@@ -842,7 +741,7 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
                       <span className="text-gray-600">Start Date:</span>
                       <span className="font-medium">
                         {new Date(formData.tanggal_mulai).toLocaleDateString(
-                          "id-ID"
+                          "id-ID",
                         )}
                       </span>
                     </div>
@@ -850,34 +749,8 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
                       <span className="text-gray-600">Deadline:</span>
                       <span className="font-medium">
                         {new Date(formData.deadline).toLocaleDateString(
-                          "id-ID"
+                          "id-ID",
                         )}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Team & Budget
-                  </h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Team Members:</span>
-                      <span className="font-medium">
-                        {selectedPegawai.length}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Partners:</span>
-                      <span className="font-medium">
-                        {selectedMitra.length}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Total Budget:</span>
-                      <span className="font-medium text-emerald-600">
-                        {formatCurrency(totalBudget)}
                       </span>
                     </div>
                   </div>

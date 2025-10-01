@@ -34,11 +34,10 @@ interface SpendingTrend {
 
 export async function GET(request: NextRequest) {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const supabase = (await createClient()) as any;
     const svc = createServiceClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
     const { searchParams } = new URL(request.url);
     const period = searchParams.get("period") || "current_month";
@@ -56,25 +55,30 @@ export async function GET(request: NextRequest) {
 
     // Calculate date range based on period
     let startDate: Date;
+    let endDate: Date;
     const now = new Date();
 
     switch (period) {
       case "last_month":
         startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        endDate = new Date(now.getFullYear(), now.getMonth(), 0); // Last day of last month
         break;
       case "quarter":
         const quarterStart = Math.floor(now.getMonth() / 3) * 3;
         startDate = new Date(now.getFullYear(), quarterStart, 1);
+        endDate = new Date(now.getFullYear(), quarterStart + 3, 0); // Last day of quarter
         break;
       case "year":
         startDate = new Date(now.getFullYear(), 0, 1);
+        endDate = new Date(now.getFullYear(), 11, 31); // Last day of year
         break;
       default: // current_month
         startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Last day of current month
     }
 
-    const currentMonth = startDate.getMonth() + 1;
-    const currentYear = startDate.getFullYear();
+    const _currentMonth = startDate.getMonth() + 1;
+    const _currentYear = startDate.getFullYear();
 
     // Determine owned projects (accept both ketua_tim_id and leader_user_id)
     const { data: ownedProjectsRows } = await (svc as any)
@@ -82,12 +86,12 @@ export async function GET(request: NextRequest) {
       .select("id")
       .or(`ketua_tim_id.eq.${user.id},leader_user_id.eq.${user.id}`);
     const ownedIds = new Set<string>(
-      (ownedProjectsRows || []).map((p: { id: string }) => p.id)
+      (ownedProjectsRows || []).map((p: { id: string }) => p.id),
     );
     const ownedIdArray = Array.from(ownedIds);
 
     // Get current project assignments for accurate budget calculation (filtered by owned projects)
-    const { data: currentAssignments } =
+    const { data: _currentAssignments } =
       ownedIdArray.length > 0
         ? await (svc as any)
             .from("project_assignments")
@@ -95,38 +99,87 @@ export async function GET(request: NextRequest) {
             .in("project_id", ownedIdArray)
         : { data: [] };
 
-    // Calculate spending based on current assignments (not historical financial_records)
-    const totalSpending = (currentAssignments || []).reduce(
-      (
-        sum: number,
-        assignment: { uang_transport: number | null; honor: number | null }
-      ) => sum + (assignment.uang_transport || 0) + (assignment.honor || 0),
-      0
+    // Calculate transport spending from earnings_ledger (actual transport allocations)
+    // First get tasks for owned projects
+    const { data: ownedTasks } =
+      ownedIdArray.length > 0
+        ? await (svc as any)
+            .from("tasks")
+            .select("id")
+            .in("project_id", ownedIdArray)
+        : { data: [] };
+
+    const ownedTaskIds = (ownedTasks || []).map((t: any) => t.id);
+
+    // Then get transport allocations for those tasks
+    const { data: transportAllocations } =
+      ownedTaskIds.length > 0
+        ? await (svc as any)
+            .from("task_transport_allocations")
+            .select("id")
+            .in("task_id", ownedTaskIds)
+        : { data: [] };
+
+    const allocationIds = (transportAllocations || []).map((a: any) => a.id);
+
+    // Finally get earnings for those allocations
+    const { data: transportEarnings } =
+      allocationIds.length > 0
+        ? await (svc as any)
+            .from("earnings_ledger")
+            .select("amount, occurred_on")
+            .eq("type", "transport")
+            .gte("occurred_on", startDate.toISOString().split("T")[0])
+            .lte("occurred_on", endDate.toISOString().split("T")[0])
+            .in("source_id", allocationIds)
+        : { data: [] };
+
+    const transportSpending = (transportEarnings || []).reduce(
+      (sum: number, earning: { amount: number }) => sum + earning.amount,
+      0,
     );
 
-    const transportSpending = (currentAssignments || [])
-      .filter(
-        (assignment: { assignee_type: string }) =>
-          assignment.assignee_type === "pegawai"
-      )
+    // Calculate honor spending from financial_records (actual partner honor)
+    const { data: honorRecords } =
+      ownedIdArray.length > 0
+        ? await (svc as any)
+            .from("financial_records")
+            .select(
+              "amount, bulan, tahun, project_id, recipient_id, description",
+            )
+            .eq("recipient_type", "mitra")
+            .in("project_id", ownedIdArray)
+            .gte("tahun", startDate.getFullYear())
+            .lte("tahun", endDate.getFullYear())
+        : { data: [] };
+
+    // Also get ALL financial records for debugging
+    const { data: _allFinancialRecords } =
+      ownedIdArray.length > 0
+        ? await (svc as any)
+            .from("financial_records")
+            .select("*")
+            .in("project_id", ownedIdArray)
+        : { data: [] };
+
+    // Filter honor records by date range
+    const honorSpending = (honorRecords || [])
+      .filter((record: { bulan: number; tahun: number }) => {
+        const recordDate = new Date(record.tahun, record.bulan - 1, 1); // First day of the month
+        const recordEndDate = new Date(record.tahun, record.bulan, 0); // Last day of the month
+
+        // Check if the record month overlaps with the date range
+        return recordDate <= endDate && recordEndDate >= startDate;
+      })
       .reduce(
-        (sum: number, assignment: { uang_transport: number | null }) =>
-          sum + (assignment.uang_transport || 0),
-        0
+        (sum: number, record: { amount: number }) => sum + record.amount,
+        0,
       );
 
-    const honorSpending = (currentAssignments || [])
-      .filter(
-        (assignment: { assignee_type: string }) =>
-          assignment.assignee_type === "mitra"
-      )
-      .reduce(
-        (sum: number, assignment: { honor: number | null }) =>
-          sum + (assignment.honor || 0),
-        0
-      );
+    // Calculate total spending from actual financial data
+    const totalSpending = transportSpending + honorSpending;
 
-    // Build project budgets without relying on implicit relationship
+    // Build project budgets from tasks instead of project_assignments
     const { data: projectRows } =
       ownedIdArray.length > 0
         ? await (svc as any)
@@ -139,19 +192,47 @@ export async function GET(request: NextRequest) {
       string,
       { transport: number; honor: number }
     >();
-    for (const a of currentAssignments as Array<{
-      project_id: string;
-      uang_transport: number | null;
-      honor: number | null;
-    }>) {
-      const rec = budgetByProject.get(a.project_id) || {
-        transport: 0,
-        honor: 0,
-      };
-      rec.transport += a.uang_transport || 0;
-      rec.honor += a.honor || 0;
-      budgetByProject.set(a.project_id, rec);
+
+    if (ownedIdArray.length > 0) {
+      // Get transport budget from tasks with transport
+      const { data: transportTasks } = await (svc as any)
+        .from("tasks")
+        .select("project_id, transport_days")
+        .in("project_id", ownedIdArray)
+        .eq("has_transport", true);
+
+      // Get honor budget from tasks with mitra assignments
+      const { data: honorTasks } = await (svc as any)
+        .from("tasks")
+        .select("project_id, honor_amount")
+        .in("project_id", ownedIdArray)
+        .not("assignee_mitra_id", "is", null);
+
+      // Calculate transport budget (150,000 per transport day)
+      for (const task of transportTasks || []) {
+        const rec = budgetByProject.get(task.project_id) || {
+          transport: 0,
+          honor: 0,
+        };
+        rec.transport += (task.transport_days || 0) * 150000;
+        budgetByProject.set(task.project_id, rec);
+      }
+
+      // Calculate honor budget
+      for (const task of honorTasks || []) {
+        const rec = budgetByProject.get(task.project_id) || {
+          transport: 0,
+          honor: 0,
+        };
+        rec.honor += task.honor_amount || 0;
+        budgetByProject.set(task.project_id, rec);
+      }
     }
+
+    console.log(
+      "🔍 [DEBUG] Budget by Project:",
+      Object.fromEntries(budgetByProject),
+    );
 
     const projectBudgets: ProjectBudget[] = (projectRows || []).map(
       (p: {
@@ -175,15 +256,15 @@ export async function GET(request: NextRequest) {
               ? Math.round((totalBudget / totalSpending) * 100)
               : 0,
         };
-      }
+      },
     );
 
     const totalActiveBudget = projectBudgets.reduce(
       (sum: number, project: ProjectBudget) => sum + project.total_budget,
-      0
+      0,
     );
 
-    // Get spending trends (last 4 months) - using current assignments for consistency
+    // Get spending trends (last 4 months) - using actual financial data
     const spendingTrends: SpendingTrend[] = [];
     for (let i = 3; i >= 0; i--) {
       const date = new Date();
@@ -191,29 +272,42 @@ export async function GET(request: NextRequest) {
       const month = date.getMonth() + 1;
       const year = date.getFullYear();
 
-      // For historical data, we'll use current assignments as proxy
-      // In a real system, you might want to maintain historical snapshots
-      const monthlyTransport = (currentAssignments || [])
-        .filter(
-          (assignment: { assignee_type: string }) =>
-            assignment.assignee_type === "pegawai"
-        )
-        .reduce(
-          (sum: number, assignment: { uang_transport: number | null }) =>
-            sum + (assignment.uang_transport || 0),
-          0
-        );
+      // Get monthly transport spending from earnings_ledger
+      const monthStart = new Date(year, month - 1, 1);
+      const monthEnd = new Date(year, month, 0);
 
-      const monthlyHonor = (currentAssignments || [])
-        .filter(
-          (assignment: { assignee_type: string }) =>
-            assignment.assignee_type === "mitra"
-        )
-        .reduce(
-          (sum: number, assignment: { honor: number | null }) =>
-            sum + (assignment.honor || 0),
-          0
-        );
+      const { data: monthlyTransportEarnings } =
+        allocationIds.length > 0
+          ? await (svc as any)
+              .from("earnings_ledger")
+              .select("amount")
+              .eq("type", "transport")
+              .gte("occurred_on", monthStart.toISOString().split("T")[0])
+              .lte("occurred_on", monthEnd.toISOString().split("T")[0])
+              .in("source_id", allocationIds)
+          : { data: [] };
+
+      const monthlyTransport = (monthlyTransportEarnings || []).reduce(
+        (sum: number, earning: { amount: number }) => sum + earning.amount,
+        0,
+      );
+
+      // Get monthly honor spending from financial_records
+      const { data: monthlyHonorRecords } =
+        ownedIdArray.length > 0
+          ? await (svc as any)
+              .from("financial_records")
+              .select("amount")
+              .eq("recipient_type", "mitra")
+              .eq("bulan", month)
+              .eq("tahun", year)
+              .in("project_id", ownedIdArray)
+          : { data: [] };
+
+      const monthlyHonor = (monthlyHonorRecords || []).reduce(
+        (sum: number, record: { amount: number }) => sum + record.amount,
+        0,
+      );
 
       spendingTrends.push({
         month: date.toLocaleDateString("en-US", {
@@ -226,46 +320,46 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Get top spenders from current assignments (avoid inner joins that may be blocked by RLS)
-    // Aggregate Pegawai by assignee_id
-    const { data: pegawaiAssignments } = await (svc as any)
-      .from("project_assignments")
-      .select(`uang_transport, assignee_id, project_id, assignee_type`)
-      .eq("assignee_type", "pegawai");
+    // Get top spenders from actual financial data
+    // Get transport spending by user from earnings_ledger
+    const { data: allTransportEarnings } =
+      allocationIds.length > 0
+        ? await (svc as any)
+            .from("earnings_ledger")
+            .select("user_id, amount")
+            .eq("type", "transport")
+            .gte("occurred_on", startDate.toISOString().split("T")[0])
+            .lte("occurred_on", endDate.toISOString().split("T")[0])
+            .in("source_id", allocationIds)
+        : { data: [] };
 
-    // Restrict to projects owned by this ketua tim
-    const ownedProjectIds = new Set(ownedIdArray);
-
-    const pegawaiTotals = (pegawaiAssignments || [])
-      .filter((a: { project_id: string }) => ownedProjectIds.has(a.project_id))
-      .reduce(
-        (
-          acc: {
-            [key: string]: {
-              name: string;
-              amount: number;
-              projects: Set<string>;
-            };
-          },
-          assignment: {
-            uang_transport: number | null;
-            assignee_id: string;
-            project_id: string;
-          }
-        ) => {
-          if (!acc[assignment.assignee_id]) {
-            acc[assignment.assignee_id] = {
-              name: assignment.assignee_id, // temporary, will be replaced with fetched name below
-              amount: 0,
-              projects: new Set(),
-            };
-          }
-          acc[assignment.assignee_id].amount += assignment.uang_transport || 0;
-          acc[assignment.assignee_id].projects.add(assignment.project_id);
-          return acc;
+    // Aggregate transport spending by user
+    const pegawaiTotals = (allTransportEarnings || []).reduce(
+      (
+        acc: {
+          [key: string]: {
+            name: string;
+            amount: number;
+            projects: Set<string>;
+          };
         },
-        {}
-      );
+        earning: {
+          user_id: string;
+          amount: number;
+        },
+      ) => {
+        if (!acc[earning.user_id]) {
+          acc[earning.user_id] = {
+            name: earning.user_id, // temporary, will be replaced with fetched name below
+            amount: 0,
+            projects: new Set(),
+          };
+        }
+        acc[earning.user_id].amount += earning.amount;
+        return acc;
+      },
+      {},
+    );
 
     // Try to resolve pegawai names in batch; fallback to masked id if RLS blocks
     const pegawaiIds = Object.keys(pegawaiTotals);
@@ -301,18 +395,28 @@ export async function GET(request: NextRequest) {
         };
       })
       .sort(
-        (a: { amount: number }, b: { amount: number }) => b.amount - a.amount
+        (a: { amount: number }, b: { amount: number }) => b.amount - a.amount,
       )
       .slice(0, 5);
 
-    // Aggregate Mitra by assignee_id
-    const { data: mitraAssignments } = await (svc as any)
-      .from("project_assignments")
-      .select(`honor, assignee_id, project_id, assignee_type`)
-      .eq("assignee_type", "mitra");
+    // Get honor spending by mitra from financial_records
+    const { data: allHonorRecords } =
+      ownedIdArray.length > 0
+        ? await (svc as any)
+            .from("financial_records")
+            .select("recipient_id, amount, project_id, bulan, tahun")
+            .eq("recipient_type", "mitra")
+            .in("project_id", ownedIdArray)
+            .gte("tahun", startDate.getFullYear())
+            .lte("tahun", endDate.getFullYear())
+        : { data: [] };
 
-    const mitraTotals = (mitraAssignments || [])
-      .filter((a: { project_id: string }) => ownedProjectIds.has(a.project_id))
+    // Filter by date range and aggregate by mitra
+    const mitraTotals = (allHonorRecords || [])
+      .filter((record: { bulan: number; tahun: number }) => {
+        const recordDate = new Date(record.tahun, record.bulan - 1);
+        return recordDate >= startDate && recordDate <= endDate;
+      })
       .reduce(
         (
           acc: {
@@ -322,24 +426,24 @@ export async function GET(request: NextRequest) {
               projects: Set<string>;
             };
           },
-          assignment: {
-            honor: number | null;
-            assignee_id: string;
+          record: {
+            recipient_id: string;
+            amount: number;
             project_id: string;
-          }
+          },
         ) => {
-          if (!acc[assignment.assignee_id]) {
-            acc[assignment.assignee_id] = {
-              name: assignment.assignee_id, // temporary, will be replaced with fetched name below
+          if (!acc[record.recipient_id]) {
+            acc[record.recipient_id] = {
+              name: record.recipient_id, // temporary, will be replaced with fetched name below
               amount: 0,
               projects: new Set(),
             };
           }
-          acc[assignment.assignee_id].amount += assignment.honor || 0;
-          acc[assignment.assignee_id].projects.add(assignment.project_id);
+          acc[record.recipient_id].amount += record.amount;
+          acc[record.recipient_id].projects.add(record.project_id);
           return acc;
         },
-        {}
+        {},
       );
 
     // Resolve mitra names in batch; mitra likely public/visible via RLS
@@ -377,7 +481,7 @@ export async function GET(request: NextRequest) {
         };
       })
       .sort(
-        (a: { amount: number }, b: { amount: number }) => b.amount - a.amount
+        (a: { amount: number }, b: { amount: number }) => b.amount - a.amount,
       )
       .slice(0, 5);
 
@@ -409,7 +513,7 @@ export async function GET(request: NextRequest) {
     console.error("Financial API Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

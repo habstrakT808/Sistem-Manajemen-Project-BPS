@@ -12,7 +12,7 @@ import type { Database } from "@/../database/types/database.types";
 // Helper to query projects with typed service client
 async function fetchProjectNames(
   client: SupabaseClient<Database>,
-  ids: string[]
+  ids: string[],
 ): Promise<Record<string, string>> {
   const { data } = await client
     .from("projects")
@@ -78,28 +78,21 @@ export async function GET() {
     // Service client to bypass recursive RLS for safe, user-scoped reads
     const svc = createServiceClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
     // Compute stats inline to avoid RPC touching projects policies
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
 
-    const [
-      { count: assignedProjectsCount },
-      { count: activeTasks },
-      { count: completedTasks },
-      { data: monthlyEarningsRows },
-      { count: pendingTransportCount },
-      { count: transportRequired },
-      { count: transportAllocated },
-      { count: pendingReviews },
-    ] = await Promise.all([
+    const settled = await Promise.allSettled([
       // Use service role for project_members to avoid recursive policy on projects
+      // Count assigned projects with team only
       svc
-        .from("project_members")
-        .select("project_id", { count: "exact", head: true })
-        .eq("user_id", user.id),
+        .from("projects")
+        .select("id", { count: "exact", head: true })
+        .not("team_id", "is", null)
+        .or(`leader_user_id.eq.${user.id},ketua_tim_id.eq.${user.id}`),
       // Use service role for tasks as tasks policies may reference projects via FOR ALL
       svc
         .from("tasks")
@@ -111,12 +104,18 @@ export async function GET() {
         .select("id", { count: "exact", head: true })
         .eq("assignee_user_id", user.id)
         .eq("status", "completed"),
-      // Use service role for earnings to avoid transitive policy evaluation
+      // Earnings rows (will be filtered later by allocation->task->project team_id)
       svc
         .from("earnings_ledger")
-        .select("amount, occurred_on")
+        .select("amount, occurred_on, source_id")
         .eq("user_id", user.id)
         .gte("occurred_on", startOfMonth.toISOString().split("T")[0]),
+      // Get all transport allocations (will be filtered by project team_id)
+      svc
+        .from("task_transport_allocations")
+        .select("id, amount, task_id")
+        .eq("user_id", user.id)
+        .is("canceled_at", null),
       // Use service role for transport allocations to avoid policies referencing projects
       svc
         .from("task_transport_allocations")
@@ -145,10 +144,142 @@ export async function GET() {
         .is("rating", null),
     ]);
 
-    const monthly_earnings = (monthlyEarningsRows || []).reduce(
-      (sum: number, r: { amount: number }) => sum + (r?.amount || 0),
-      0
-    );
+    const [
+      projectsSet,
+      activeTasksSet,
+      completedTasksSet,
+      earningsSet,
+      transportDataSet,
+      pendingTransportSet,
+      transportRequiredSet,
+      transportAllocatedSet,
+      pendingReviewsSet,
+    ] = settled as any[];
+
+    const assignedProjectsCount =
+      projectsSet.status === "fulfilled" ? projectsSet.value.count || 0 : 0;
+    const activeTasks =
+      activeTasksSet.status === "fulfilled"
+        ? activeTasksSet.value.count || 0
+        : 0;
+    const completedTasks =
+      completedTasksSet.status === "fulfilled"
+        ? completedTasksSet.value.count || 0
+        : 0;
+    const monthlyEarningsRows =
+      earningsSet.status === "fulfilled" ? earningsSet.value.data || [] : [];
+    const transportAllocationsData =
+      transportDataSet.status === "fulfilled"
+        ? transportDataSet.value.data || []
+        : [];
+    const pendingTransportCount =
+      pendingTransportSet.status === "fulfilled"
+        ? pendingTransportSet.value.count || 0
+        : 0;
+    const transportRequired =
+      transportRequiredSet.status === "fulfilled"
+        ? transportRequiredSet.value.count || 0
+        : 0;
+    const transportAllocated =
+      transportAllocatedSet.status === "fulfilled"
+        ? transportAllocatedSet.value.count || 0
+        : 0;
+    const pendingReviews =
+      pendingReviewsSet.status === "fulfilled"
+        ? pendingReviewsSet.value.count || 0
+        : 0;
+
+    // Recompute monthly earnings only for allocations whose task.project has a team
+    let monthly_earnings = 0;
+    if ((monthlyEarningsRows || []).length > 0) {
+      const sourceIds = Array.from(
+        new Set(
+          (monthlyEarningsRows || [])
+            .map((r: any) => r?.source_id)
+            .filter(Boolean),
+        ),
+      ) as string[];
+      let validAllocIds = new Set<string>();
+      if (sourceIds.length > 0) {
+        const { data: allocs } = await svc
+          .from("task_transport_allocations")
+          .select("id, task_id")
+          .in("id", sourceIds);
+        const taskIds = Array.from(
+          new Set((allocs || []).map((a: any) => a.task_id).filter(Boolean)),
+        );
+        if (taskIds.length > 0) {
+          const { data: tasks } = await svc
+            .from("tasks")
+            .select("id, project_id")
+            .in("id", taskIds);
+          const projectIds2 = Array.from(
+            new Set(
+              (tasks || []).map((t: any) => t.project_id).filter(Boolean),
+            ),
+          );
+          if (projectIds2.length > 0) {
+            const { data: projectsOk } = await svc
+              .from("projects")
+              .select("id, team_id")
+              .in("id", projectIds2)
+              .not("team_id", "is", null);
+            const okProjectIds = new Set(
+              (projectsOk || []).map((p: any) => p.id),
+            );
+            (allocs || []).forEach((a: any) => {
+              const t = ((tasks as any[]) || []).find(
+                (x: any) => x.id === a.task_id,
+              ) as any;
+              if (t && okProjectIds.has(t.project_id)) validAllocIds.add(a.id);
+            });
+          }
+        }
+      }
+      monthly_earnings = (monthlyEarningsRows || [])
+        .filter((r: any) =>
+          r.source_id ? validAllocIds.has(r.source_id) : false,
+        )
+        .reduce((sum: number, r: any) => sum + (r?.amount || 0), 0);
+    }
+
+    // Calculate transport earnings from actual transport allocations
+    let transport_earnings = 0;
+    if ((transportAllocationsData || []).length > 0) {
+      const taskIds = Array.from(
+        new Set(
+          (transportAllocationsData || [])
+            .map((a: any) => a.task_id)
+            .filter(Boolean),
+        ),
+      );
+      if (taskIds.length > 0) {
+        const { data: tasks } = await svc
+          .from("tasks")
+          .select("id, project_id")
+          .in("id", taskIds);
+        const projectIds2 = Array.from(
+          new Set((tasks || []).map((t: any) => t.project_id).filter(Boolean)),
+        );
+        let okProjectIds = new Set<string>();
+        if (projectIds2.length > 0) {
+          const { data: projectsOk } = await svc
+            .from("projects")
+            .select("id, team_id")
+            .in("id", projectIds2)
+            .not("team_id", "is", null);
+          okProjectIds = new Set((projectsOk || []).map((p: any) => p.id));
+        }
+        transport_earnings = (transportAllocationsData || [])
+          .filter((a: any) => {
+            const t = ((tasks as any[]) || []).find(
+              (x: any) => x.id === a.task_id,
+            ) as any;
+            return t && okProjectIds.has(t.project_id);
+          })
+          .reduce((sum: number, a: any) => sum + (a?.amount || 0), 0);
+      }
+    }
 
     const stats: StatsData = {
       total_tasks: (activeTasks || 0) + (completedTasks || 0),
@@ -158,7 +289,7 @@ export async function GET() {
       active_projects: 0,
       completed_projects: 0,
       total_earnings: monthly_earnings,
-      transport_earnings: monthly_earnings,
+      transport_earnings: transport_earnings,
       pending_transport_allocations: pendingTransportCount || 0,
       transport_required: transportRequired || 0,
       transport_allocated: transportAllocated || 0,
@@ -190,7 +321,7 @@ export async function GET() {
           allocation_date,
           canceled_at
         )
-      `
+      `,
       )
       .eq("assignee_user_id", user.id)
       .lte("start_date", weekFromNow.toISOString().split("T")[0])
@@ -206,8 +337,8 @@ export async function GET() {
       new Set(
         ((todayTasks as TaskData[]) || [])
           .map((t) => t.project_id)
-          .filter(Boolean)
-      )
+          .filter(Boolean),
+      ),
     ) as string[];
 
     let projectNameById: Record<string, string> = {};
@@ -219,8 +350,9 @@ export async function GET() {
     // 1) Projects where user is leader
     const { data: ownedProjects } = await svc
       .from("projects")
-      .select("id, nama_project, status, deadline, leader_user_id")
-      .or(`ketua_tim_id.eq.${user.id},leader_user_id.eq.${user.id}`);
+      .select("id, nama_project, status, deadline, leader_user_id, team_id")
+      .or(`ketua_tim_id.eq.${user.id},leader_user_id.eq.${user.id}`)
+      .not("team_id", "is", null);
 
     // 2) Projects where user is member
     const { data: memberRows } = await svc
@@ -230,18 +362,19 @@ export async function GET() {
 
     const memberProjectIds = Array.from(
       new Set(
-        (memberRows || []).map((r) => (r as { project_id: string }).project_id)
-      )
+        (memberRows || []).map((r) => (r as { project_id: string }).project_id),
+      ),
     );
 
     const { data: memberProjects } = await svc
       .from("projects")
-      .select("id, nama_project, status, deadline, leader_user_id")
-      .in("id", memberProjectIds.length > 0 ? memberProjectIds : ["__none__"]);
+      .select("id, nama_project, status, deadline, leader_user_id, team_id")
+      .in("id", memberProjectIds.length > 0 ? memberProjectIds : ["__none__"])
+      .not("team_id", "is", null);
 
     // Merge with role info
     const leaderIds = new Set(
-      (ownedProjects || []).map((p) => (p as { id: string }).id)
+      (ownedProjects || []).map((p) => (p as { id: string }).id),
     );
     const allProjects = [
       ...((ownedProjects || []).map((p) => ({
@@ -284,7 +417,7 @@ export async function GET() {
 
     // Map leader names
     const leaderUserIds = Array.from(
-      new Set(allProjects.map((p) => p.leader_user_id).filter(Boolean))
+      new Set(allProjects.map((p) => p.leader_user_id).filter(Boolean)),
     ) as string[];
     const leaderNameById: Record<string, string> = {};
     if (leaderUserIds.length > 0) {
@@ -365,11 +498,13 @@ export async function GET() {
               ]
             : [];
 
-        const myAlloc = allocList.find(
-          (a) => a.user_id === user.id && !a.canceled_at
-        ) as
-          | { allocation_date: string | null; canceled_at: string | null }
-          | undefined;
+        // Get all allocations for this user (not just the first one)
+        const myAllocations = allocList
+          .filter((a) => a.user_id === user.id && !a.canceled_at)
+          .map((alloc) => ({
+            allocation_date: alloc.allocation_date,
+            canceled_at: alloc.canceled_at,
+          }));
 
         return {
           id: task.id,
@@ -383,14 +518,9 @@ export async function GET() {
           project_name: task.project_id
             ? projectNameById[task.project_id] || "-"
             : "-",
-          transport_allocation: myAlloc
-            ? {
-                allocation_date: myAlloc.allocation_date,
-                canceled_at: myAlloc.canceled_at,
-              }
-            : null,
+          transport_allocations: myAllocations,
         };
-      }
+      },
     );
 
     return NextResponse.json({
@@ -402,7 +532,7 @@ export async function GET() {
     console.error("Pegawai Dashboard API Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -170,13 +170,7 @@ export function UserForm({ user, onClose, onSuccess }: UserFormProps) {
                     setFormData({ ...formData, email: e.target.value })
                   }
                   required
-                  disabled={isEditing} // Email cannot be changed after creation
                 />
-                {isEditing && (
-                  <p className="text-xs text-gray-500">
-                    Email cannot be changed after creation
-                  </p>
-                )}
               </div>
 
               {/* Password (only for new users) */}

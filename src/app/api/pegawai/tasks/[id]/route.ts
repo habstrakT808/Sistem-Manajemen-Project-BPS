@@ -57,14 +57,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // Service client to avoid RLS issues
     const svc = createServiceClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
     // Debug: Check if task exists and get all relevant fields
     const { data: taskExists, error: existsError } = await svc
       .from("tasks")
       .select(
-        "id, assignee_user_id, pegawai_id, project_id, title, deskripsi_tugas"
+        "id, assignee_user_id, pegawai_id, project_id, title, deskripsi_tugas",
       )
       .eq("id", taskId)
       .single();
@@ -108,12 +108,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         start_date,
         end_date,
         has_transport,
+        transport_days,
         status,
         response_pegawai,
         created_at,
         updated_at,
         project_id
-      `
+      `,
       )
       .eq("id", taskId)
       .single();
@@ -122,7 +123,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       console.log("Debug - Task fetch error:", taskError);
       return NextResponse.json(
         { error: "Failed to fetch task details" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -138,7 +139,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       console.log("Debug - Project fetch error:", projectError);
       return NextResponse.json(
         { error: "Failed to fetch project details" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -156,7 +157,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     console.error("Task GET API Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -180,7 +181,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     // Service client to avoid RLS issues
     const svc = createServiceClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
     // Verify task belongs to user (check both assignee_user_id and pegawai_id)
@@ -194,7 +195,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     if (taskError || !task) {
       return NextResponse.json(
         { error: "Task not found or access denied" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -226,7 +227,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         status,
         response_pegawai,
         updated_at
-      `
+      `,
       )
       .single();
 
@@ -242,7 +243,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     console.error("Task Update API Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

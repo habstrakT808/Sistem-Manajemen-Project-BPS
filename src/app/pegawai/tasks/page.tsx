@@ -14,8 +14,13 @@ import { toast } from "sonner";
 
 interface Task {
   id: string;
+  title: string;
   deskripsi_tugas: string;
+  start_date: string;
+  end_date: string;
   tanggal_tugas: string;
+  has_transport: boolean;
+  transport_days: number;
   status: "pending" | "in_progress" | "completed";
   response_pegawai?: string;
   created_at: string;
@@ -28,6 +33,12 @@ interface Task {
       nama_lengkap: string;
     };
   };
+  transport_allocation: {
+    id: string;
+    allocation_date: string | null;
+    allocated_at: string | null;
+    canceled_at: string | null;
+  } | null;
 }
 
 async function fetchTasksRequest(): Promise<Task[]> {
@@ -43,7 +54,7 @@ export default function TasksPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState(
-    searchParams.get("status") || "all"
+    searchParams.get("status") || "all",
   );
 
   const {
@@ -65,7 +76,7 @@ export default function TasksPage() {
       in_progress: tasks.filter((t) => t.status === "in_progress").length,
       completed: tasks.filter((t) => t.status === "completed").length,
     }),
-    [tasks]
+    [tasks],
   );
 
   const getFilteredTasks = (status: string) => {

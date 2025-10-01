@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
       if (leaderError || !leader) {
         return NextResponse.json(
           { error: "Invalid leader - must be an active pegawai" },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
     // Use service role to bypass RLS recursion when touching teams
     const supabaseAdmin = createServiceClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
     // Create team
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
         leader_user_id,
         created_at,
         users!teams_leader_user_id_fkey (nama_lengkap, email)
-      `
+      `,
       )
       .single();
 
@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
     console.error("Team Creation API Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -155,7 +155,7 @@ export async function GET() {
     // Use service role to fetch teams to avoid RLS recursive evaluation
     const supabaseAdmin = createServiceClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
     // Get all teams
@@ -170,7 +170,7 @@ export async function GET() {
         created_at,
         updated_at,
         users!teams_leader_user_id_fkey (nama_lengkap, email)
-      `
+      `,
       )
       .order("created_at", { ascending: false });
 
@@ -220,7 +220,7 @@ export async function GET() {
     console.error("Teams Fetch API Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -249,7 +249,7 @@ export async function PUT(request: NextRequest) {
 
     const supabaseAdmin = createServiceClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
     const updatePayload: {
@@ -279,7 +279,7 @@ export async function PUT(request: NextRequest) {
     console.error("Team Update API Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -309,20 +309,74 @@ export async function DELETE(request: NextRequest) {
 
     const supabaseAdmin = createServiceClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
-    // Safety: detach leader references from projects to avoid FK constraints
-    const projectUpdate: { team_id: null; leader_user_id: null } = {
-      team_id: null,
-      leader_user_id: null,
-    };
-    await supabaseAdmin
+    // Gather all project ids under this team
+    const { data: teamProjects, error: fetchProjectsErr } = await (
+      supabaseAdmin as any
+    )
       .from("projects")
-      .update(projectUpdate as never)
+      .select("id")
       .eq("team_id", id as string);
+    if (fetchProjectsErr) throw fetchProjectsErr;
 
-    const { error } = await supabaseAdmin
+    const projectIds = (teamProjects || []).map((p: { id: string }) => p.id);
+
+    if (projectIds.length > 0) {
+      // Delete transport allocations linked to tasks of these projects
+      const { data: taskRows } = await (supabaseAdmin as any)
+        .from("tasks")
+        .select("id")
+        .in("project_id", projectIds);
+      const taskIds = (taskRows || []).map((t: { id: string }) => t.id);
+
+      if (taskIds.length > 0) {
+        // Capture allocation ids before deleting allocations, then delete earnings by source_id
+        const { data: allocRows } = await (supabaseAdmin as any)
+          .from("task_transport_allocations")
+          .select("id")
+          .in("task_id", taskIds);
+        const allocIds = (allocRows || []).map((a: { id: string }) => a.id);
+        if (allocIds.length > 0) {
+          const { error: delEarnErr } = await (supabaseAdmin as any)
+            .from("earnings_ledger")
+            .delete()
+            .in("source_id", allocIds);
+          if (delEarnErr) throw delEarnErr;
+        }
+
+        const { error: delAllocErr } = await (supabaseAdmin as any)
+          .from("task_transport_allocations")
+          .delete()
+          .in("task_id", taskIds);
+        if (delAllocErr) throw delAllocErr;
+      }
+
+      // Delete tasks under these projects first
+      const { error: delTasksErr } = await (supabaseAdmin as any)
+        .from("tasks")
+        .delete()
+        .in("project_id", projectIds);
+      if (delTasksErr) throw delTasksErr;
+
+      // Delete project members
+      const { error: delMembersErr } = await (supabaseAdmin as any)
+        .from("project_members")
+        .delete()
+        .in("project_id", projectIds);
+      if (delMembersErr) throw delMembersErr;
+
+      // Finally delete projects
+      const { error: delProjectsErr } = await (supabaseAdmin as any)
+        .from("projects")
+        .delete()
+        .in("id", projectIds);
+      if (delProjectsErr) throw delProjectsErr;
+    }
+
+    // Delete the team itself
+    const { error } = await (supabaseAdmin as any)
       .from("teams")
       .delete()
       .eq("id", id as string);
@@ -333,7 +387,7 @@ export async function DELETE(request: NextRequest) {
     console.error("Team Delete API Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

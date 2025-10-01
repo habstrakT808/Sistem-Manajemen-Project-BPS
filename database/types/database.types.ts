@@ -150,9 +150,17 @@ export type Database = {
         Row: {
           id: string;
           project_id: string;
-          pegawai_id: string;
+          pegawai_id: string | null;
+          assignee_mitra_id: string | null;
+          assignee_user_id: string | null;
+          title: string | null;
           tanggal_tugas: string;
           deskripsi_tugas: string;
+          start_date: string | null;
+          end_date: string | null;
+          has_transport: boolean;
+          transport_days: number;
+          honor_amount: number;
           status: "pending" | "in_progress" | "completed";
           response_pegawai: string | null;
           created_at: string;
@@ -161,9 +169,17 @@ export type Database = {
         Insert: {
           id?: string;
           project_id: string;
-          pegawai_id: string;
+          pegawai_id?: string | null;
+          assignee_mitra_id?: string | null;
+          assignee_user_id?: string | null;
+          title?: string | null;
           tanggal_tugas: string;
           deskripsi_tugas: string;
+          start_date?: string | null;
+          end_date?: string | null;
+          has_transport?: boolean;
+          transport_days?: number;
+          honor_amount?: number;
           status?: "pending" | "in_progress" | "completed";
           response_pegawai?: string | null;
           created_at?: string;
@@ -172,9 +188,17 @@ export type Database = {
         Update: {
           id?: string;
           project_id?: string;
-          pegawai_id?: string;
+          pegawai_id?: string | null;
+          assignee_mitra_id?: string | null;
+          assignee_user_id?: string | null;
+          title?: string | null;
           tanggal_tugas?: string;
           deskripsi_tugas?: string;
+          start_date?: string | null;
+          end_date?: string | null;
+          has_transport?: boolean;
+          transport_days?: number;
+          honor_amount?: number;
           status?: "pending" | "in_progress" | "completed";
           response_pegawai?: string | null;
           created_at?: string;

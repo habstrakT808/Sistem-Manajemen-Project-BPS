@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -73,7 +73,7 @@ interface ProjectsResponse {
 
 async function fetchProjectsRequest(
   page: number,
-  status?: string
+  status?: string,
 ): Promise<ProjectsResponse> {
   const params = new URLSearchParams({ page: page.toString(), limit: "10" });
   if (status && status !== "all") params.append("status", status);
@@ -83,7 +83,7 @@ async function fetchProjectsRequest(
   const result = await response.json();
   if (!response.ok) {
     throw new Error(
-      (result.data as unknown as string) || "Failed to fetch projects"
+      (result.data as unknown as string) || "Failed to fetch projects",
     );
   }
   return result as ProjectsResponse;
@@ -112,7 +112,7 @@ export default function ProjectList() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const projects = data?.data || [];
+  const _projects = data?.data || [];
   const pagination = data?.pagination || {
     page: 1,
     limit: 10,
@@ -141,20 +141,27 @@ export default function ProjectList() {
   }, [pagination.page, pagination.totalPages, selectedStatus, queryClient]);
 
   const calculateProjectBudget = (
-    assignments: ProjectData["project_assignments"] | undefined
+    assignments: ProjectData["project_assignments"] | undefined,
   ) => {
     const list = Array.isArray(assignments) ? assignments : [];
-    return list.reduce((total, assignment) => {
-      return total + (assignment.uang_transport || 0) + (assignment.honor || 0);
+    const budget = list.reduce((total, assignment) => {
+      const transport = assignment.uang_transport || 0;
+      const honor = assignment.honor || 0;
+      console.log(
+        `[DEBUG] Assignment budget - Transport: ${transport}, Honor: ${honor}`,
+      );
+      return total + transport + honor;
     }, 0);
+    console.log(`[DEBUG] Total project budget calculated: ${budget}`);
+    return budget;
   };
 
   const getTeamSummary = (
-    assignments: ProjectData["project_assignments"] | undefined
+    assignments: ProjectData["project_assignments"] | undefined,
   ) => {
     const list = Array.isArray(assignments) ? assignments : [];
     const pegawaiCount = list.filter(
-      (a) => a.assignee_type === "pegawai"
+      (a) => a.assignee_type === "pegawai",
     ).length;
     const mitraCount = list.filter((a) => a.assignee_type === "mitra").length;
     return `${pegawaiCount} Pegawai, ${mitraCount} Mitra`;
@@ -173,14 +180,15 @@ export default function ProjectList() {
   };
 
   const filteredProjects = useMemo(() => {
+    const projects = data?.data || [];
     if (!searchTerm) return projects;
     const term = searchTerm.toLowerCase();
     return projects.filter(
       (project) =>
         project.nama_project.toLowerCase().includes(term) ||
-        project.deskripsi.toLowerCase().includes(term)
+        project.deskripsi.toLowerCase().includes(term),
     );
-  }, [projects, searchTerm]);
+  }, [data?.data, searchTerm]);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -195,7 +203,7 @@ export default function ProjectList() {
 
   const handleFinishProject = async (projectId: string) => {
     const confirmed = window.confirm(
-      "Tandai project sebagai selesai sekarang? Semua tugas tersisa akan ditandai selesai dan deadline di-set ke hari ini."
+      "Tandai project sebagai selesai sekarang? Semua tugas tersisa akan ditandai selesai dan deadline di-set ke hari ini.",
     );
     if (!confirmed) return;
 
@@ -203,7 +211,7 @@ export default function ProjectList() {
     try {
       const response = await fetch(
         `/api/ketua-tim/projects/${projectId}/finish`,
-        { method: "POST" }
+        { method: "POST" },
       );
       const result = await response.json();
       if (!response.ok)
@@ -225,7 +233,7 @@ export default function ProjectList() {
 
   const handleDeleteProject = async (projectId: string) => {
     const confirmed = window.confirm(
-      "Hapus project ini? Tindakan ini tidak dapat dibatalkan. Semua tugas dan assignment terkait akan dihapus."
+      "Hapus project ini? Tindakan ini tidak dapat dibatalkan. Semua tugas dan assignment terkait akan dihapus.",
     );
     if (!confirmed) return;
 
@@ -382,7 +390,7 @@ export default function ProjectList() {
                   }
                 })();
                 const budget = calculateProjectBudget(
-                  project.project_assignments
+                  project.project_assignments,
                 );
                 const teamSummary = getTeamSummary(project.project_assignments);
                 const viewHref = `/ketua-tim/projects/${project.id}`;
@@ -425,11 +433,11 @@ export default function ProjectList() {
                                 </div>
                                 <div className="text-gray-500">
                                   {new Date(
-                                    project.tanggal_mulai
+                                    project.tanggal_mulai,
                                   ).toLocaleDateString("id-ID")}{" "}
                                   -{" "}
                                   {new Date(
-                                    project.deadline
+                                    project.deadline,
                                   ).toLocaleDateString("id-ID")}
                                 </div>
                               </div>

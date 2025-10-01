@@ -4,7 +4,6 @@ import { createClient } from "@/lib/supabase/server";
 export async function GET(request: NextRequest) {
   console.log("🔍 [DEBUG] Starting pegawai tasks TEST API (no auth)");
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const supabase = (await createClient()) as any;
     console.log("🔍 [DEBUG] Supabase client created");
 
@@ -39,7 +38,7 @@ export async function GET(request: NextRequest) {
         response_pegawai,
         created_at,
         updated_at
-      `
+      `,
       )
       .eq("pegawai_id", testUserId);
 
@@ -94,7 +93,7 @@ export async function GET(request: NextRequest) {
     console.log("🔍 [DEBUG] Getting project data");
     const projectIds = [
       ...new Set(
-        (tasks || []).map((task: { project_id: string }) => task.project_id)
+        (tasks || []).map((task: { project_id: string }) => task.project_id),
       ),
     ];
     console.log("🔍 [DEBUG] Project IDs:", projectIds);
@@ -122,15 +121,15 @@ export async function GET(request: NextRequest) {
           nama_project: string;
           status: string;
           ketua_tim_id: string;
-        }) => [p.id, p]
-      )
+        }) => [p.id, p],
+      ),
     );
 
     // Get user data for all project ketua tims
     console.log("🔍 [DEBUG] Getting user data");
     const ketuaTimIds = [
       ...new Set(
-        (projects || []).map((p: { ketua_tim_id: string }) => p.ketua_tim_id)
+        (projects || []).map((p: { ketua_tim_id: string }) => p.ketua_tim_id),
       ),
     ];
     console.log("🔍 [DEBUG] Ketua tim IDs:", ketuaTimIds);
@@ -152,7 +151,7 @@ export async function GET(request: NextRequest) {
 
     // Create a map for quick user lookup
     const userMap = new Map(
-      (users || []).map((u: { id: string; nama_lengkap: string }) => [u.id, u])
+      (users || []).map((u: { id: string; nama_lengkap: string }) => [u.id, u]),
     );
 
     // Enrich tasks with project and user data
@@ -185,7 +184,7 @@ export async function GET(request: NextRequest) {
             users: user || { id: "", nama_lengkap: "Unknown" },
           },
         };
-      }
+      },
     );
 
     console.log("🔍 [DEBUG] Enrichment complete, returning data");
@@ -199,7 +198,7 @@ export async function GET(request: NextRequest) {
     });
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

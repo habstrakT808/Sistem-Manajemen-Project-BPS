@@ -34,11 +34,10 @@ interface TeamProductivity {
 
 export async function GET(request: NextRequest) {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const supabase = (await createClient()) as any;
     const svc = createServiceClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
     const { searchParams } = new URL(request.url);
     const period = searchParams.get("period") || "3_months";
@@ -75,7 +74,7 @@ export async function GET(request: NextRequest) {
     let { data: ownedAllProjects } = await (svc as any)
       .from("projects")
       .select(
-        `id, nama_project, status, tanggal_mulai, deadline, created_at, updated_at`
+        `id, nama_project, status, tanggal_mulai, deadline, created_at, updated_at`,
       )
       .or(`ketua_tim_id.eq.${user.id},leader_user_id.eq.${user.id}`);
 
@@ -94,8 +93,8 @@ export async function GET(request: NextRequest) {
 
       const memberIds = new Set(
         (memberRows?.data || []).map(
-          (r: { project_id: string }) => r.project_id
-        )
+          (r: { project_id: string }) => r.project_id,
+        ),
       );
       for (const r of assignmentRows?.data || []) {
         memberIds.add((r as { project_id: string }).project_id);
@@ -113,7 +112,7 @@ export async function GET(request: NextRequest) {
             deadline,
             created_at,
             project_assignments (id)
-          `
+          `,
           )
           .in("id", Array.from(memberIds));
         ownedAllProjects = derivedProjects || [];
@@ -122,13 +121,13 @@ export async function GET(request: NextRequest) {
 
     // Owned project IDs used throughout
     const ownedIdArray = Array.from(
-      new Set((ownedAllProjects || []).map((p: any) => p.id))
+      new Set((ownedAllProjects || []).map((p: any) => p.id)),
     );
 
     // For widgets that should be ALL-TIME, use all owned projects
     const totalProjects = (ownedAllProjects || []).length;
     const completedProjects = (ownedAllProjects || []).filter(
-      (p: { status: string }) => p.status === "completed"
+      (p: { status: string }) => p.status === "completed",
     ).length;
     const completionRate =
       totalProjects > 0
@@ -139,14 +138,14 @@ export async function GET(request: NextRequest) {
     const completedProjectsWithDuration = (ownedAllProjects || [])
       .filter(
         (p: { status: string; tanggal_mulai: string; updated_at: string }) =>
-          p.status === "completed"
+          p.status === "completed",
       )
       .map((p: { tanggal_mulai: string; updated_at: string }) => {
         const start = new Date(p.tanggal_mulai);
         // Use updated_at as the completion timestamp when status is completed
         const end = new Date(p.updated_at);
         return Math.ceil(
-          (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)
+          (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24),
         );
       });
 
@@ -155,8 +154,8 @@ export async function GET(request: NextRequest) {
         ? Math.round(
             completedProjectsWithDuration.reduce(
               (sum: number, duration: number) => sum + duration,
-              0
-            ) / completedProjectsWithDuration.length
+              0,
+            ) / completedProjectsWithDuration.length,
           )
         : 0;
 
@@ -166,7 +165,7 @@ export async function GET(request: NextRequest) {
         if (p.status !== "completed") return false;
         // Consider a project on-time if it was completed (updated_at) on or before its deadline
         return new Date(p.updated_at) <= new Date(p.deadline);
-      }
+      },
     ).length;
 
     const onTimeDelivery =
@@ -184,13 +183,13 @@ export async function GET(request: NextRequest) {
         tanggal_mulai,
         deadline,
         project_assignments (id)
-      `
+      `,
       )
       .in(
         "id",
         ownedIdArray.length
           ? ownedIdArray
-          : ["00000000-0000-0000-0000-000000000000"]
+          : ["00000000-0000-0000-0000-000000000000"],
       ) // guard empty
       .eq("status", "active");
 
@@ -204,7 +203,7 @@ export async function GET(request: NextRequest) {
             .sort(
               (a: any, b: any) =>
                 new Date(b.updated_at || b.deadline || 0).getTime() -
-                new Date(a.updated_at || a.deadline || 0).getTime()
+                new Date(a.updated_at || a.deadline || 0).getTime(),
             )
             .slice(0, 5);
 
@@ -225,7 +224,7 @@ export async function GET(request: NextRequest) {
 
           const totalTasks = (projectTasks || []).length;
           const completedTasks = (projectTasks || []).filter(
-            (t: { status: string }) => t.status === "completed"
+            (t: { status: string }) => t.status === "completed",
           ).length;
           const completionPercentage =
             totalTasks > 0
@@ -236,16 +235,16 @@ export async function GET(request: NextRequest) {
           const today = new Date();
           const deadline = new Date(project.deadline);
           const daysRemaining = Math.ceil(
-            (deadline.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+            (deadline.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
           );
 
           // Calculate project timeline progress
           const startDate = new Date(project.tanggal_mulai);
           const totalDays = Math.ceil(
-            (deadline.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+            (deadline.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
           );
           const daysPassed = Math.ceil(
-            (today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+            (today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
           );
           const timelineProgress =
             totalDays > 0 ? Math.round((daysPassed / totalDays) * 100) : 0;
@@ -275,8 +274,8 @@ export async function GET(request: NextRequest) {
             budget_used: Math.min(100, Math.max(0, timelineProgress)), // Simplified budget calculation
             status,
           };
-        }
-      )
+        },
+      ),
     );
 
     // Team members across owned projects
@@ -290,9 +289,9 @@ export async function GET(request: NextRequest) {
     const uniqueMembers = Array.from(
       new Set(
         (teamAssignments || []).map(
-          (r: { assignee_id: string }) => r.assignee_id
-        )
-      )
+          (r: { assignee_id: string }) => r.assignee_id,
+        ),
+      ),
     ).map((id) => [String(id), String(id)] as [string, string]);
 
     const teamProductivity: TeamProductivity[] = await Promise.all(
@@ -315,10 +314,10 @@ export async function GET(request: NextRequest) {
 
         const totalTasks = (memberTasks || []).length;
         const completedTasks = (memberTasks || []).filter(
-          (t: { status: string }) => t.status === "completed"
+          (t: { status: string }) => t.status === "completed",
         ).length;
         const pendingTasks = (memberTasks || []).filter(
-          (t: { status: string }) => t.status === "pending"
+          (t: { status: string }) => t.status === "pending",
         ).length;
         const completionRate =
           totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
@@ -332,10 +331,11 @@ export async function GET(request: NextRequest) {
         const activeOwnedProjectIds = new Set(
           (ownedAllProjects as Array<any>)
             .filter((p) => p.status === "active" || p.status === "upcoming")
-            .map((p) => p.id)
+            .map((p) => p.id),
         );
         const projectsAssigned = (currentProjects || []).filter(
-          (r: { project_id: string }) => activeOwnedProjectIds.has(r.project_id)
+          (r: { project_id: string }) =>
+            activeOwnedProjectIds.has(r.project_id),
         ).length;
 
         // Determine workload level
@@ -354,13 +354,13 @@ export async function GET(request: NextRequest) {
           projects_assigned: projectsAssigned,
           workload_level: workloadLevel,
         };
-      })
+      }),
     );
 
     // Calculate team utilization
     const totalTeamMembers = uniqueMembers.length;
     const activeMembers = teamProductivity.filter(
-      (member) => member.projects_assigned > 0
+      (member) => member.projects_assigned > 0,
     ).length;
     const teamUtilization =
       totalTeamMembers > 0
@@ -385,7 +385,7 @@ export async function GET(request: NextRequest) {
           "id",
           ownedIdArray.length
             ? ownedIdArray
-            : ["00000000-0000-0000-0000-000000000000"]
+            : ["00000000-0000-0000-0000-000000000000"],
         )
         // Count projects that were completed in this month by looking at updated_at
         .gte("updated_at", monthStart.toISOString())
@@ -399,7 +399,7 @@ export async function GET(request: NextRequest) {
           "project_id",
           ownedIdArray.length
             ? ownedIdArray
-            : ["00000000-0000-0000-0000-000000000000"]
+            : ["00000000-0000-0000-0000-000000000000"],
         )
         .gte("updated_at", monthStart.toISOString())
         .lte("updated_at", monthEnd.toISOString());
@@ -411,20 +411,20 @@ export async function GET(request: NextRequest) {
           "project_id",
           ownedIdArray.length
             ? ownedIdArray
-            : ["00000000-0000-0000-0000-000000000000"]
+            : ["00000000-0000-0000-0000-000000000000"],
         )
         .eq("bulan", date.getMonth() + 1)
         .eq("tahun", date.getFullYear());
 
       const budgetSpent = (monthFinancial || []).reduce(
         (sum: number, record: { amount: number }) => sum + record.amount,
-        0
+        0,
       );
 
       monthlyTrends.push({
         month: date.toLocaleDateString("en-US", { month: "short" }),
         projects_completed: (monthProjects || []).filter(
-          (p: { status: string }) => p.status === "completed"
+          (p: { status: string }) => p.status === "completed",
         ).length,
         tasks_completed: (monthTasks || []).length,
         budget_spent: budgetSpent,
@@ -450,7 +450,7 @@ export async function GET(request: NextRequest) {
     console.error("Analytics API Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

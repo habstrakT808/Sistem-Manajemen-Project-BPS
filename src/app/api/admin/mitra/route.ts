@@ -10,12 +10,11 @@ const supabaseAdmin = createClient<Database>(
       autoRefreshToken: false,
       persistSession: false,
     },
-  }
+  },
 );
 
 export async function GET() {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (supabaseAdmin as any)
       .from("mitra")
       .select(
@@ -24,7 +23,7 @@ export async function GET() {
         mitra_reviews (
           rating
         )
-      `
+      `,
       )
       .order("created_at", { ascending: false });
 
@@ -32,7 +31,7 @@ export async function GET() {
       console.error("Error fetching mitra:", error);
       return NextResponse.json(
         { error: "Failed to fetch mitra" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -42,7 +41,7 @@ export async function GET() {
         (
           mitra: Database["public"]["Tables"]["mitra"]["Row"] & {
             mitra_reviews?: { rating: number }[];
-          }
+          },
         ) => ({
           ...mitra,
           review_count: mitra.mitra_reviews?.length || 0,
@@ -51,11 +50,11 @@ export async function GET() {
                 mitra.mitra_reviews.reduce(
                   (sum: number, review: { rating: number }) =>
                     sum + review.rating,
-                  0
+                  0,
                 ) / mitra.mitra_reviews.length
               ).toFixed(1)
             : 0,
-        })
+        }),
       ) || [];
 
     return NextResponse.json({ data: mitraWithStats });
@@ -63,7 +62,7 @@ export async function GET() {
     console.error("Error in GET /api/admin/mitra:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -92,7 +91,7 @@ export async function POST(request: NextRequest) {
     if (!nama_mitra || !jenis) {
       return NextResponse.json(
         { error: "Missing required fields" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -131,7 +130,6 @@ export async function POST(request: NextRequest) {
       if (occ?.id) insertData.pekerjaan_id = occ.id;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (supabaseAdmin as any)
       .from("mitra")
       .insert(insertData)
@@ -142,7 +140,7 @@ export async function POST(request: NextRequest) {
       console.error("Error creating mitra:", error);
       return NextResponse.json(
         { error: "Failed to create mitra" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -154,7 +152,7 @@ export async function POST(request: NextRequest) {
     console.error("Error in POST /api/admin/mitra:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -183,7 +181,7 @@ export async function PUT(request: NextRequest) {
     if (!id || !nama_mitra || !jenis) {
       return NextResponse.json(
         { error: "Missing required fields" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -221,7 +219,6 @@ export async function PUT(request: NextRequest) {
       if (occ?.id) updateData.pekerjaan_id = occ.id;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabaseAdmin as any)
       .from("mitra")
       .update(updateData)
@@ -231,7 +228,7 @@ export async function PUT(request: NextRequest) {
       console.error("Error updating mitra:", error);
       return NextResponse.json(
         { error: "Failed to update mitra" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -242,7 +239,7 @@ export async function PUT(request: NextRequest) {
     console.error("Error in PUT /api/admin/mitra:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -255,11 +252,10 @@ export async function DELETE(request: NextRequest) {
     if (!id) {
       return NextResponse.json(
         { error: "Mitra ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabaseAdmin as any)
       .from("mitra")
       .delete()
@@ -269,7 +265,7 @@ export async function DELETE(request: NextRequest) {
       console.error("Error deleting mitra:", error);
       return NextResponse.json(
         { error: "Failed to delete mitra" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -280,7 +276,7 @@ export async function DELETE(request: NextRequest) {
     console.error("Error in DELETE /api/admin/mitra:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
