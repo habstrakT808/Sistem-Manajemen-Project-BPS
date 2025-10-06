@@ -87,14 +87,14 @@ export function MitraManagement() {
       const result = await response.json();
 
       if (!response.ok) {
-        toast.error(result.error || "Failed to fetch mitra");
+        toast.error(result.error || "Gagal mengambil mitra");
         return;
       }
 
       setMitra(result.data);
     } catch (error) {
       console.error("Error fetching mitra:", error);
-      toast.error("Failed to fetch mitra");
+      toast.error("Gagal mengambil mitra");
     } finally {
       setLoading(false);
     }
@@ -140,16 +140,16 @@ export function MitraManagement() {
       const result = await response.json();
 
       if (!response.ok) {
-        toast.error(result.error || "Failed to delete mitra");
+        toast.error(result.error || "Gagal menghapus mitra");
         return;
       }
 
-      toast.success("Mitra deleted successfully");
+      toast.success("Mitra berhasil dihapus");
       fetchMitra();
       setDeletingMitra(null);
     } catch (error) {
       console.error("Error deleting mitra:", error);
-      toast.error("Failed to delete mitra");
+      toast.error("Gagal menghapus mitra");
     }
   };
 
@@ -173,17 +173,19 @@ export function MitraManagement() {
       const result = await response.json();
 
       if (!response.ok) {
-        toast.error(result.error || "Failed to update mitra status");
+        toast.error(result.error || "Gagal memperbarui status mitra");
         return;
       }
 
       toast.success(
-        `Mitra ${mitraItem.is_active ? "deactivated" : "activated"} successfully`,
+        mitraItem.is_active
+          ? "Mitra berhasil dinonaktifkan"
+          : "Mitra berhasil diaktifkan",
       );
       fetchMitra();
     } catch (error) {
       console.error("Error updating mitra status:", error);
-      toast.error("Failed to update mitra status");
+      toast.error("Gagal memperbarui status mitra");
     }
   };
 
@@ -247,10 +249,10 @@ export function MitraManagement() {
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent flex items-center">
             <Building2 className="w-8 h-8 mr-3 text-purple-600" />
-            Mitra Management
+            Manajemen Mitra
           </h1>
           <p className="text-gray-600 text-lg mt-2">
-            Manage business partners and individual contractors
+            Kelola mitra bisnis dan kontraktor individu
           </p>
         </div>
 
@@ -261,14 +263,14 @@ export function MitraManagement() {
             className="border-2 border-purple-300 text-purple-700 hover:bg-purple-50 font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
           >
             <Building2 className="w-4 h-4 mr-2" />
-            Import Excel
+            Impor Excel
           </Button>
           <Button
             onClick={() => setShowMitraForm(true)}
             className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
           >
             <Plus className="w-4 h-4 mr-2" />
-            Add Mitra
+            Tambah Mitra
           </Button>
         </div>
       </div>
@@ -298,7 +300,7 @@ export function MitraManagement() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-semibold text-gray-600 mb-1">
-                  Active Partners
+                  Mitra Aktif
                 </p>
                 <p className="text-2xl font-bold text-gray-900">
                   {mitra.filter((m) => m.is_active).length}
@@ -316,10 +318,10 @@ export function MitraManagement() {
       <div className="border-0 shadow-xl rounded-xl overflow-hidden bg-white">
         <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-6">
           <div className="font-semibold text-xl text-gray-900">
-            Filters & Search
+            Filter & Pencarian
           </div>
           <div className="text-sm text-gray-600 mt-1">
-            Find and filter mitra based on their information
+            Temukan dan saring mitra berdasarkan informasinya
           </div>
         </div>
         <div className="p-6 bg-white">
@@ -328,7 +330,7 @@ export function MitraManagement() {
               <div className="relative">
                 <Search className="absolute left-4 top-3 h-5 w-5 text-gray-400" />
                 <Input
-                  placeholder="Search mitra..."
+                  placeholder="Cari mitra..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-12 py-3 rounded-xl border-2 focus:border-purple-300 transition-colors"
@@ -343,20 +345,27 @@ export function MitraManagement() {
                     variant="outline"
                     className="border-2 border-gray-200 hover:border-purple-300 hover:bg-purple-50 rounded-xl px-6"
                   >
-                    Status: {statusFilter === "all" ? "All" : statusFilter}
+                    Status:{" "}
+                    {statusFilter === "all"
+                      ? "Semua"
+                      : statusFilter === "active"
+                        ? "Aktif"
+                        : "Tidak Aktif"}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="rounded-xl shadow-xl">
-                  <DropdownMenuLabel>Filter by Status</DropdownMenuLabel>
+                  <DropdownMenuLabel>
+                    Filter berdasarkan Status
+                  </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => setStatusFilter("all")}>
-                    All Status
+                    Semua Status
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setStatusFilter("active")}>
-                    Active
+                    Aktif
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setStatusFilter("inactive")}>
-                    Inactive
+                    Tidak Aktif
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -372,7 +381,7 @@ export function MitraManagement() {
             Mitra ({filteredMitra.length})
           </div>
           <div className="text-muted-foreground text-sm">
-            A list of all business partners and contractors
+            Daftar semua mitra bisnis dan kontraktor
           </div>
         </div>
         <div className="p-0 bg-white">
@@ -380,7 +389,7 @@ export function MitraManagement() {
             <div className="flex items-center justify-center h-32">
               <div className="flex items-center space-x-2">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-                <span className="text-gray-600">Loading mitra...</span>
+                <span className="text-gray-600">Memuat mitra...</span>
               </div>
             </div>
           ) : (
@@ -388,7 +397,7 @@ export function MitraManagement() {
               <TableHeader>
                 <TableRow className="bg-gray-50 hover:bg-gray-50">
                   <TableHead className="font-semibold text-gray-900">
-                    Partner
+                    Mitra
                   </TableHead>
                   <TableHead className="font-semibold text-gray-900">
                     Rating
@@ -397,13 +406,13 @@ export function MitraManagement() {
                     Status
                   </TableHead>
                   <TableHead className="font-semibold text-gray-900">
-                    Contact
+                    Kontak
                   </TableHead>
                   <TableHead className="font-semibold text-gray-900">
-                    Created
+                    Dibuat
                   </TableHead>
                   <TableHead className="w-[70px] font-semibold text-gray-900">
-                    Actions
+                    Aksi
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -435,7 +444,7 @@ export function MitraManagement() {
                           renderStarRating(mitraItem.average_rating)
                         ) : (
                           <span className="text-sm text-gray-400">
-                            No reviews
+                            Tidak ada ulasan
                           </span>
                         )}
                       </TableCell>
@@ -448,17 +457,17 @@ export function MitraManagement() {
                               : "bg-gray-100 text-gray-700 border-gray-200"
                           } font-semibold`}
                         >
-                          {mitraItem.is_active ? "Active" : "Inactive"}
+                          {mitraItem.is_active ? "Aktif" : "Tidak Aktif"}
                         </Badge>
                       </TableCell>
 
                       <TableCell>
                         <div className="text-sm">
                           <div className="text-gray-900">
-                            {mitraItem.kontak || "No contact"}
+                            {mitraItem.kontak || "Tidak ada kontak"}
                           </div>
                           <div className="text-gray-500 text-xs">
-                            {mitraItem.alamat || "No address"}
+                            {mitraItem.alamat || "Tidak ada alamat"}
                           </div>
                         </div>
                       </TableCell>
@@ -485,7 +494,7 @@ export function MitraManagement() {
                             align="end"
                             className="rounded-xl shadow-xl"
                           >
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuLabel>Aksi</DropdownMenuLabel>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               onClick={() => setDetailMitra(mitraItem)}
@@ -503,7 +512,7 @@ export function MitraManagement() {
                               className="rounded-lg"
                             >
                               <Edit className="w-4 h-4 mr-2" />
-                              Edit
+                              Ubah
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => handleToggleMitraStatus(mitraItem)}
@@ -512,12 +521,12 @@ export function MitraManagement() {
                               {mitraItem.is_active ? (
                                 <>
                                   <EyeOff className="w-4 h-4 mr-2" />
-                                  Deactivate
+                                  Nonaktifkan
                                 </>
                               ) : (
                                 <>
                                   <Eye className="w-4 h-4 mr-2" />
-                                  Activate
+                                  Aktifkan
                                 </>
                               )}
                             </DropdownMenuItem>
@@ -527,7 +536,7 @@ export function MitraManagement() {
                               className="text-red-600 rounded-lg hover:bg-red-50"
                             >
                               <Trash2 className="w-4 h-4 mr-2" />
-                              Delete
+                              Hapus
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -541,9 +550,9 @@ export function MitraManagement() {
                     <TableCell colSpan={7} className="text-center py-16">
                       <div className="text-gray-500">
                         <Building2 className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                        <p className="text-lg font-medium">No mitra found</p>
+                        <p className="text-lg font-medium">Tidak ada mitra</p>
                         <p className="text-sm mt-2">
-                          Try adjusting your search or filters
+                          Coba sesuaikan pencarian atau filter Anda
                         </p>
                       </div>
                     </TableCell>
@@ -574,7 +583,7 @@ export function MitraManagement() {
                     {detailMitra.nama_mitra}
                   </div>
                   <div className="text-sm text-gray-500">
-                    Created{" "}
+                    Dibuat{" "}
                     {new Date(detailMitra.created_at).toLocaleDateString(
                       "id-ID",
                     )}
@@ -588,7 +597,7 @@ export function MitraManagement() {
                     Status
                   </div>
                   <div className="font-medium text-gray-900">
-                    {detailMitra.is_active ? "Active" : "Inactive"}
+                    {detailMitra.is_active ? "Aktif" : "Tidak Aktif"}
                   </div>
                 </div>
                 <div className="bg-white rounded-xl border p-4">
@@ -694,20 +703,20 @@ export function MitraManagement() {
       >
         <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the
-              mitra <strong> {deletingMitra?.nama_mitra}</strong> and remove all
-              associated data including reviews and project assignments.
+              Tindakan ini tidak dapat dibatalkan. Ini akan menghapus mitra{" "}
+              <strong> {deletingMitra?.nama_mitra}</strong> secara permanen dan
+              menghapus semua data terkait termasuk ulasan dan penugasan proyek.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="rounded-xl">Batal</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deletingMitra && handleDeleteMitra(deletingMitra)}
               className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 rounded-xl"
             >
-              Delete Mitra
+              Hapus Mitra
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

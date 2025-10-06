@@ -62,9 +62,11 @@ interface TaskData {
   }>;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const supabase = await createClient();
+    const { searchParams } = new URL(request.url);
+    const projectId = searchParams.get("project_id");
 
     // Auth check
     const {
@@ -94,16 +96,24 @@ export async function GET() {
         .not("team_id", "is", null)
         .or(`leader_user_id.eq.${user.id},ketua_tim_id.eq.${user.id}`),
       // Use service role for tasks as tasks policies may reference projects via FOR ALL
-      svc
-        .from("tasks")
-        .select("id", { count: "exact", head: true })
-        .eq("assignee_user_id", user.id)
-        .in("status", ["pending", "in_progress"]),
-      svc
-        .from("tasks")
-        .select("id", { count: "exact", head: true })
-        .eq("assignee_user_id", user.id)
-        .eq("status", "completed"),
+      (() => {
+        let q = svc
+          .from("tasks")
+          .select("id", { count: "exact", head: true })
+          .eq("assignee_user_id", user.id)
+          .in("status", ["pending", "in_progress"]);
+        if (projectId) q = q.eq("project_id", projectId);
+        return q;
+      })(),
+      (() => {
+        let q = svc
+          .from("tasks")
+          .select("id", { count: "exact", head: true })
+          .eq("assignee_user_id", user.id)
+          .eq("status", "completed");
+        if (projectId) q = q.eq("project_id", projectId);
+        return q;
+      })(),
       // Earnings rows (will be filtered later by allocation->task->project team_id)
       svc
         .from("earnings_ledger")
@@ -111,9 +121,10 @@ export async function GET() {
         .eq("user_id", user.id)
         .gte("occurred_on", startOfMonth.toISOString().split("T")[0]),
       // Get all transport allocations (will be filtered by project team_id)
+      // Include allocation_date so project-scoped counters can detect allocated vs pending
       svc
         .from("task_transport_allocations")
-        .select("id, amount, task_id")
+        .select("id, amount, task_id, allocation_date, canceled_at")
         .eq("user_id", user.id)
         .is("canceled_at", null),
       // Use service role for transport allocations to avoid policies referencing projects
@@ -172,19 +183,19 @@ export async function GET() {
       transportDataSet.status === "fulfilled"
         ? transportDataSet.value.data || []
         : [];
-    const pendingTransportCount =
+    let pendingTransportCount =
       pendingTransportSet.status === "fulfilled"
         ? pendingTransportSet.value.count || 0
         : 0;
-    const transportRequired =
+    let transportRequired =
       transportRequiredSet.status === "fulfilled"
         ? transportRequiredSet.value.count || 0
         : 0;
-    const transportAllocated =
+    let transportAllocated =
       transportAllocatedSet.status === "fulfilled"
         ? transportAllocatedSet.value.count || 0
         : 0;
-    const pendingReviews =
+    let pendingReviews =
       pendingReviewsSet.status === "fulfilled"
         ? pendingReviewsSet.value.count || 0
         : 0;
@@ -243,6 +254,96 @@ export async function GET() {
         .reduce((sum: number, r: any) => sum + (r?.amount || 0), 0);
     }
 
+    // Align Pending Reviews with reviews page logic
+    try {
+      // 1) Projects where the user is a member and actually has tasks
+      const { data: memberRows } = await svc
+        .from("project_members")
+        .select("project_id")
+        .eq("user_id", user.id);
+
+      const { data: userTasksForProjects } = await svc
+        .from("tasks")
+        .select("project_id")
+        .eq("assignee_user_id", user.id);
+
+      const participatedProjectIds = new Set<string>(
+        (userTasksForProjects || [])
+          .map((t: any) => t.project_id)
+          .filter(Boolean)
+          .map(String),
+      );
+
+      const memberProjectIds = (memberRows || [])
+        .map((m: any) => m.project_id)
+        .filter((pid: any) => participatedProjectIds.has(String(pid)));
+
+      if (memberProjectIds.length > 0) {
+        const { data: completedProjects } = await svc
+          .from("projects")
+          .select("id, status")
+          .in("id", memberProjectIds)
+          .eq("status", "completed");
+
+        const completedIds = ((completedProjects || []) as Array<any>)
+          .map((p) => p.id)
+          .filter(Boolean) as string[];
+
+        const scopedCompletedIds = projectId
+          ? completedIds.filter((id) => id === projectId)
+          : completedIds;
+
+        if (scopedCompletedIds.length > 0) {
+          // 2) Mitra assignments on those completed projects
+          const { data: mitraAssignments } = await (svc as any)
+            .from("project_assignments")
+            .select("project_id, assignee_id")
+            .eq("assignee_type", "mitra")
+            .in("project_id", scopedCompletedIds);
+
+          const assignments = (mitraAssignments || []) as Array<{
+            project_id: string;
+            assignee_id: string;
+          }>;
+
+          // 3) Existing reviews by this user (could be unrated/null rating)
+          const { data: existingReviews } = await (svc as any)
+            .from("mitra_reviews")
+            .select("project_id, mitra_id, rating")
+            .eq("pegawai_id", user.id)
+            .in(
+              "project_id",
+              scopedCompletedIds.length > 0 ? scopedCompletedIds : ["__none__"],
+            );
+
+          const hasReview = new Set(
+            (existingReviews || []).map(
+              (r: any) => `${r.project_id}:${r.mitra_id}`,
+            ),
+          );
+
+          // Count assignments without any review OR with review but rating is null
+          const pendingFromAssignments = assignments.filter((a) => {
+            const key = `${a.project_id}:${a.assignee_id}`;
+            const match = (existingReviews || []).find(
+              (r: any) =>
+                r.project_id === a.project_id && r.mitra_id === a.assignee_id,
+            );
+            return !match || match.rating == null;
+          }).length;
+
+          pendingReviews = pendingFromAssignments;
+        } else {
+          pendingReviews = 0;
+        }
+      } else {
+        pendingReviews = 0;
+      }
+    } catch (e) {
+      // Keep fallback from initial count if recompute fails
+      console.warn("Pending reviews recompute failed", e);
+    }
+
     // Calculate transport earnings from actual transport allocations
     let transport_earnings = 0;
     if ((transportAllocationsData || []).length > 0) {
@@ -270,14 +371,37 @@ export async function GET() {
             .not("team_id", "is", null);
           okProjectIds = new Set((projectsOk || []).map((p: any) => p.id));
         }
-        transport_earnings = (transportAllocationsData || [])
-          .filter((a: any) => {
-            const t = ((tasks as any[]) || []).find(
-              (x: any) => x.id === a.task_id,
-            ) as any;
-            return t && okProjectIds.has(t.project_id);
-          })
-          .reduce((sum: number, a: any) => sum + (a?.amount || 0), 0);
+        const allocationsForScopedProjects = (
+          transportAllocationsData || []
+        ).filter((a: any) => {
+          const t = ((tasks as any[]) || []).find(
+            (x: any) => x.id === a.task_id,
+          ) as any;
+          return t && okProjectIds.has(t.project_id);
+        });
+        transport_earnings = allocationsForScopedProjects.reduce(
+          (sum: number, a: any) => sum + (a?.amount || 0),
+          0,
+        );
+
+        // If a specific project is selected, override transport counters to be project-scoped
+        if (projectId) {
+          const tasksById: Record<string, string | null> = {};
+          (tasks || []).forEach((t: any) => (tasksById[t.id] = t.project_id));
+          const forThisProject = (alloc: any) =>
+            tasksById[alloc.task_id] === projectId && !alloc.canceled_at;
+
+          const allForProject = (transportAllocationsData || []).filter(
+            (a: any) => forThisProject(a),
+          );
+          transportRequired = allForProject.length;
+          transportAllocated = allForProject.filter(
+            (a: any) => a.allocation_date,
+          ).length;
+          pendingTransportCount = allForProject.filter(
+            (a: any) => !a.allocation_date,
+          ).length;
+        }
       }
     }
 
@@ -302,7 +426,7 @@ export async function GET() {
     weekFromNow.setDate(today.getDate() + 7);
 
     // Note: avoid join on projects because there is no FK in schema cache
-    const { data: todayTasks, error: tasksError } = await svc
+    let todayQuery = svc
       .from("tasks")
       .select(
         `
@@ -327,6 +451,10 @@ export async function GET() {
       .lte("start_date", weekFromNow.toISOString().split("T")[0])
       .gte("end_date", today.toISOString().split("T")[0])
       .order("start_date", { ascending: true });
+    if (projectId) {
+      todayQuery = todayQuery.eq("project_id", projectId);
+    }
+    const { data: todayTasks, error: tasksError } = await todayQuery;
 
     if (tasksError) {
       throw tasksError;

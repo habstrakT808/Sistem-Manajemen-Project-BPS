@@ -626,407 +626,416 @@ export default function TaskManagement() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-            Advanced Task Management
+            Manajemen Tugas Lanjutan
           </h1>
           <p className="text-gray-600 text-lg mt-2">
-            Create and manage tasks with transport allocations for your team
-            members.
+            Buat dan kelola tugas dengan alokasi transport untuk anggota tim.
           </p>
         </div>
 
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300">
-              <Plus className="w-4 h-4 mr-2" />
-              Create Task
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Create New Task</DialogTitle>
-              <DialogDescription>
-                Create a task with date range and optional transport allocation.
-              </DialogDescription>
-            </DialogHeader>
+        <div className="flex items-center space-x-2">
+          <Dialog
+            open={isCreateDialogOpen}
+            onOpenChange={setIsCreateDialogOpen}
+          >
+            <DialogTrigger asChild>
+              <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold px-4 py-2 rounded-xl">
+                <Plus className="w-4 h-4 mr-2" />
+                Buat Tugas
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Buat Tugas Baru</DialogTitle>
+                <DialogDescription>
+                  Buat tugas dengan rentang tanggal dan opsi alokasi transport.
+                </DialogDescription>
+              </DialogHeader>
 
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="project">Project *</Label>
-                <Select
-                  value={formData.project_id}
-                  onValueChange={(value) => {
-                    setFormData((prev) => ({
-                      ...prev,
-                      project_id: value,
-                      assignee_user_id: "",
-                    }));
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select project" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(projects || []).map((project) => (
-                      <SelectItem key={project.id} value={project.id}>
-                        {project.nama_project}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Assignee Type Selection */}
-              <div className="space-y-2">
-                <Label>Assignee Type *</Label>
-                <div className="grid grid-cols-2 gap-3">
-                  <Button
-                    type="button"
-                    variant={
-                      formData.assignee_type === "member"
-                        ? "default"
-                        : "outline"
-                    }
-                    onClick={() => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        assignee_type: "member",
-                        assignee_mitra_id: "",
-                        honor_amount: 0,
-                      }));
-                    }}
-                    className={`flex items-center justify-center space-x-2 h-12 ${
-                      formData.assignee_type === "member"
-                        ? "bg-blue-600 hover:bg-blue-700 text-white"
-                        : "border-2 border-gray-200 hover:border-blue-300"
-                    }`}
-                  >
-                    <User className="w-4 h-4" />
-                    <span>Team Member</span>
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={
-                      formData.assignee_type === "mitra" ? "default" : "outline"
-                    }
-                    onClick={() => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        assignee_type: "mitra",
-                        assignee_user_id: "",
-                        transport_days: 0,
-                        has_transport: false,
-                      }));
-                    }}
-                    className={`flex items-center justify-center space-x-2 h-12 ${
-                      formData.assignee_type === "mitra"
-                        ? "bg-green-600 hover:bg-green-700 text-white"
-                        : "border-2 border-gray-200 hover:border-green-300"
-                    }`}
-                  >
-                    <Building2 className="w-4 h-4" />
-                    <span>Mitra</span>
-                  </Button>
-                </div>
-              </div>
-
-              {/* Team Member Selection */}
-              {formData.assignee_type === "member" && (
+              <div className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="assignee">Team Member *</Label>
+                  <Label htmlFor="project">Proyek *</Label>
                   <Select
-                    value={formData.assignee_user_id}
-                    onValueChange={(value) =>
+                    value={formData.project_id}
+                    onValueChange={(value) => {
                       setFormData((prev) => ({
                         ...prev,
-                        assignee_user_id: value,
-                      }))
-                    }
-                    disabled={!formData.project_id || loadingMembers}
+                        project_id: value,
+                        assignee_user_id: "",
+                      }));
+                    }}
                   >
                     <SelectTrigger>
-                      <SelectValue
-                        placeholder={
-                          loadingMembers
-                            ? "Loading team members..."
-                            : !formData.project_id
-                              ? "Select project first"
-                              : (projectMembers?.length || 0) === 0
-                                ? "No team members available"
-                                : "Select team member"
-                        }
-                      />
+                      <SelectValue placeholder="Pilih proyek" />
                     </SelectTrigger>
                     <SelectContent>
-                      {(projectMembers || []).map((member) => (
-                        <SelectItem key={member.id} value={member.id}>
-                          <div className="flex items-center justify-between w-full">
-                            <span>{member.nama_lengkap}</span>
-                            <span className="text-xs text-gray-500 ml-2">
-                              {member.email}
-                            </span>
-                          </div>
+                      {(projects || []).map((project) => (
+                        <SelectItem key={project.id} value={project.id}>
+                          {project.nama_project}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-              )}
 
-              {/* Mitra Selection */}
-              {formData.assignee_type === "mitra" && (
+                {/* Assignee Type Selection */}
                 <div className="space-y-2">
-                  <Label htmlFor="mitra">Mitra *</Label>
-                  <Select
-                    value={formData.assignee_mitra_id}
-                    onValueChange={(value) => {
-                      const selectedMitra = mitraOptions?.find(
-                        (m) => m.id === value,
-                      );
-                      setFormData((prev) => ({
-                        ...prev,
-                        assignee_mitra_id: value,
-                        honor_amount: selectedMitra ? 500000 : 0, // Default honor amount
-                      }));
-                    }}
-                    disabled={!formData.project_id || loadingMitra}
-                  >
-                    <SelectTrigger>
-                      <SelectValue
-                        placeholder={
-                          !formData.project_id
-                            ? "Select project first"
-                            : loadingMitra
-                              ? "Loading project mitra..."
-                              : (mitraOptions?.length || 0) === 0
-                                ? "No mitra assigned to this project"
-                                : "Select mitra"
-                        }
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(mitraOptions || []).map((mitra) => (
-                        <SelectItem key={mitra.id} value={mitra.id}>
-                          <div className="flex items-center justify-between w-full">
-                            <div className="flex flex-col">
-                              <span className="font-medium">
-                                {mitra.nama_mitra}
+                  <Label>Tipe Penugasan *</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button
+                      type="button"
+                      variant={
+                        formData.assignee_type === "member"
+                          ? "default"
+                          : "outline"
+                      }
+                      onClick={() => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          assignee_type: "member",
+                          assignee_mitra_id: "",
+                          honor_amount: 0,
+                        }));
+                      }}
+                      className={`flex items-center justify-center space-x-2 h-12 ${
+                        formData.assignee_type === "member"
+                          ? "bg-blue-600 hover:bg-blue-700 text-white"
+                          : "border-2 border-gray-200 hover:border-blue-300"
+                      }`}
+                    >
+                      <User className="w-4 h-4" />
+                      <span>Anggota Tim</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={
+                        formData.assignee_type === "mitra"
+                          ? "default"
+                          : "outline"
+                      }
+                      onClick={() => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          assignee_type: "mitra",
+                          assignee_user_id: "",
+                          transport_days: 0,
+                          has_transport: false,
+                        }));
+                      }}
+                      className={`flex items-center justify-center space-x-2 h-12 ${
+                        formData.assignee_type === "mitra"
+                          ? "bg-green-600 hover:bg-green-700 text-white"
+                          : "border-2 border-gray-200 hover:border-green-300"
+                      }`}
+                    >
+                      <Building2 className="w-4 h-4" />
+                      <span>Mitra</span>
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Team Member Selection */}
+                {formData.assignee_type === "member" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="assignee">Anggota Tim *</Label>
+                    <Select
+                      value={formData.assignee_user_id}
+                      onValueChange={(value) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          assignee_user_id: value,
+                        }))
+                      }
+                      disabled={!formData.project_id || loadingMembers}
+                    >
+                      <SelectTrigger>
+                        <SelectValue
+                          placeholder={
+                            loadingMembers
+                              ? "Memuat anggota tim..."
+                              : !formData.project_id
+                                ? "Pilih proyek terlebih dahulu"
+                                : (projectMembers?.length || 0) === 0
+                                  ? "Tidak ada anggota tim"
+                                  : "Pilih anggota tim"
+                          }
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(projectMembers || []).map((member) => (
+                          <SelectItem key={member.id} value={member.id}>
+                            <div className="flex items-center justify-between w-full">
+                              <span>{member.nama_lengkap}</span>
+                              <span className="text-xs text-gray-500 ml-2">
+                                {member.email}
                               </span>
-                              <div className="flex items-center space-x-2 text-xs text-gray-500">
-                                <span className="capitalize">
-                                  {mitra.jenis}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* Mitra Selection */}
+                {formData.assignee_type === "mitra" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="mitra">Mitra *</Label>
+                    <Select
+                      value={formData.assignee_mitra_id}
+                      onValueChange={(value) => {
+                        const selectedMitra = mitraOptions?.find(
+                          (m) => m.id === value,
+                        );
+                        setFormData((prev) => ({
+                          ...prev,
+                          assignee_mitra_id: value,
+                          honor_amount: selectedMitra ? 500000 : 0, // Default honor amount
+                        }));
+                      }}
+                      disabled={!formData.project_id || loadingMitra}
+                    >
+                      <SelectTrigger>
+                        <SelectValue
+                          placeholder={
+                            !formData.project_id
+                              ? "Pilih proyek terlebih dahulu"
+                              : loadingMitra
+                                ? "Memuat mitra proyek..."
+                                : (mitraOptions?.length || 0) === 0
+                                  ? "Tidak ada mitra pada proyek ini"
+                                  : "Pilih mitra"
+                          }
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(mitraOptions || []).map((mitra) => (
+                          <SelectItem key={mitra.id} value={mitra.id}>
+                            <div className="flex items-center justify-between w-full">
+                              <div className="flex flex-col">
+                                <span className="font-medium">
+                                  {mitra.nama_mitra}
                                 </span>
-                                {mitra.rating_average > 0 && (
-                                  <span>
-                                    ★ {mitra.rating_average.toFixed(1)}
+                                <div className="flex items-center space-x-2 text-xs text-gray-500">
+                                  <span className="capitalize">
+                                    {mitra.jenis}
                                   </span>
-                                )}
+                                  {mitra.rating_average > 0 && (
+                                    <span>
+                                      ★ {mitra.rating_average.toFixed(1)}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label htmlFor="title">Task Title *</Label>
-                <Input
-                  id="title"
-                  value={formData.title || ""}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, title: e.target.value }))
-                  }
-                  placeholder="Enter task title"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="description">Task Description *</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description || ""}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      description: e.target.value,
-                    }))
-                  }
-                  placeholder="Describe the task in detail..."
-                  rows={3}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="start_date">Start Date *</Label>
-                  <Input
-                    id="start_date"
-                    type="date"
-                    value={formData.start_date || ""}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        start_date: e.target.value,
-                      }))
-                    }
-                    min={selectedProjectDetail?.tanggal_mulai}
-                    max={selectedProjectDetail?.deadline}
-                  />
-                  {selectedProjectDetail && (
-                    <div className="text-xs text-gray-500">
-                      Project:{" "}
-                      {new Date(
-                        selectedProjectDetail.tanggal_mulai,
-                      ).toLocaleDateString("id-ID")}{" "}
-                      -{" "}
-                      {new Date(
-                        selectedProjectDetail.deadline,
-                      ).toLocaleDateString("id-ID")}
-                    </div>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="end_date">End Date *</Label>
-                  <Input
-                    id="end_date"
-                    type="date"
-                    value={formData.end_date || ""}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        end_date: e.target.value,
-                      }))
-                    }
-                    min={
-                      formData.start_date ||
-                      selectedProjectDetail?.tanggal_mulai
-                    }
-                    max={selectedProjectDetail?.deadline}
-                  />
-                </div>
-              </div>
-
-              {/* Transport Allowance for Team Members */}
-              {formData.assignee_type === "member" && (
-                <div className="space-y-2">
-                  <Label htmlFor="transport_days">Transport Days</Label>
-                  <div className="flex items-center space-x-3 p-4 border border-gray-200 rounded-xl">
-                    <MapPin className="w-5 h-5 text-blue-500" />
-                    <div className="flex-1">
-                      <div className="font-semibold text-gray-900">
-                        Transport Allowance
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {formatCurrency(150000)} per day ×{" "}
-                        {formData.transport_days} days ={" "}
-                        {formatCurrency(150000 * formData.transport_days)}
-                      </div>
-                    </div>
-                    <div className="w-24">
-                      <Input
-                        id="transport_days"
-                        type="number"
-                        min="0"
-                        value={formData.transport_days}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            transport_days: parseInt(e.target.value) || 0,
-                          }))
-                        }
-                        placeholder="0"
-                        className="text-center"
-                      />
-                    </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                </div>
-              )}
-
-              {/* Honor for Mitra */}
-              {formData.assignee_type === "mitra" && (
-                <div className="space-y-2">
-                  <Label htmlFor="honor_amount">Honor Amount</Label>
-                  <div className="flex items-center space-x-3 p-4 border border-green-200 rounded-xl bg-green-50">
-                    <DollarSign className="w-5 h-5 text-green-600" />
-                    <div className="flex-1">
-                      <div className="font-semibold text-gray-900">
-                        Honor untuk Mitra
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        Total honor yang akan diberikan kepada mitra
-                      </div>
-                    </div>
-                    <div className="w-32">
-                      <Input
-                        id="honor_amount"
-                        type="number"
-                        min="0"
-                        step="50000"
-                        value={formData.honor_amount}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            honor_amount: parseInt(e.target.value) || 0,
-                          }))
-                        }
-                        placeholder="500000"
-                        className="text-center"
-                      />
-                    </div>
-                  </div>
-                  <div className="text-xs text-gray-500 px-1">
-                    Total: {formatCurrency(formData.honor_amount)}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setIsCreateDialogOpen(false);
-                  setFormData(initialFormData);
-                }}
-                disabled={creating}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleCreateTask}
-                disabled={creating}
-                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
-              >
-                {creating ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create Task
-                  </>
                 )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            setSelectedStatus("all");
-            setSelectedProject("all");
-            setSearchTerm("");
-          }}
-          className="text-gray-600 hover:text-gray-900"
-        >
-          <X className="w-4 h-4 mr-2" />
-          Clear Filters
-        </Button>
+
+                <div className="space-y-2">
+                  <Label htmlFor="title">Judul Tugas *</Label>
+                  <Input
+                    id="title"
+                    value={formData.title || ""}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        title: e.target.value,
+                      }))
+                    }
+                    placeholder="Masukkan judul tugas"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="description">Deskripsi Tugas *</Label>
+                  <Textarea
+                    id="description"
+                    value={formData.description || ""}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        description: e.target.value,
+                      }))
+                    }
+                    placeholder="Jelaskan tugas secara detail..."
+                    rows={3}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="start_date">Tanggal Mulai *</Label>
+                    <Input
+                      id="start_date"
+                      type="date"
+                      value={formData.start_date || ""}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          start_date: e.target.value,
+                        }))
+                      }
+                      min={selectedProjectDetail?.tanggal_mulai}
+                      max={selectedProjectDetail?.deadline}
+                    />
+                    {selectedProjectDetail && (
+                      <div className="text-xs text-gray-500">
+                        Proyek:{" "}
+                        {new Date(
+                          selectedProjectDetail.tanggal_mulai,
+                        ).toLocaleDateString("id-ID")}{" "}
+                        -{" "}
+                        {new Date(
+                          selectedProjectDetail.deadline,
+                        ).toLocaleDateString("id-ID")}
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="end_date">Tanggal Selesai *</Label>
+                    <Input
+                      id="end_date"
+                      type="date"
+                      value={formData.end_date || ""}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          end_date: e.target.value,
+                        }))
+                      }
+                      min={
+                        formData.start_date ||
+                        selectedProjectDetail?.tanggal_mulai
+                      }
+                      max={selectedProjectDetail?.deadline}
+                    />
+                  </div>
+                </div>
+
+                {/* Transport Allowance for Team Members */}
+                {formData.assignee_type === "member" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="transport_days">Hari Transport</Label>
+                    <div className="flex items-center space-x-3 p-4 border border-gray-200 rounded-xl">
+                      <MapPin className="w-5 h-5 text-blue-500" />
+                      <div className="flex-1">
+                        <div className="font-semibold text-gray-900">
+                          Uang Transport
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {formatCurrency(150000)} per hari ×{" "}
+                          {formData.transport_days} hari ={" "}
+                          {formatCurrency(150000 * formData.transport_days)}
+                        </div>
+                      </div>
+                      <div className="w-24">
+                        <Input
+                          id="transport_days"
+                          type="number"
+                          min="0"
+                          value={formData.transport_days}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              transport_days: parseInt(e.target.value) || 0,
+                            }))
+                          }
+                          placeholder="0"
+                          className="text-center"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Honor for Mitra */}
+                {formData.assignee_type === "mitra" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="honor_amount">Honor</Label>
+                    <div className="flex items-center space-x-3 p-4 border border-green-200 rounded-xl bg-green-50">
+                      <DollarSign className="w-5 h-5 text-green-600" />
+                      <div className="flex-1">
+                        <div className="font-semibold text-gray-900">
+                          Honor untuk Mitra
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          Total honor yang akan diberikan kepada mitra
+                        </div>
+                      </div>
+                      <div className="w-32">
+                        <Input
+                          id="honor_amount"
+                          type="number"
+                          min="0"
+                          step="50000"
+                          value={formData.honor_amount}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              honor_amount: parseInt(e.target.value) || 0,
+                            }))
+                          }
+                          placeholder="500000"
+                          className="text-center"
+                        />
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-500 px-1">
+                      Total: {formatCurrency(formData.honor_amount)}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsCreateDialogOpen(false);
+                    setFormData(initialFormData);
+                  }}
+                  disabled={creating}
+                >
+                  Batal
+                </Button>
+                <Button
+                  onClick={handleCreateTask}
+                  disabled={creating}
+                  className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                >
+                  {creating ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Membuat...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Buat Tugas
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setSelectedStatus("all");
+              setSelectedProject("all");
+              setSearchTerm("");
+            }}
+            className="text-gray-600 hover:text-gray-900"
+          >
+            <X className="w-4 h-4 mr-2" />
+            Reset Filter
+          </Button>
+        </div>
       </div>
 
       {/* Transport Statistics Card */}
@@ -1038,7 +1047,7 @@ export default function TaskManagement() {
               {formatCurrency(totalTransportAmount)}
             </div>
             <div className="text-green-100 mt-2 text-sm">
-              Total Transport Budget
+              Total Anggaran Transport
             </div>
           </div>
         </div>
@@ -1050,7 +1059,7 @@ export default function TaskManagement() {
               {transportTasksCount}
             </div>
             <div className="text-blue-100 mt-2 text-sm">
-              Tasks with Transport
+              Tugas dengan Transport
             </div>
           </div>
         </div>
@@ -1061,7 +1070,7 @@ export default function TaskManagement() {
               <ClipboardList className="w-6 h-6 mr-3" />
               {statusCounts.all}
             </div>
-            <div className="text-purple-100 mt-2 text-sm">Total Tasks</div>
+            <div className="text-purple-100 mt-2 text-sm">Total Tugas</div>
           </div>
         </div>
       </div>
@@ -1071,7 +1080,7 @@ export default function TaskManagement() {
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
           <Input
-            placeholder="Search tasks..."
+            placeholder="Cari tugas..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -1080,10 +1089,10 @@ export default function TaskManagement() {
 
         <Select value={selectedProject} onValueChange={setSelectedProject}>
           <SelectTrigger className="w-48">
-            <SelectValue placeholder="All Projects" />
+            <SelectValue placeholder="Semua Proyek" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Projects</SelectItem>
+            <SelectItem value="all">Semua Proyek</SelectItem>
             {(projects || []).map((project) => (
               <SelectItem key={project.id} value={project.id}>
                 {project.nama_project}
@@ -1097,7 +1106,7 @@ export default function TaskManagement() {
           className="border-2 border-gray-200 text-gray-600 hover:bg-gray-50"
         >
           <Filter className="w-4 h-4 mr-2" />
-          More Filters
+          Filter Lainnya
         </Button>
       </div>
 
@@ -1109,13 +1118,13 @@ export default function TaskManagement() {
       >
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="all" className="flex items-center space-x-2">
-            <span>All Tasks</span>
+            <span>Semua Tugas</span>
             <Badge className="bg-gray-100 text-gray-800 text-xs">
               {statusCounts.all}
             </Badge>
           </TabsTrigger>
           <TabsTrigger value="pending" className="flex items-center space-x-2">
-            <span>Pending</span>
+            <span>Tertunda</span>
             <Badge className="bg-yellow-100 text-yellow-800 text-xs">
               {statusCounts.pending}
             </Badge>
@@ -1124,7 +1133,7 @@ export default function TaskManagement() {
             value="in_progress"
             className="flex items-center space-x-2"
           >
-            <span>In Progress</span>
+            <span>Berjalan</span>
             <Badge className="bg-blue-100 text-blue-800 text-xs">
               {statusCounts.in_progress}
             </Badge>
@@ -1133,7 +1142,7 @@ export default function TaskManagement() {
             value="completed"
             className="flex items-center space-x-2"
           >
-            <span>Completed</span>
+            <span>Selesai</span>
             <Badge className="bg-green-100 text-green-800 text-xs">
               {statusCounts.completed}
             </Badge>
@@ -1146,19 +1155,19 @@ export default function TaskManagement() {
               <div className="text-center py-12">
                 <ClipboardList className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  No tasks found
+                  Tidak ada tugas ditemukan
                 </h3>
                 <p className="text-gray-500 mb-6">
                   {searchTerm
-                    ? "Try adjusting your search terms"
-                    : "Create your first task to get started"}
+                    ? "Coba ubah kata pencarian Anda"
+                    : "Buat tugas pertama Anda untuk memulai"}
                 </p>
                 <Button
                   onClick={() => setIsCreateDialogOpen(true)}
                   className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
                 >
                   <Plus className="w-4 h-4 mr-2" />
-                  Create Task
+                  Buat Tugas
                 </Button>
               </div>
             ) : (
@@ -1247,13 +1256,14 @@ export default function TaskManagement() {
                               )}
                               <div className="text-sm">
                                 <div className="font-medium text-gray-900">
-                                  Assigned to
+                                  Ditugaskan kepada
                                 </div>
                                 <div className="text-gray-600">
                                   {task.assignee_type === "mitra"
-                                    ? task.mitra?.nama_mitra || "Unknown Mitra"
+                                    ? task.mitra?.nama_mitra ||
+                                      "Mitra Tidak Dikenal"
                                     : task.users?.nama_lengkap ||
-                                      "Unknown User"}
+                                      "Pengguna Tidak Dikenal"}
                                 </div>
                                 {task.assignee_type === "mitra" &&
                                   task.mitra && (
@@ -1267,7 +1277,7 @@ export default function TaskManagement() {
                               <Calendar className="w-4 h-4 text-emerald-600" />
                               <div className="text-sm">
                                 <div className="font-medium text-gray-900">
-                                  Project
+                                  Proyek
                                 </div>
                                 <div className="text-gray-600">
                                   {task.projects.nama_project}
@@ -1284,10 +1294,10 @@ export default function TaskManagement() {
                                   <div>
                                     <div className="text-sm font-medium text-purple-900 flex items-center">
                                       <DollarSign className="w-4 h-4 mr-2" />
-                                      Honor Amount
+                                      Honor
                                     </div>
                                     <div className="text-sm text-purple-700 mt-1">
-                                      Payment for Mitra services
+                                      Pembayaran untuk layanan Mitra
                                     </div>
                                   </div>
                                   <div className="text-lg font-semibold text-purple-600">
@@ -1304,12 +1314,12 @@ export default function TaskManagement() {
                                 <div>
                                   <div className="text-sm font-medium text-green-900 flex items-center">
                                     <MapPin className="w-4 h-4 mr-2" />
-                                    Transport Allocation
+                                    Alokasi Transport
                                   </div>
                                   <div className="text-sm text-green-700 mt-1">
                                     {transportAllocation?.allocation_date
-                                      ? `Allocated for: ${new Date(transportAllocation.allocation_date).toLocaleDateString("id-ID")}`
-                                      : "Waiting for date selection"}
+                                      ? `Dialokasikan untuk: ${new Date(transportAllocation.allocation_date).toLocaleDateString("id-ID")}`
+                                      : "Menunggu pemilihan tanggal"}
                                   </div>
                                 </div>
                                 <div className="flex items-center space-x-2">
@@ -1336,7 +1346,7 @@ export default function TaskManagement() {
                           {task.response_pegawai && (
                             <div className="mt-4 p-3 bg-blue-50 rounded-lg">
                               <div className="text-sm font-medium text-blue-900 mb-1">
-                                Response:
+                                Tanggapan:
                               </div>
                               <div className="text-sm text-blue-800">
                                 {task.response_pegawai}
@@ -1353,7 +1363,7 @@ export default function TaskManagement() {
                             onClick={() => handleViewTask(task)}
                           >
                             <Eye className="w-4 h-4 mr-1" />
-                            View
+                            Lihat
                           </Button>
                           <Button
                             variant="outline"
@@ -1362,7 +1372,7 @@ export default function TaskManagement() {
                             onClick={() => handleEditTask(task)}
                           >
                             <Edit className="w-4 h-4 mr-1" />
-                            Edit
+                            Ubah
                           </Button>
                           <Button
                             variant="outline"
@@ -1374,15 +1384,15 @@ export default function TaskManagement() {
                             }}
                           >
                             <Trash2 className="w-4 h-4 mr-1" />
-                            Delete
+                            Hapus
                           </Button>
                         </div>
                       </div>
 
                       <div className="text-xs text-gray-400">
-                        Created:{" "}
+                        Dibuat:{" "}
                         {new Date(task.created_at).toLocaleDateString("id-ID")}{" "}
-                        • Updated:{" "}
+                        • Diperbarui:{" "}
                         {new Date(task.updated_at).toLocaleDateString("id-ID")}
                       </div>
                     </div>

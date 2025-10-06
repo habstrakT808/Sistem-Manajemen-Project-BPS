@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useActiveTeam } from "@/components/providers";
+import { useActiveProject } from "@/components/providers";
 import { useAuthContext } from "@/components/auth/AuthProvider";
 import {
   Crown,
@@ -42,6 +43,7 @@ async function fetchTeams(): Promise<TeamItem[]> {
 export default function TeamListView() {
   const router = useRouter();
   const { setActiveTeam } = useActiveTeam();
+  const { setActiveProject } = useActiveProject();
   const { user, userProfile } = useAuthContext();
 
   // Force re-render when user changes
@@ -240,17 +242,15 @@ export default function TeamListView() {
                 <div
                   key={team.id}
                   className="group relative bg-white/90 backdrop-blur-sm rounded-2xl border border-white/50 shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-3 hover:scale-105 cursor-pointer overflow-hidden"
-                  onClick={() => {
+                  onClick={async () => {
                     setActiveTeam({ id: team.id, role: team.role });
                     console.log("Team click:", {
                       teamRole: team.role,
                       userRole: userProfile?.role,
                     });
-                    if (team.role === "leader") {
-                      router.push("/ketua-tim");
-                    } else {
-                      router.push("/pegawai/dashboard");
-                    }
+                    router.push(
+                      `/pegawai/projects?team_id=${encodeURIComponent(team.id)}`,
+                    );
                   }}
                   style={{
                     animationDelay: `${index * 100}ms`,

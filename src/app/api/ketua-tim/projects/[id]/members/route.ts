@@ -5,7 +5,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import type { Database } from "@/../database/types/database.types";
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
 interface ProjectMember {
   users: {
@@ -25,7 +24,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const supabase = await createClient();
     const svc = createServiceClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
     const { id: projectId } = await params;
 
@@ -37,7 +36,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     if (authError || !user) {
       return NextResponse.json(
         { error: "Unauthorized", code: "AUTH_REQUIRED" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -61,7 +60,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           error: "Project not found or access denied",
           code: "PROJECT_NOT_FOUND",
         },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -78,7 +77,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           email,
           is_active
         )
-      `
+      `,
       )
       .eq("project_id", projectId)
       .eq("users.is_active", true)
@@ -95,50 +94,57 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       email: member.users.email,
       role: member.role,
     }));
+    // Merge with project_assignments (pegawai) and deduplicate, not just fallback
+    const { data: assigns, error: assignsError } = await (svc as any)
+      .from("project_assignments")
+      .select("assignee_id")
+      .eq("project_id", projectId)
+      .eq("assignee_type", "pegawai");
 
-    // Fallback: if no project_members found, derive from project_assignments (pegawai)
-    if (!projectMembers || projectMembers.length === 0) {
-      const { data: assigns, error: assignsError } = await (svc as any)
-        .from("project_assignments")
-        .select("assignee_id")
-        .eq("project_id", projectId)
-        .eq("assignee_type", "pegawai");
+    if (!assignsError && assigns && assigns.length > 0) {
+      const existingIds = new Set(
+        projectMembers.map((m: { id: string }) => m.id),
+      );
+      const leaderId = (project as { leader_user_id?: string }).leader_user_id;
+      const ketuaId = (project as { ketua_tim_id?: string }).ketua_tim_id;
+      const userIds = (assigns as Array<{ assignee_id: string }>)
+        .map((a) => a.assignee_id)
+        .filter((uid) => !!uid && uid !== leaderId && uid !== ketuaId);
 
-      if (!assignsError && assigns && assigns.length > 0) {
-        const userIds = (assigns as Array<{ assignee_id: string }>).map(
-          (a) => a.assignee_id
-        );
+      if (userIds.length > 0) {
         const { data: userRows } = await (svc as any)
           .from("users")
           .select("id, nama_lengkap, email, is_active")
           .in("id", userIds)
           .eq("is_active", true);
 
-        projectMembers = (userRows || []).map(
-          (u: { id: string; nama_lengkap: string; email: string }) => ({
+        const additionalMembers = (userRows || [])
+          .filter((u: { id: string }) => !existingIds.has(u.id))
+          .map((u: { id: string; nama_lengkap: string; email: string }) => ({
             id: u.id,
             nama_lengkap: u.nama_lengkap,
             email: u.email,
             role: "member",
-          })
-        );
-        // Optional: upsert missing project_members for future consistency
-        try {
-          const upserts = projectMembers.map((m: { id: string }) => ({
-            project_id: projectId,
-            user_id: m.id,
-            role: "member",
           }));
-          if (upserts.length > 0) {
+
+        if (additionalMembers.length > 0) {
+          projectMembers = [...projectMembers, ...additionalMembers];
+          // Upsert missing project_members for future consistency
+          try {
+            const upserts = additionalMembers.map((m: { id: string }) => ({
+              project_id: projectId,
+              user_id: m.id,
+              role: "member",
+            }));
             await (svc as any)
               .from("project_members")
               .upsert(upserts, { onConflict: "project_id,user_id" });
+          } catch (e) {
+            console.warn(
+              "Non-fatal: failed to upsert project_members from assignments",
+              e,
+            );
           }
-        } catch (e) {
-          console.warn(
-            "Non-fatal: failed to upsert project_members from assignments",
-            e
-          );
         }
       }
     }
@@ -155,7 +161,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     console.error("Project Members API Error:", error);
     return NextResponse.json(
       { error: "Internal server error", code: "INTERNAL_ERROR" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -186,7 +192,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (projectError || !project) {
       return NextResponse.json(
         { error: "Project not found or access denied" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -220,7 +226,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     console.error("Add Members API Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -251,7 +257,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     if (projectError || !project) {
       return NextResponse.json(
         { error: "Project not found or access denied" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -274,7 +280,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     console.error("Remove Member API Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

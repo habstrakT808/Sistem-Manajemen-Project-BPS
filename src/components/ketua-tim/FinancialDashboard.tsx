@@ -234,7 +234,7 @@ export default function FinancialDashboard() {
   const handleRefresh = async () => {
     const res = await refetch();
     if (res.error) toast.error(res.error.message);
-    else toast.success("Financial data refreshed");
+    else toast.success("Data keuangan berhasil diperbarui");
   };
 
   if (isLoading && !financialData) {
@@ -271,9 +271,9 @@ export default function FinancialDashboard() {
 
   const statsCards = [
     {
-      title: "Monthly Spending",
+      title: "Pengeluaran Bulanan",
       value: formatCurrency(stats.total_monthly_spending),
-      description: "Total this month",
+      description: "Total bulan ini",
       icon: DollarSign,
       color: "from-purple-500 to-purple-600",
       bgColor: "from-purple-50 to-purple-100",
@@ -281,9 +281,9 @@ export default function FinancialDashboard() {
       trendUp: true,
     },
     {
-      title: "Transport Budget",
+      title: "Anggaran Transport",
       value: formatCurrency(stats.transport_spending),
-      description: "Pegawai allowances",
+      description: "Uang transport pegawai",
       icon: Users,
       color: "from-blue-500 to-blue-600",
       bgColor: "from-blue-50 to-blue-100",
@@ -291,9 +291,9 @@ export default function FinancialDashboard() {
       trendUp: true,
     },
     {
-      title: "Partner Fees",
+      title: "Honor Mitra",
       value: formatCurrency(stats.honor_spending),
-      description: "Mitra payments",
+      description: "Pembayaran untuk mitra",
       icon: TrendingUp,
       color: "from-green-500 to-green-600",
       bgColor: "from-green-50 to-green-100",
@@ -309,10 +309,10 @@ export default function FinancialDashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-            Financial Dashboard
+            Dasbor Keuangan
           </h1>
           <p className="text-gray-600 text-lg mt-2">
-            Monitor project budgets, spending trends, and financial performance.
+            Pantau anggaran proyek, tren pengeluaran, dan performa keuangan.
           </p>
         </div>
 
@@ -322,19 +322,19 @@ export default function FinancialDashboard() {
               onClick={() => setActiveTab("overview")}
               className={`px-4 py-2 text-sm font-medium ${activeTab === "overview" ? "bg-gray-100 text-gray-900" : "text-gray-600 hover:bg-gray-50"}`}
             >
-              Overview
+              Ikhtisar
             </button>
             <button
               onClick={() => setActiveTab("spending")}
               className={`px-4 py-2 text-sm font-medium ${activeTab === "spending" ? "bg-gray-100 text-gray-900" : "text-gray-600 hover:bg-gray-50"}`}
             >
-              Spending Detail
+              Detail Pengeluaran
             </button>
             <button
               onClick={() => setActiveTab("transport")}
               className={`px-4 py-2 text-sm font-medium ${activeTab === "transport" ? "bg-gray-100 text-gray-900" : "text-gray-600 hover:bg-gray-50"}`}
             >
-              Transport Allocations
+              Alokasi Transport
             </button>
           </div>
           <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
@@ -342,10 +342,10 @@ export default function FinancialDashboard() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="current_month">This Month</SelectItem>
-              <SelectItem value="last_month">Last Month</SelectItem>
-              <SelectItem value="quarter">This Quarter</SelectItem>
-              <SelectItem value="year">This Year</SelectItem>
+              <SelectItem value="current_month">Bulan Ini</SelectItem>
+              <SelectItem value="last_month">Bulan Lalu</SelectItem>
+              <SelectItem value="quarter">Kuartal Ini</SelectItem>
+              <SelectItem value="year">Tahun Ini</SelectItem>
             </SelectContent>
           </Select>
 
@@ -358,12 +358,12 @@ export default function FinancialDashboard() {
             <RefreshCw
               className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`}
             />
-            Refresh
+            Muat Ulang
           </Button>
 
           <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300">
             <Download className="w-4 h-4 mr-2" />
-            Export Report
+            Ekspor Laporan
           </Button>
         </div>
       </div>
@@ -431,14 +431,14 @@ export default function FinancialDashboard() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center text-white text-xl font-semibold">
                     <FolderOpen className="w-6 h-6 mr-3" />
-                    Project Budgets
+                    Anggaran Proyek
                   </div>
                   <Badge className="bg-white/20 text-white">
                     {project_budgets.length}
                   </Badge>
                 </div>
                 <div className="text-purple-100 mt-2 text-sm">
-                  Budget allocation by project
+                  Alokasi anggaran per proyek
                 </div>
               </div>
               <div className="p-6 space-y-4">
@@ -461,7 +461,7 @@ export default function FinancialDashboard() {
                           • Honor: {formatCurrency(project.honor_budget)}
                         </div>
                         <div className="text-sm text-gray-400 mt-1">
-                          Deadline:{" "}
+                          Tenggat:{" "}
                           {new Date(project.deadline).toLocaleDateString(
                             "id-ID",
                           )}
@@ -488,17 +488,17 @@ export default function FinancialDashboard() {
               <div className="bg-gradient-to-r from-orange-600 to-red-600 p-6">
                 <div className="flex items-center text-white text-xl font-semibold">
                   <BarChart3 className="w-6 h-6 mr-3" />
-                  Top Spenders
+                  Pengeluaran Tertinggi
                 </div>
                 <div className="text-orange-100 mt-2 text-sm">
-                  Highest budget allocations
+                  Alokasi anggaran tertinggi
                 </div>
               </div>
               <div className="p-6 space-y-6">
                 {/* Top Pegawai */}
                 <div>
                   <h4 className="font-semibold text-gray-900 mb-3">
-                    Team Members
+                    Anggota Tim
                   </h4>
                   <div className="space-y-2">
                     {top_spenders.pegawai.map((pegawai, index) => (
@@ -511,7 +511,7 @@ export default function FinancialDashboard() {
                             {pegawai.name}
                           </div>
                           <div className="text-sm text-gray-500">
-                            {pegawai.projects} projects
+                            {pegawai.projects} proyek
                           </div>
                         </div>
                         <div className="text-right">
@@ -526,7 +526,7 @@ export default function FinancialDashboard() {
 
                 {/* Top Mitra */}
                 <div>
-                  <h4 className="font-semibold text-gray-900 mb-3">Partners</h4>
+                  <h4 className="font-semibold text-gray-900 mb-3">Mitra</h4>
                   <div className="space-y-2">
                     {top_spenders.mitra.map((mitra, index) => (
                       <div
@@ -538,12 +538,12 @@ export default function FinancialDashboard() {
                             {mitra.name}
                           </div>
                           <div className="text-sm text-gray-500">
-                            {mitra.projects} projects
+                            {mitra.projects} proyek
                           </div>
                           {mitra.remaining_limit < 0 && (
                             <div className="text-xs text-red-600 flex items-center mt-1">
                               <AlertCircle className="w-3 h-3 mr-1" />
-                              Exceeds limit by{" "}
+                              Melebihi batas sebesar{" "}
                               {formatCurrency(Math.abs(mitra.remaining_limit))}
                             </div>
                           )}
@@ -556,8 +556,8 @@ export default function FinancialDashboard() {
                           </div>
                           <div className="text-xs text-gray-500">
                             {mitra.remaining_limit >= 0
-                              ? `${formatCurrency(mitra.remaining_limit)} left`
-                              : "Over limit"}
+                              ? `${formatCurrency(mitra.remaining_limit)} tersisa`
+                              : "Melebihi batas"}
                           </div>
                         </div>
                       </div>
@@ -572,7 +572,7 @@ export default function FinancialDashboard() {
           <div className="border-0 shadow-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white overflow-hidden rounded-xl">
             <div className="p-8">
               <h3 className="text-2xl font-bold mb-6">
-                Financial Reports & Actions
+                Laporan & Aksi Keuangan
               </h3>
               <div className="grid md:grid-cols-3 gap-6">
                 <Button
@@ -587,9 +587,9 @@ export default function FinancialDashboard() {
                     <div className="flex items-center">
                       <FileText className="w-6 h-6 mr-3" />
                       <div className="text-left">
-                        <div className="font-semibold">Generate Report</div>
+                        <div className="font-semibold">Buat Laporan</div>
                         <div className="text-sm opacity-80">
-                          Monthly financial report
+                          Laporan keuangan bulanan
                         </div>
                       </div>
                     </div>
@@ -610,9 +610,9 @@ export default function FinancialDashboard() {
                     <div className="flex items-center">
                       <FolderOpen className="w-6 h-6 mr-3" />
                       <div className="text-left">
-                        <div className="font-semibold">New Project</div>
+                        <div className="font-semibold">Proyek Baru</div>
                         <div className="text-sm opacity-80">
-                          Create with budget
+                          Buat dengan anggaran
                         </div>
                       </div>
                     </div>
@@ -623,10 +623,8 @@ export default function FinancialDashboard() {
                   <div className="flex items-center">
                     <CheckCircle className="w-6 h-6 mr-3" />
                     <div className="text-left">
-                      <div className="font-semibold">Budget Review</div>
-                      <div className="text-sm opacity-80">
-                        Review allocations
-                      </div>
+                      <div className="font-semibold">Tinjau Anggaran</div>
+                      <div className="text-sm opacity-80">Tinjau alokasi</div>
                     </div>
                   </div>
                 </Button>
@@ -642,7 +640,7 @@ export default function FinancialDashboard() {
             <div className="bg-gradient-to-r from-teal-600 to-emerald-600 p-6">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-bold text-white">
-                  Spending Calendar
+                  Kalender Pengeluaran
                 </h2>
                 <div className="text-white text-sm">
                   {format(selectedDate, "MMMM yyyy", { locale: localeId })}
@@ -684,7 +682,7 @@ export default function FinancialDashboard() {
                 }}
               />
               <div className="mt-4 flex flex-wrap items-center gap-3 text-xs">
-                <span className="text-gray-500">Legend:</span>
+                <span className="text-gray-500">Legenda:</span>
                 <Badge className="bg-green-100 text-green-800 border-green-200">
                   &lt; 1 juta
                 </Badge>
@@ -700,7 +698,7 @@ export default function FinancialDashboard() {
 
           <div className="border-0 shadow-xl rounded-xl overflow-hidden">
             <div className="bg-gradient-to-r from-orange-600 to-red-600 p-4">
-              <h3 className="font-bold text-white">Spending Details</h3>
+              <h3 className="font-bold text-white">Detail Pengeluaran</h3>
             </div>
             <div className="p-4 space-y-3">
               <div className="text-sm text-gray-600">
@@ -716,7 +714,7 @@ export default function FinancialDashboard() {
                 <RefreshCw
                   className={`w-4 h-4 mr-2 ${fetchingDay ? "animate-spin" : ""}`}
                 />{" "}
-                Refresh Day
+                Muat Ulang Hari
               </Button>
               <div className="divide-y">
                 {(dailyDetails?.details || []).map((d, i) => (
@@ -755,7 +753,7 @@ export default function FinancialDashboard() {
             <div className="bg-gradient-to-r from-indigo-600 to-blue-600 p-6">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-bold text-white">
-                  Transport Allocation Calendar
+                  Kalender Alokasi Transport
                 </h2>
                 <div className="text-white text-sm">
                   {format(selectedDate, "MMMM yyyy", { locale: localeId })}
@@ -780,9 +778,9 @@ export default function FinancialDashboard() {
                 }}
               />
               <div className="mt-4 flex flex-wrap items-center gap-3 text-xs">
-                <span className="text-gray-500">Legend:</span>
+                <span className="text-gray-500">Legenda:</span>
                 <Badge className="bg-blue-100 text-blue-800 border-blue-200">
-                  Allocation exists
+                  Ada alokasi
                 </Badge>
               </div>
             </div>
@@ -790,7 +788,7 @@ export default function FinancialDashboard() {
 
           <div className="border-0 shadow-xl rounded-xl overflow-hidden">
             <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-4">
-              <h3 className="font-bold text-white">Allocation Details</h3>
+              <h3 className="font-bold text-white">Detail Alokasi</h3>
             </div>
             <div className="p-4 space-y-3">
               <div className="text-sm text-gray-600">
@@ -806,7 +804,7 @@ export default function FinancialDashboard() {
                 <RefreshCw
                   className={`w-4 h-4 mr-2 ${fetchingTransportDay ? "animate-spin" : ""}`}
                 />{" "}
-                Refresh Day
+                Muat Ulang Hari
               </Button>
               <div className="divide-y">
                 {(transportDetails?.details || []).map((d, i) => (

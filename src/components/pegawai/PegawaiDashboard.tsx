@@ -5,6 +5,8 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useActiveProject } from "@/components/providers";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -89,6 +91,8 @@ async function fetchPegawaiDashboard(): Promise<DashboardData> {
 
 export default function PegawaiDashboard() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const { activeProject, setActiveProject } = useActiveProject();
   const [refreshing, setRefreshing] = useState(false);
   const [updatingTask, setUpdatingTask] = useState<string | null>(null);
 
@@ -98,8 +102,30 @@ export default function PegawaiDashboard() {
     error,
     refetch,
   } = useQuery<DashboardData, Error>({
-    queryKey: ["pegawai", "dashboard"],
-    queryFn: fetchPegawaiDashboard,
+    queryKey: [
+      "pegawai",
+      "dashboard",
+      {
+        projectId: searchParams.get("project_id") || activeProject?.id || null,
+      },
+    ],
+    queryFn: async () => {
+      const selectedProjectId =
+        searchParams.get("project_id") || activeProject?.id || undefined;
+      // Persist into context if provided via URL and context empty
+      if (selectedProjectId && !activeProject?.id) {
+        setActiveProject({ id: selectedProjectId, role: "member" });
+      }
+      const qs = selectedProjectId
+        ? `?project_id=${encodeURIComponent(selectedProjectId)}`
+        : "";
+      const res = await fetch(`/api/pegawai/dashboard${qs}`, {
+        cache: "no-store",
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Gagal mengambil data dasbor");
+      return json as DashboardData;
+    },
     staleTime: 2 * 60 * 1000,
   });
 
@@ -108,7 +134,7 @@ export default function PegawaiDashboard() {
     const res = await refetch();
     setRefreshing(false);
     if (res.error) toast.error(res.error.message);
-    else toast.success("Dashboard refreshed");
+    else toast.success("Dasbor diperbarui");
   };
 
   const handleTaskStatusUpdate = async (
@@ -131,17 +157,17 @@ export default function PegawaiDashboard() {
 
       if (!apiResponse.ok) {
         const error = await apiResponse.json();
-        throw new Error(error.error || "Failed to update task");
+        throw new Error(error.error || "Gagal memperbarui tugas");
       }
 
       toast.success(
-        `Task ${newStatus === "completed" ? "completed" : "started"}!`,
+        `Tugas ${newStatus === "completed" ? "selesai" : "dimulai"}!`,
       );
       await refetch();
     } catch (error) {
       console.error("Error updating task:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to update task",
+        error instanceof Error ? error.message : "Gagal memperbarui tugas",
       );
     } finally {
       setUpdatingTask(null);
@@ -162,7 +188,7 @@ export default function PegawaiDashboard() {
           <div className="w-16 h-16 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl flex items-center justify-center mx-auto animate-pulse">
             <Leaf className="w-8 h-8 text-white" />
           </div>
-          <p className="text-gray-600 text-lg">Loading your workspace...</p>
+          <p className="text-gray-600 text-lg">Memuat ruang kerja Anda...</p>
         </div>
       </div>
     );
@@ -174,7 +200,7 @@ export default function PegawaiDashboard() {
         <div className="text-center space-y-6">
           <AlertCircle className="w-20 h-20 text-red-500 mx-auto" />
           <h2 className="text-3xl font-bold text-gray-900">
-            Failed to Load Dashboard
+            Gagal Memuat Dasbor
           </h2>
           <p className="text-gray-600 max-w-md mx-auto">{error.message}</p>
           <Button
@@ -184,7 +210,7 @@ export default function PegawaiDashboard() {
             <RefreshCw
               className={`w-5 h-5 mr-2 ${refreshing ? "animate-spin" : ""}`}
             />
-            Try Again
+            Coba Lagi
           </Button>
         </div>
       </div>
@@ -262,7 +288,7 @@ export default function PegawaiDashboard() {
                   </div>
                   <div>
                     <h1 className="text-3xl md:text-4xl font-bold text-white">
-                      Welcome Back!
+                      Selamat Datang Kembali!
                     </h1>
                     <p className="text-emerald-100 text-base md:text-lg">
                       {todayDate}
@@ -273,7 +299,7 @@ export default function PegawaiDashboard() {
                 <div className="flex items-center space-x-3">
                   <Badge className="bg-white/20 backdrop-blur-sm text-white border-white/30 hover:bg-white/30 transition-all duration-300">
                     <Leaf className="w-3 h-3 mr-1" />
-                    Pegawai Access
+                    Akses Pegawai
                   </Badge>
                   <Badge className="bg-white/20 backdrop-blur-sm text-white border-white/30 hover:bg-white/30 transition-all duration-300">
                     <Calendar className="w-3 h-3 mr-1" />
@@ -286,8 +312,8 @@ export default function PegawaiDashboard() {
                   {(stats.pending_transport_allocations || 0) > 0 && (
                     <Badge className="bg-red-500/80 backdrop-blur-sm text-white border-red-400/50 animate-pulse hover:bg-red-500 transition-all duration-300">
                       <MapPin className="w-3 h-3 mr-1" />
-                      {stats.pending_transport_allocations} Transport Dates
-                      Needed
+                      {stats.pending_transport_allocations} Butuh Tanggal
+                      Transport
                     </Badge>
                   )}
                 </div>
@@ -297,7 +323,7 @@ export default function PegawaiDashboard() {
                 <div className="flex items-center space-x-2 px-4 py-3 bg-white/20 backdrop-blur-sm rounded-2xl border border-white/30">
                   <TrendingUp className="w-5 h-5 text-white" />
                   <span className="text-white font-semibold">
-                    Productive Day!
+                    Hari yang Produktif!
                   </span>
                 </div>
 
@@ -309,7 +335,7 @@ export default function PegawaiDashboard() {
                   <RefreshCw
                     className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`}
                   />
-                  Refresh
+                  Muat Ulang
                 </Button>
 
                 <Button
@@ -317,12 +343,16 @@ export default function PegawaiDashboard() {
                   className="bg-white text-emerald-600 hover:bg-emerald-50 font-semibold px-6 py-3 rounded-2xl shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300"
                 >
                   <Link
-                    href="/pegawai/tasks"
+                    href={
+                      activeProject?.id
+                        ? `/pegawai/tasks?project_id=${activeProject.id}`
+                        : "/pegawai/tasks"
+                    }
                     prefetch
                     onMouseEnter={() => router.prefetch("/pegawai/tasks")}
                   >
                     <ClipboardList className="w-4 h-4 mr-2" />
-                    View All Tasks
+                    Lihat Semua Tugas
                   </Link>
                 </Button>
               </div>
@@ -337,12 +367,12 @@ export default function PegawaiDashboard() {
           <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-xl border border-white/50 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Tasks</p>
+                <p className="text-sm font-medium text-gray-600">Total Tugas</p>
                 <p className="text-3xl font-bold text-gray-900">
                   {stats.total_tasks}
                 </p>
                 <p className="text-xs text-green-600 font-medium">
-                  +{stats.completed_tasks} completed
+                  +{stats.completed_tasks} selesai
                 </p>
               </div>
               <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center">
@@ -355,13 +385,13 @@ export default function PegawaiDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">
-                  Active Projects
+                  Proyek Aktif
                 </p>
                 <p className="text-3xl font-bold text-gray-900">
                   {stats.total_projects}
                 </p>
                 <p className="text-xs text-blue-600 font-medium">
-                  {stats.active_projects} active
+                  {stats.active_projects} aktif
                 </p>
               </div>
               <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center">
@@ -374,13 +404,13 @@ export default function PegawaiDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">
-                  Monthly Earnings
+                  Pendapatan Bulanan
                 </p>
                 <p className="text-3xl font-bold text-gray-900">
                   {formatCurrency(stats.total_earnings || 0)}
                 </p>
                 <p className="text-xs text-emerald-600 font-medium">
-                  Transport fees
+                  Biaya transport
                 </p>
               </div>
               <div className="w-12 h-12 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-2xl flex items-center justify-center">
@@ -393,15 +423,13 @@ export default function PegawaiDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">
-                  Task Completion
+                  Penyelesaian Tugas
                 </p>
                 <p className="text-3xl font-bold text-gray-900">
                   {stats.completed_tasks}/
                   {stats.completed_tasks + stats.pending_tasks}
                 </p>
-                <p className="text-xs text-orange-600 font-medium">
-                  This month
-                </p>
+                <p className="text-xs text-orange-600 font-medium">Bulan ini</p>
               </div>
               <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-orange-600 rounded-2xl flex items-center justify-center">
                 <Target className="w-6 h-6 text-white" />
@@ -458,7 +486,7 @@ export default function PegawaiDashboard() {
                       <div className="flex items-center space-x-2">
                         <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
                         <span className="text-xs text-emerald-600 font-medium">
-                          Active
+                          Aktif
                         </span>
                       </div>
                       <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-emerald-600 group-hover:translate-x-1 opacity-0 group-hover:opacity-100 transition-all duration-300" />
@@ -490,10 +518,10 @@ export default function PegawaiDashboard() {
                   </div>
                   <div>
                     <h3 className="text-2xl font-bold text-white">
-                      Today&apos;s Tasks
+                      Tugas Hari Ini
                     </h3>
                     <p className="text-emerald-100 text-sm font-medium">
-                      Tasks for today and this week
+                      Tugas untuk hari ini dan pekan ini
                     </p>
                   </div>
                 </div>
@@ -585,7 +613,7 @@ export default function PegawaiDashboard() {
                               </div>
 
                               <div className="text-sm text-gray-600 mb-2">
-                                Project: {task.project_name}
+                                Proyek: {task.project_name}
                               </div>
 
                               <div className="text-sm text-gray-500">
@@ -600,7 +628,7 @@ export default function PegawaiDashboard() {
 
                               {task.response_pegawai && (
                                 <div className="text-sm text-gray-500 bg-white p-2 rounded border mt-2">
-                                  <strong>Response:</strong>{" "}
+                                  <strong>Respon:</strong>{" "}
                                   {task.response_pegawai}
                                 </div>
                               )}
@@ -617,7 +645,7 @@ export default function PegawaiDashboard() {
                                     href={`/pegawai/tasks/${task.id}/transport`}
                                   >
                                     <MapPin className="w-3 h-3 mr-1" />
-                                    Select Date
+                                    Pilih Tanggal
                                   </Link>
                                 </Button>
                               ) : (
@@ -632,7 +660,7 @@ export default function PegawaiDashboard() {
                                       href={`/pegawai/tasks/${task.id}/transport`}
                                     >
                                       <Calendar className="w-3 h-3 mr-1" />
-                                      Edit Date
+                                      Ubah Tanggal
                                     </Link>
                                   </Button>
                                 )
@@ -651,7 +679,7 @@ export default function PegawaiDashboard() {
                                   className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
                                 >
                                   <Play className="w-3 h-3 mr-1" />
-                                  Start
+                                  Mulai
                                 </Button>
                               )}
 
@@ -660,7 +688,7 @@ export default function PegawaiDashboard() {
                                   size="sm"
                                   onClick={() => {
                                     const response = prompt(
-                                      "Add your response (optional):",
+                                      "Tambahkan respon Anda (opsional):",
                                     );
                                     handleTaskStatusUpdate(
                                       task.id,
@@ -672,7 +700,7 @@ export default function PegawaiDashboard() {
                                   className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white"
                                 >
                                   <CheckSquare className="w-3 h-3 mr-1" />
-                                  Complete
+                                  Selesaikan
                                 </Button>
                               )}
                             </div>
@@ -689,7 +717,7 @@ export default function PegawaiDashboard() {
                       className="w-full border-2 border-green-200 text-green-600 hover:bg-green-50"
                     >
                       <Link href="/pegawai/tasks">
-                        View All My Tasks
+                        Lihat Semua Tugas Saya
                         <ArrowRight className="w-4 h-4 ml-2" />
                       </Link>
                     </Button>
@@ -698,8 +726,12 @@ export default function PegawaiDashboard() {
               ) : (
                 <div className="text-center py-8">
                   <CheckCircle className="w-12 h-12 text-green-300 mx-auto mb-4" />
-                  <p className="text-gray-500 mb-2">No tasks for today!</p>
-                  <p className="text-sm text-gray-400">Enjoy your free time</p>
+                  <p className="text-gray-500 mb-2">
+                    Tidak ada tugas hari ini!
+                  </p>
+                  <p className="text-sm text-gray-400">
+                    Nikmati waktu luang Anda
+                  </p>
                 </div>
               )}
             </div>
@@ -723,10 +755,10 @@ export default function PegawaiDashboard() {
                   </div>
                   <div>
                     <h3 className="text-2xl font-bold text-white">
-                      My Projects
+                      Proyek Saya
                     </h3>
                     <p className="text-blue-100 text-sm font-medium">
-                      Projects I&apos;m participating in
+                      Proyek yang saya ikuti
                     </p>
                   </div>
                 </div>
@@ -761,16 +793,18 @@ export default function PegawaiDashboard() {
                                   : "bg-blue-100 text-blue-800"
                               }
                             >
-                              {project.user_role.toUpperCase()}
+                              {project.user_role === "leader"
+                                ? "KETUA"
+                                : "ANGGOTA"}
                             </Badge>
                           </div>
 
                           <div className="text-sm text-gray-500 group-hover:text-blue-500 mt-1">
-                            Leader: {project.ketua_tim_name}
+                            Ketua: {project.ketua_tim_name}
                           </div>
 
                           <div className="text-sm text-gray-400 mt-1">
-                            Deadline:{" "}
+                            Tenggat:{" "}
                             {new Date(project.deadline).toLocaleDateString(
                               "id-ID",
                             )}
@@ -799,7 +833,11 @@ export default function PegawaiDashboard() {
                                   : "bg-gray-100 text-gray-800"
                             }
                           >
-                            {project.status.toUpperCase()}
+                            {project.status === "active"
+                              ? "AKTIF"
+                              : project.status === "upcoming"
+                                ? "SEGERA"
+                                : "SELESAI"}
                           </Badge>
                         </div>
                       </div>
@@ -819,7 +857,7 @@ export default function PegawaiDashboard() {
                           router.prefetch("/pegawai/projects")
                         }
                       >
-                        View All My Projects
+                        Lihat Semua Proyek Saya
                         <ArrowRight className="w-4 h-4 ml-2" />
                       </Link>
                     </Button>
@@ -828,9 +866,9 @@ export default function PegawaiDashboard() {
               ) : (
                 <div className="text-center py-8">
                   <FolderOpen className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500 mb-2">No projects assigned</p>
+                  <p className="text-gray-500 mb-2">Belum ada proyek</p>
                   <p className="text-sm text-gray-400">
-                    Wait for project assignments
+                    Tunggu penugasan proyek
                   </p>
                 </div>
               )}
@@ -864,10 +902,10 @@ export default function PegawaiDashboard() {
           <div className="relative p-8 md:p-12">
             <div className="text-center mb-8 md:mb-12">
               <h2 className="text-3xl md:text-4xl font-bold mb-4">
-                Performance Overview
+                Ikhtisar Kinerja
               </h2>
               <p className="text-emerald-100 text-base md:text-lg">
-                Your productivity metrics at a glance
+                Metrik produktivitas Anda secara ringkas
               </p>
             </div>
 
@@ -891,7 +929,7 @@ export default function PegawaiDashboard() {
                   %
                 </div>
                 <div className="text-emerald-100 text-sm font-medium">
-                  Task completion rate
+                  Tingkat penyelesaian tugas
                 </div>
               </div>
 
@@ -913,7 +951,7 @@ export default function PegawaiDashboard() {
                   %
                 </div>
                 <div className="text-emerald-100 text-sm font-medium">
-                  Average project progress
+                  Rata-rata progres proyek
                 </div>
               </div>
 
@@ -927,7 +965,7 @@ export default function PegawaiDashboard() {
                   {stats.total_projects}
                 </div>
                 <div className="text-emerald-100 text-sm font-medium">
-                  Active projects
+                  Proyek aktif
                 </div>
               </div>
 
@@ -941,7 +979,7 @@ export default function PegawaiDashboard() {
                   {formatCurrency(stats.transport_earnings || 0)}
                 </div>
                 <div className="text-emerald-100 text-sm font-medium">
-                  Monthly transport
+                  Transport bulanan
                 </div>
               </div>
             </div>

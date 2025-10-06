@@ -90,8 +90,8 @@ interface TeamAnalytics {
 }
 
 async function fetchTeamData(): Promise<TeamMember[]> {
-  // Try the working endpoint first
-  const response = await fetch("/api/team-data-direct", {
+  // Use authenticated ketua tim endpoint with stats
+  const response = await fetch("/api/ketua-tim/team?include_stats=true", {
     cache: "no-store",
   });
   const result = await response.json();

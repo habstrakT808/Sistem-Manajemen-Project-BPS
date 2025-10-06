@@ -84,11 +84,11 @@ export function UserForm({ user, onClose, onSuccess }: UserFormProps) {
         const result = await response.json();
 
         if (!response.ok) {
-          toast.error(result.error || "Failed to update user");
+          toast.error(result.error || "Gagal memperbarui pengguna");
           return;
         }
 
-        toast.success("User updated successfully");
+        toast.success("Pengguna berhasil diperbarui");
       } else {
         // Create new user
         const response = await fetch("/api/admin/users", {
@@ -110,17 +110,17 @@ export function UserForm({ user, onClose, onSuccess }: UserFormProps) {
         const result = await response.json();
 
         if (!response.ok) {
-          toast.error(result.error || "Failed to create user");
+          toast.error(result.error || "Gagal membuat pengguna");
           return;
         }
 
-        toast.success("User created successfully");
+        toast.success("Pengguna berhasil dibuat");
       }
 
       onSuccess();
     } catch (error) {
       console.error("Error saving user:", error);
-      toast.error("Failed to save user");
+      toast.error("Gagal menyimpan pengguna");
     } finally {
       setLoading(false);
     }
@@ -132,16 +132,16 @@ export function UserForm({ user, onClose, onSuccess }: UserFormProps) {
       <div className="flex items-center space-x-4">
         <Button variant="ghost" onClick={onClose}>
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Users
+          Kembali ke Pengguna
         </Button>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            {isEditing ? "Edit User" : "Create New User"}
+            {isEditing ? "Ubah Pengguna" : "Buat Pengguna Baru"}
           </h1>
           <p className="text-gray-600">
             {isEditing
-              ? "Update user information and permissions"
-              : "Add a new user to the system"}
+              ? "Perbarui informasi dan izin pengguna"
+              : "Tambahkan pengguna baru ke sistem"}
           </p>
         </div>
       </div>
@@ -149,11 +149,11 @@ export function UserForm({ user, onClose, onSuccess }: UserFormProps) {
       {/* Form */}
       <Card>
         <CardHeader>
-          <CardTitle>User Information</CardTitle>
+          <CardTitle>Informasi Pengguna</CardTitle>
           <CardDescription>
             {isEditing
-              ? "Update the user details below"
-              : "Enter the user details below"}
+              ? "Perbarui detail pengguna di bawah ini"
+              : "Masukkan detail pengguna di bawah ini"}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -161,7 +161,7 @@ export function UserForm({ user, onClose, onSuccess }: UserFormProps) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Email */}
               <div className="space-y-2">
-                <Label htmlFor="email">Email Address *</Label>
+                <Label htmlFor="email">Alamat Email *</Label>
                 <Input
                   id="email"
                   type="email"
@@ -176,7 +176,7 @@ export function UserForm({ user, onClose, onSuccess }: UserFormProps) {
               {/* Password (only for new users) */}
               {!isEditing && (
                 <div className="space-y-2">
-                  <Label htmlFor="password">Password *</Label>
+                  <Label htmlFor="password">Kata Sandi *</Label>
                   <div className="relative">
                     <Input
                       id="password"
@@ -202,13 +202,13 @@ export function UserForm({ user, onClose, onSuccess }: UserFormProps) {
                       )}
                     </Button>
                   </div>
-                  <p className="text-xs text-gray-500">Minimum 8 characters</p>
+                  <p className="text-xs text-gray-500">Minimal 8 karakter</p>
                 </div>
               )}
 
               {/* Full Name */}
               <div className="space-y-2">
-                <Label htmlFor="nama_lengkap">Full Name *</Label>
+                <Label htmlFor="nama_lengkap">Nama Lengkap *</Label>
                 <Input
                   id="nama_lengkap"
                   value={formData.nama_lengkap}
@@ -221,7 +221,7 @@ export function UserForm({ user, onClose, onSuccess }: UserFormProps) {
 
               {/* Role */}
               <div className="space-y-2">
-                <Label htmlFor="role">Role *</Label>
+                <Label htmlFor="role">Peran *</Label>
                 <Select
                   value={formData.role}
                   onValueChange={(value: UserRole) =>
@@ -232,9 +232,9 @@ export function UserForm({ user, onClose, onSuccess }: UserFormProps) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="pegawai">Pegawai - Employee</SelectItem>
+                    <SelectItem value="pegawai">Pegawai - Karyawan</SelectItem>
                     <SelectItem value="admin">
-                      Admin - System Administrator
+                      Admin - Administrator Sistem
                     </SelectItem>
                   </SelectContent>
                 </Select>
@@ -242,7 +242,7 @@ export function UserForm({ user, onClose, onSuccess }: UserFormProps) {
 
               {/* Phone Number */}
               <div className="space-y-2">
-                <Label htmlFor="no_telepon">Phone Number</Label>
+                <Label htmlFor="no_telepon">Nomor Telepon</Label>
                 <Input
                   id="no_telepon"
                   type="tel"
@@ -250,13 +250,13 @@ export function UserForm({ user, onClose, onSuccess }: UserFormProps) {
                   onChange={(e) =>
                     setFormData({ ...formData, no_telepon: e.target.value })
                   }
-                  placeholder="e.g., 0812-3456-7890"
+                  placeholder="contoh: 0812-3456-7890"
                 />
               </div>
 
               {/* Status */}
               <div className="space-y-2">
-                <Label htmlFor="is_active">Account Status</Label>
+                <Label htmlFor="is_active">Status Akun</Label>
                 <div className="flex items-center space-x-2">
                   <Switch
                     id="is_active"
@@ -266,7 +266,7 @@ export function UserForm({ user, onClose, onSuccess }: UserFormProps) {
                     }
                   />
                   <Label htmlFor="is_active" className="text-sm">
-                    {formData.is_active ? "Active" : "Inactive"}
+                    {formData.is_active ? "Aktif" : "Tidak Aktif"}
                   </Label>
                 </div>
               </div>
@@ -274,14 +274,14 @@ export function UserForm({ user, onClose, onSuccess }: UserFormProps) {
 
             {/* Address */}
             <div className="space-y-2">
-              <Label htmlFor="alamat">Address</Label>
+              <Label htmlFor="alamat">Alamat</Label>
               <Textarea
                 id="alamat"
                 value={formData.alamat}
                 onChange={(e) =>
                   setFormData({ ...formData, alamat: e.target.value })
                 }
-                placeholder="Enter full address"
+                placeholder="Masukkan alamat lengkap"
                 rows={3}
               />
             </div>
@@ -289,18 +289,20 @@ export function UserForm({ user, onClose, onSuccess }: UserFormProps) {
             {/* Actions */}
             <div className="flex items-center justify-end space-x-4 pt-6">
               <Button type="button" variant="outline" onClick={onClose}>
-                Cancel
+                Batal
               </Button>
               <Button type="submit" disabled={loading}>
                 {loading ? (
                   <div className="flex items-center space-x-2">
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    <span>Saving...</span>
+                    <span>Menyimpan...</span>
                   </div>
                 ) : (
                   <div className="flex items-center space-x-2">
                     <Save className="w-4 h-4" />
-                    <span>{isEditing ? "Update User" : "Create User"}</span>
+                    <span>
+                      {isEditing ? "Perbarui Pengguna" : "Buat Pengguna"}
+                    </span>
                   </div>
                 )}
               </Button>

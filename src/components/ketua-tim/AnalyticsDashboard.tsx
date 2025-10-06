@@ -107,7 +107,7 @@ export default function AnalyticsDashboard() {
   const handleRefresh = async () => {
     const res = await refetch();
     if (res.error) toast.error(res.error.message);
-    else toast.success("Analytics data refreshed");
+    else toast.success("Data analitik berhasil diperbarui");
   };
 
   const getStatusColor = (status: string) => {
@@ -197,25 +197,25 @@ export default function AnalyticsDashboard() {
 
   const statsCards = [
     {
-      title: "Total Projects",
+      title: "Total Proyek",
       value: stats.total_projects.toString(),
-      description: "All time projects",
+      description: "Total sepanjang waktu",
       icon: BarChart3,
       color: "from-blue-500 to-blue-600",
       bgColor: "from-blue-50 to-blue-100",
     },
     {
-      title: "Completion Rate",
+      title: "Tingkat Penyelesaian",
       value: `${stats.completion_rate}%`,
-      description: "Projects completed",
+      description: "Proyek selesai",
       icon: CheckCircle,
       color: "from-green-500 to-green-600",
       bgColor: "from-green-50 to-green-100",
     },
     {
-      title: "Avg Duration",
-      value: `${stats.average_project_duration} days`,
-      description: "Project completion time",
+      title: "Rata-rata Durasi",
+      value: `${stats.average_project_duration} hari`,
+      description: "Waktu penyelesaian proyek",
       icon: Clock,
       color: "from-purple-500 to-purple-600",
       bgColor: "from-purple-50 to-purple-100",
@@ -235,10 +235,10 @@ export default function AnalyticsDashboard() {
       <div className="rounded-2xl border border-white/60 bg-white/70 supports-[backdrop-filter]:bg-white/60 backdrop-blur shadow-xl p-6 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-            Analytics Dashboard
+            Dasbor Analitik
           </h1>
           <p className="text-gray-600 text-lg mt-2">
-            Track performance, productivity, and project insights.
+            Lacak performa, produktivitas, dan wawasan proyek.
           </p>
         </div>
 
@@ -248,10 +248,10 @@ export default function AnalyticsDashboard() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="1_month">Last Month</SelectItem>
-              <SelectItem value="3_months">Last 3 Months</SelectItem>
-              <SelectItem value="6_months">Last 6 Months</SelectItem>
-              <SelectItem value="1_year">Last Year</SelectItem>
+              <SelectItem value="1_month">Bulan Lalu</SelectItem>
+              <SelectItem value="3_months">3 Bulan Terakhir</SelectItem>
+              <SelectItem value="6_months">6 Bulan Terakhir</SelectItem>
+              <SelectItem value="1_year">Tahun Lalu</SelectItem>
             </SelectContent>
           </Select>
 
@@ -264,12 +264,12 @@ export default function AnalyticsDashboard() {
             <RefreshCw
               className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`}
             />
-            Refresh
+            Muat Ulang
           </Button>
 
           <Button className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold px-6 py-3 shadow-lg hover:shadow-2xl transform hover:scale-[1.02] transition-all duration-300">
             <Download className="w-4 h-4 mr-2" />
-            Export Report
+            Ekspor Laporan
           </Button>
         </div>
       </div>
@@ -318,14 +318,14 @@ export default function AnalyticsDashboard() {
             <div className="flex items-center justify-between">
               <div className="flex items-center text-white text-xl font-semibold">
                 <Activity className="w-6 h-6 mr-3" />
-                Project Performance
+                Kinerja Proyek
               </div>
               <Badge className="bg-white/20 text-white">
                 {project_performance.length}
               </Badge>
             </div>
             <div className="text-blue-100 mt-2 text-sm">
-              Current project status and progress
+              Status dan progres proyek saat ini
             </div>
           </div>
           <div className="p-6 space-y-4">
@@ -345,32 +345,32 @@ export default function AnalyticsDashboard() {
 
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <div className="text-gray-500">Progress</div>
+                    <div className="text-gray-500">Progres</div>
                     <div className="font-semibold">
                       {project.completion_percentage}%
                     </div>
                   </div>
                   <div>
-                    <div className="text-gray-500">Days Left</div>
+                    <div className="text-gray-500">Sisa Hari</div>
                     <div className="font-semibold">
-                      {project.days_remaining} days
+                      {project.days_remaining} hari
                     </div>
                   </div>
                   <div>
-                    <div className="text-gray-500">Team Size</div>
+                    <div className="text-gray-500">Ukuran Tim</div>
                     <div className="font-semibold">
-                      {project.team_size} members
+                      {project.team_size} anggota
                     </div>
                   </div>
                   <div>
-                    <div className="text-gray-500">Budget Used</div>
+                    <div className="text-gray-500">Anggaran Terpakai</div>
                     <div className="font-semibold">{project.budget_used}%</div>
                   </div>
                 </div>
 
                 <div className="mt-3">
                   <div className="flex justify-between text-sm mb-1">
-                    <span>Progress</span>
+                    <span>Progres</span>
                     <span>{project.completion_percentage}%</span>
                   </div>
                   <div className="w-full bg-gray-200/70 rounded-full h-2">
@@ -391,14 +391,14 @@ export default function AnalyticsDashboard() {
             <div className="flex items-center justify-between">
               <div className="flex items-center text-white text-xl font-semibold">
                 <Users className="w-6 h-6 mr-3" />
-                Team Productivity
+                Produktivitas Tim
               </div>
               <Badge className="bg-white/20 text-white">
                 {team_productivity.length}
               </Badge>
             </div>
             <div className="text-green-100 mt-2 text-sm">
-              Individual team member performance
+              Performa tiap anggota tim
             </div>
           </div>
           <div className="p-6 space-y-4">
@@ -418,34 +418,34 @@ export default function AnalyticsDashboard() {
 
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <div className="text-gray-500">Completed</div>
+                    <div className="text-gray-500">Selesai</div>
                     <div className="font-semibold">
-                      {member.tasks_completed} tasks
+                      {member.tasks_completed} tugas
                     </div>
                   </div>
                   <div>
-                    <div className="text-gray-500">Pending</div>
+                    <div className="text-gray-500">Tertunda</div>
                     <div className="font-semibold">
-                      {member.tasks_pending} tasks
+                      {member.tasks_pending} tugas
                     </div>
                   </div>
                   <div>
-                    <div className="text-gray-500">Success Rate</div>
+                    <div className="text-gray-500">Tingkat Keberhasilan</div>
                     <div className="font-semibold">
                       {member.completion_rate}%
                     </div>
                   </div>
                   <div>
-                    <div className="text-gray-500">Projects</div>
+                    <div className="text-gray-500">Proyek</div>
                     <div className="font-semibold">
-                      {member.projects_assigned} active
+                      {member.projects_assigned} aktif
                     </div>
                   </div>
                 </div>
 
                 <div className="mt-3">
                   <div className="flex justify-between text-sm mb-1">
-                    <span>Completion Rate</span>
+                    <span>Tingkat Penyelesaian</span>
                     <span>{member.completion_rate}%</span>
                   </div>
                   <div className="w-full bg-gray-200/70 rounded-full h-2">
@@ -464,7 +464,7 @@ export default function AnalyticsDashboard() {
       {/* Performance Summary */}
       <div className="border-0 shadow-2xl bg-gradient-to-r from-purple-600 to-pink-600 text-white overflow-hidden rounded-2xl ring-1 ring-white/20">
         <div className="p-8">
-          <h3 className="text-2xl font-bold mb-6">Performance Summary</h3>
+          <h3 className="text-2xl font-bold mb-6">Ringkasan Performa</h3>
           <div className="grid md:grid-cols-1 gap-8 text-center relative">
             <div className="space-y-2">
               <div className="flex items-center justify-center mb-3">
@@ -472,7 +472,7 @@ export default function AnalyticsDashboard() {
               </div>
               <div className="text-3xl font-bold">{stats.completion_rate}%</div>
               <div className="text-purple-100 text-sm">
-                Overall completion rate
+                Tingkat penyelesaian keseluruhan
               </div>
             </div>
 

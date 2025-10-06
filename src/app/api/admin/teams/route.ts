@@ -181,36 +181,85 @@ export async function GET() {
     // Compute counts using separate queries to avoid recursive policies
     const teamIds = (teams || []).map((t: TeamRecord) => t.id);
 
-    // Members per team
-    const teamMemberCounts = new Map<string, number>();
+    // Prepare member sets per team to compute distinct members
+    const teamMemberSets = new Map<string, Set<string>>();
+
+    // Projects per team (and capture ids to map members -> team)
+    const teamProjectCounts = new Map<string, number>();
+    const projectIdToTeamId = new Map<string, string>();
+    const projectLeaderUserIds = new Map<string, string | null>();
     if (teamIds.length > 0) {
-      const { data: members } = await supabaseAdmin
-        .from("team_members")
-        .select("team_id")
+      const { data: projects } = await (supabaseAdmin as any)
+        .from("projects")
+        .select("id, team_id, leader_user_id, ketua_tim_id")
         .in("team_id", teamIds as unknown as string[]);
-      (members || []).forEach((m) => {
-        const id = (m as { team_id: string }).team_id;
-        teamMemberCounts.set(id, (teamMemberCounts.get(id) || 0) + 1);
-      });
+
+      (projects || []).forEach(
+        (p: {
+          id: string;
+          team_id: string;
+          leader_user_id?: string | null;
+          ketua_tim_id?: string | null;
+        }) => {
+          const teamId = p.team_id as string;
+          teamProjectCounts.set(
+            teamId,
+            (teamProjectCounts.get(teamId) || 0) + 1,
+          );
+          projectIdToTeamId.set(p.id, teamId);
+          // prefer new column leader_user_id, fallback to ketua_tim_id
+          projectLeaderUserIds.set(
+            p.id,
+            p.leader_user_id ?? p.ketua_tim_id ?? null,
+          );
+        },
+      );
     }
 
-    // Projects per team
-    const teamProjectCounts = new Map<string, number>();
-    if (teamIds.length > 0) {
-      const { data: projects } = await supabaseAdmin
-        .from("projects")
-        .select("team_id")
-        .in("team_id", teamIds as unknown as string[]);
-      (projects || []).forEach((p) => {
-        const id = (p as { team_id: string | null }).team_id as string;
-        teamProjectCounts.set(id, (teamProjectCounts.get(id) || 0) + 1);
+    // Seed sets with team leaders as members
+    (teams || []).forEach(
+      (team: TeamRecord & { leader_user_id?: string | null; id: string }) => {
+        const set = teamMemberSets.get(team.id) || new Set<string>();
+        if (team.leader_user_id) set.add(team.leader_user_id);
+        teamMemberSets.set(team.id, set);
+      },
+    );
+
+    // Add project leaders and project members to the sets
+    const allProjectIds = Array.from(projectIdToTeamId.keys());
+    if (allProjectIds.length > 0) {
+      // 1) project leaders
+      allProjectIds.forEach((pid) => {
+        const teamId = projectIdToTeamId.get(pid)!;
+        const leaderId = projectLeaderUserIds.get(pid);
+        if (leaderId) {
+          const set = teamMemberSets.get(teamId) || new Set<string>();
+          set.add(leaderId);
+          teamMemberSets.set(teamId, set);
+        }
       });
+
+      // 2) project members from project_members table
+      const { data: projMembers } = await (supabaseAdmin as any)
+        .from("project_members")
+        .select("project_id, user_id")
+        .in("project_id", allProjectIds);
+
+      (projMembers || []).forEach(
+        (row: { project_id: string; user_id: string }) => {
+          const teamId = projectIdToTeamId.get(row.project_id);
+          if (!teamId) return;
+          const set = teamMemberSets.get(teamId) || new Set<string>();
+          set.add(row.user_id);
+          teamMemberSets.set(teamId, set);
+        },
+      );
     }
 
     const safeTeams = (teams || []).map((team: TeamRecord) => ({
       ...team,
       project_count: teamProjectCounts.get(team.id) || 0,
-      total_members: teamMemberCounts.get(team.id) || 0,
+      total_members: (teamMemberSets.get(team.id) || new Set()).size,
     }));
 
     return NextResponse.json({

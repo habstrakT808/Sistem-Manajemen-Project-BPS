@@ -111,11 +111,16 @@ export async function GET(request: Request) {
       throw tasksError;
     }
 
+    // Enforce project scoping defensively even after DB filter
+    const scopedTasks = projectId
+      ? ((tasks as TaskData[]) || []).filter(
+          (t) => String(t.project_id) === String(projectId),
+        )
+      : (tasks as TaskData[]) || [];
+
     // Get project details separately to avoid FK relationship issues
     const projectIds = Array.from(
-      new Set(
-        ((tasks as TaskData[]) || []).map((t) => t.project_id).filter(Boolean),
-      ),
+      new Set(scopedTasks.map((t) => t.project_id).filter(Boolean)),
     );
 
     const projectDetails: Record<
@@ -169,9 +174,7 @@ export async function GET(request: Request) {
     }
 
     // Fetch transport allocations for these tasks for the current user only
-    const taskIds = Array.from(
-      new Set(((tasks as TaskData[]) || []).map((t) => t.id)),
-    );
+    const taskIds = Array.from(new Set(scopedTasks.map((t) => t.id)));
 
     const allocationsByTaskId: Record<
       string,
@@ -222,8 +225,15 @@ export async function GET(request: Request) {
       });
     }
 
+    // Remove known testing/dummy tasks from results
+    const cleanedTasks = scopedTasks.filter(
+      (t) =>
+        t.title !== "Task with Allocated Transport" &&
+        t.title !== "Task with Pending Transport",
+    );
+
     // Format response
-    const formattedTasks = ((tasks as TaskData[]) || []).map((task) => ({
+    const formattedTasks = cleanedTasks.map((task) => ({
       id: task.id,
       project_id: task.project_id,
       title: task.title,

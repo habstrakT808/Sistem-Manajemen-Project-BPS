@@ -61,17 +61,17 @@ interface EarningsData {
 
 async function fetchEarningsData(
   month: number,
-  year: number
+  year: number,
 ): Promise<EarningsData> {
   const response = await fetch(
     `/api/pegawai/earnings?month=${month}&year=${year}`,
     {
       cache: "no-store",
-    }
+    },
   );
   const result = await response.json();
   if (!response.ok) {
-    throw new Error(result.error || "Failed to fetch earnings");
+    throw new Error(result.error || "Gagal mengambil data pendapatan");
   }
   return result;
 }
@@ -114,34 +114,34 @@ export default function EarningsAnalytics() {
     if (res.error) {
       toast.error(res.error.message);
     } else {
-      toast.success("Earnings data refreshed");
+      toast.success("Data pendapatan diperbarui");
     }
   };
 
   const handleExport = async () => {
     try {
       const response = await fetch(
-        `/api/pegawai/earnings/export?month=${selectedMonth}&year=${selectedYear}`
+        `/api/pegawai/earnings/export?month=${selectedMonth}&year=${selectedYear}`,
       );
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `earnings_${selectedYear}_${selectedMonth.toString().padStart(2, "0")}.csv`;
+      a.download = `pendapatan_${selectedYear}_${selectedMonth.toString().padStart(2, "0")}.csv`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      toast.success("Earnings report downloaded");
+      toast.success("Laporan pendapatan diunduh");
     } catch (error) {
       console.error("Export failed:", error);
-      toast.error("Failed to export earnings data");
+      toast.error("Gagal mengekspor data pendapatan");
     }
   };
 
   const currentMonthName = new Date(
     selectedYear,
-    selectedMonth - 1
+    selectedMonth - 1,
   ).toLocaleDateString("id-ID", {
     month: "long",
     year: "numeric",
@@ -209,7 +209,7 @@ export default function EarningsAnalytics() {
       value: formatCurrency(
         current_month.records.length > 0
           ? current_month.total_earnings / current_month.records.length
-          : 0
+          : 0,
       ),
       description: "Average allocation",
       icon: Award,
@@ -224,10 +224,11 @@ export default function EarningsAnalytics() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-            My Earnings Analytics
+            Analitik Pendapatan Saya
           </h1>
           <p className="text-gray-600 text-lg mt-2">
-            Track your transport allowances and financial progress over time.
+            Lacak tunjangan transport dan progres keuangan Anda dari waktu ke
+            waktu.
           </p>
         </div>
 
@@ -261,7 +262,7 @@ export default function EarningsAnalytics() {
             <RefreshCw
               className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`}
             />
-            Refresh
+            Muat Ulang
           </Button>
 
           <Button
@@ -269,7 +270,7 @@ export default function EarningsAnalytics() {
             className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
           >
             <Download className="w-4 h-4 mr-2" />
-            Export
+            Ekspor
           </Button>
         </div>
       </div>
@@ -315,10 +316,10 @@ export default function EarningsAnalytics() {
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6">
             <h2 className="text-xl font-bold text-white flex items-center">
               <TrendingUp className="w-6 h-6 mr-3" />
-              Earnings Trend
+              Tren Pendapatan
             </h2>
             <p className="text-blue-100 text-sm mt-1">
-              Monthly transport earnings over time
+              Pendapatan transport bulanan dari waktu ke waktu
             </p>
           </div>
           <div className="p-6">
@@ -338,7 +339,7 @@ export default function EarningsAnalytics() {
                 <Tooltip
                   formatter={(value: number) => [
                     formatCurrency(value),
-                    "Earnings",
+                    "Pendapatan",
                   ]}
                   labelStyle={{ color: "#374151" }}
                 />
@@ -370,18 +371,18 @@ export default function EarningsAnalytics() {
                 className="text-white hover:bg-white hover:bg-opacity-20"
               >
                 <Download className="w-4 h-4 mr-2" />
-                Export
+                Ekspor
               </Button>
             </div>
             <p className="text-green-100 text-sm mt-1">
-              Transport allocation details
+              Detail alokasi transport
             </p>
           </div>
           <div className="p-6 space-y-4 max-h-96 overflow-y-auto">
             {current_month.records.length === 0 ? (
               <div className="text-center py-8">
                 <DollarSign className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500">No earnings this month</p>
+                <p className="text-gray-500">Belum ada pendapatan bulan ini</p>
               </div>
             ) : (
               current_month.records.map((record, index) => (
@@ -404,9 +405,9 @@ export default function EarningsAnalytics() {
                         {record.description}
                       </div>
                       <div className="text-xs text-gray-500">
-                        Date:{" "}
+                        Tanggal:{" "}
                         {new Date(record.occurred_on).toLocaleDateString(
-                          "id-ID"
+                          "id-ID",
                         )}
                       </div>
                     </div>
@@ -423,7 +424,7 @@ export default function EarningsAnalytics() {
             {current_month.records.length > 0 && (
               <div className="border-t pt-4">
                 <div className="flex justify-between items-center text-lg font-bold">
-                  <span>Total Earnings:</span>
+                  <span>Total Pendapatan:</span>
                   <span className="text-green-600">
                     {formatCurrency(current_month.total_earnings)}
                   </span>
@@ -439,10 +440,10 @@ export default function EarningsAnalytics() {
         <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-6">
           <h2 className="text-xl font-bold text-white flex items-center">
             <PieChart className="w-6 h-6 mr-3" />
-            Yearly Overview
+            Ikhtisar Tahunan
           </h2>
           <p className="text-purple-100 text-sm mt-1">
-            Monthly earnings breakdown for {selectedYear}
+            Rincian pendapatan bulanan untuk {selectedYear}
           </p>
         </div>
         <div className="p-6">
@@ -459,7 +460,7 @@ export default function EarningsAnalytics() {
               <Tooltip
                 formatter={(value: number) => [
                   formatCurrency(value),
-                  "Earnings",
+                  "Pendapatan",
                 ]}
                 labelStyle={{ color: "#374151" }}
               />
@@ -482,7 +483,7 @@ export default function EarningsAnalytics() {
       {/* Performance Insights */}
       <div className="border-0 shadow-xl bg-gradient-to-r from-green-600 to-teal-600 text-white overflow-hidden rounded-xl">
         <div className="p-8">
-          <h2 className="text-2xl font-bold mb-6">Financial Performance</h2>
+          <h2 className="text-2xl font-bold mb-6">Kinerja Finansial</h2>
           <div className="grid md:grid-cols-3 gap-8 text-center">
             <div className="space-y-2">
               <div className="flex items-center justify-center mb-3">
@@ -493,12 +494,14 @@ export default function EarningsAnalytics() {
                   ? Math.round(
                       (current_month.total_earnings /
                         Math.max(avgMonthlyEarnings, 1)) *
-                        100
+                        100,
                     )
                   : 100}
                 %
               </div>
-              <div className="text-green-100 text-sm">vs Monthly Average</div>
+              <div className="text-green-100 text-sm">
+                dibanding Rata-rata Bulanan
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -511,13 +514,13 @@ export default function EarningsAnalytics() {
                   ? formatCurrency(
                       historical_data.reduce(
                         (sum, month) => sum + month.total,
-                        0
-                      )
+                        0,
+                      ),
                     )
                   : formatCurrency(0)}
               </div>
               <div className="text-green-100 text-sm">
-                Total Lifetime Earnings
+                Total Pendapatan Seumur Hidup
               </div>
             </div>
 
@@ -528,7 +531,9 @@ export default function EarningsAnalytics() {
               <div className="text-3xl font-bold">
                 {current_month.records.length}
               </div>
-              <div className="text-green-100 text-sm">Tasks with Transport</div>
+              <div className="text-green-100 text-sm">
+                Tugas dengan Transport
+              </div>
             </div>
           </div>
         </div>

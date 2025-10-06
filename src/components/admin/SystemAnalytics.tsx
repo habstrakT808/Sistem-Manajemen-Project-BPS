@@ -95,10 +95,10 @@ export default function SystemAnalytics() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-              System Analytics
+              Analitik Sistem
             </h1>
             <p className="text-gray-600 text-lg mt-2">
-              Comprehensive insights and performance metrics
+              Wawasan komprehensif dan metrik performa
             </p>
           </div>
 
@@ -110,9 +110,9 @@ export default function SystemAnalytics() {
                 onChange={(e) => setTimeRange(e.target.value)}
                 className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="7">Last 7 days</option>
-                <option value="30">Last 30 days</option>
-                <option value="90">Last 90 days</option>
+                <option value="7">7 hari terakhir</option>
+                <option value="30">30 hari terakhir</option>
+                <option value="90">90 hari terakhir</option>
               </select>
             </div>
             <Button
@@ -120,7 +120,7 @@ export default function SystemAnalytics() {
               className="border-2 border-green-200 text-green-600 hover:bg-green-50"
             >
               <Download className="w-4 h-4 mr-2" />
-              Export Report
+              Ekspor Laporan
             </Button>
           </div>
         </div>
@@ -143,9 +143,9 @@ export default function SystemAnalytics() {
 
   const kpiCards = [
     {
-      title: "Total Users",
+      title: "Total Pengguna",
       value: (data.systemMetrics as any).total_users ?? 0,
-      description: `${(data.systemMetrics as any).active_users ?? 0} active users`,
+      description: `${(data.systemMetrics as any).active_users ?? 0} pengguna aktif`,
       icon: Users,
       color: "from-blue-500 to-blue-600",
       bgColor: "from-blue-50 to-blue-100",
@@ -153,9 +153,9 @@ export default function SystemAnalytics() {
       changeType: "neutral" as const,
     },
     {
-      title: "Active Projects",
+      title: "Proyek Aktif",
       value: (data.systemMetrics as any).active_projects ?? 0,
-      description: `${(data.systemMetrics as any).completed_projects ?? 0} completed`,
+      description: `${(data.systemMetrics as any).completed_projects ?? 0} selesai`,
       icon: FolderOpen,
       color: "from-green-500 to-green-600",
       bgColor: "from-green-50 to-green-100",
@@ -163,11 +163,11 @@ export default function SystemAnalytics() {
       changeType: "neutral" as const,
     },
     {
-      title: "This Month Spending",
+      title: "Pengeluaran Bulan Ini",
       value: formatCurrency(
         (data.systemMetrics as any).this_month_spending ?? 0,
       ),
-      description: "Monthly expenses",
+      description: "Pengeluaran bulanan",
       icon: DollarSign,
       color: "from-orange-500 to-orange-600",
       bgColor: "from-orange-50 to-orange-100",
@@ -175,9 +175,9 @@ export default function SystemAnalytics() {
       changeType: "neutral" as const,
     },
     {
-      title: "Database Size",
+      title: "Ukuran Basis Data",
       value: (data.systemMetrics as any).database_size ?? 0,
-      description: `${(data.systemMetrics as any).total_tables ?? 0} tables`,
+      description: `${(data.systemMetrics as any).total_tables ?? 0} tabel`,
       icon: Database,
       color: "from-purple-500 to-purple-600",
       bgColor: "from-purple-50 to-purple-100",
@@ -215,10 +215,10 @@ export default function SystemAnalytics() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-            System Analytics
+            Analitik Sistem
           </h1>
           <p className="text-gray-600 text-lg mt-2">
-            Comprehensive insights and performance metrics
+            Wawasan komprehensif dan metrik performa
           </p>
         </div>
 
@@ -230,9 +230,9 @@ export default function SystemAnalytics() {
               onChange={(e) => setTimeRange(e.target.value)}
               className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="7">Last 7 days</option>
-              <option value="30">Last 30 days</option>
-              <option value="90">Last 90 days</option>
+              <option value="7">7 hari terakhir</option>
+              <option value="30">30 hari terakhir</option>
+              <option value="90">90 hari terakhir</option>
             </select>
           </div>
           <Button
@@ -240,7 +240,7 @@ export default function SystemAnalytics() {
             className="border-2 border-green-200 text-green-600 hover:bg-green-50"
           >
             <Download className="w-4 h-4 mr-2" />
-            Export Report
+            Ekspor Laporan
           </Button>
         </div>
       </div>
@@ -292,7 +292,7 @@ export default function SystemAnalytics() {
                       {kpi.change}
                     </span>
                     <span className="text-sm text-gray-500 ml-2">
-                      vs last month
+                      dibanding bulan lalu
                     </span>
                   </div>
                 </div>
@@ -307,22 +307,22 @@ export default function SystemAnalytics() {
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="overview" className="flex items-center space-x-2">
             <Activity className="w-4 h-4" />
-            <span>Overview</span>
+            <span>Ringkasan</span>
           </TabsTrigger>
           <TabsTrigger value="users" className="flex items-center space-x-2">
             <Users className="w-4 h-4" />
-            <span>Users</span>
+            <span>Pengguna</span>
           </TabsTrigger>
           <TabsTrigger value="projects" className="flex items-center space-x-2">
             <FolderOpen className="w-4 h-4" />
-            <span>Projects</span>
+            <span>Proyek</span>
           </TabsTrigger>
           <TabsTrigger
             value="financial"
             className="flex items-center space-x-2"
           >
             <DollarSign className="w-4 h-4" />
-            <span>Financial</span>
+            <span>Keuangan</span>
           </TabsTrigger>
         </TabsList>
 
@@ -333,10 +333,10 @@ export default function SystemAnalytics() {
               <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6">
                 <div className="font-semibold flex items-center text-white text-xl">
                   <PieChartIcon className="w-6 h-6 mr-3" />
-                  User Roles Distribution
+                  Distribusi Peran Pengguna
                 </div>
                 <div className="text-sm text-blue-100 mt-2">
-                  Active users by role
+                  Pengguna aktif berdasarkan peran
                 </div>
               </div>
               <div className="p-6">
@@ -355,10 +355,10 @@ export default function SystemAnalytics() {
               <div className="bg-gradient-to-r from-green-600 to-teal-600 p-6">
                 <div className="font-semibold flex items-center text-white text-xl">
                   <BarChart3 className="w-6 h-6 mr-3" />
-                  Project Status Distribution
+                  Distribusi Status Proyek
                 </div>
                 <div className="text-sm text-green-100 mt-2">
-                  Projects by status
+                  Proyek berdasarkan status
                 </div>
               </div>
               <div className="p-6">
@@ -378,10 +378,10 @@ export default function SystemAnalytics() {
             <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-6">
               <div className="font-semibold flex items-center text-white text-xl">
                 <Activity className="w-6 h-6 mr-3" />
-                System Health Metrics
+                Metrik Kesehatan Sistem
               </div>
               <div className="text-sm text-purple-100 mt-2">
-                Real-time system performance indicators
+                Indikator performa sistem secara real-time
               </div>
             </div>
             <div className="p-6">
@@ -390,12 +390,12 @@ export default function SystemAnalytics() {
                   <div className="text-2xl font-bold text-gray-900 mb-1">
                     {(data.systemMetrics as any).pending_tasks ?? 0}
                   </div>
-                  <div className="text-sm text-gray-500">Pending Tasks</div>
+                  <div className="text-sm text-gray-500">Tugas Tertunda</div>
                   <Badge
                     variant="outline"
                     className="mt-2 text-yellow-600 border-yellow-600"
                   >
-                    Active
+                    Aktif
                   </Badge>
                 </div>
                 <div className="text-center">
@@ -403,7 +403,7 @@ export default function SystemAnalytics() {
                     {(data.systemMetrics as any).unread_notifications ?? 0}
                   </div>
                   <div className="text-sm text-gray-500">
-                    Unread Notifications
+                    Notifikasi Belum Dibaca
                   </div>
                   <Badge
                     variant="outline"
@@ -419,24 +419,26 @@ export default function SystemAnalytics() {
                         0) as number,
                     )}
                   </div>
-                  <div className="text-sm text-gray-500">Avg Project Days</div>
+                  <div className="text-sm text-gray-500">
+                    Rata-rata Hari Proyek
+                  </div>
                   <Badge
                     variant="outline"
                     className="mt-2 text-green-600 border-green-600"
                   >
-                    Good
+                    Baik
                   </Badge>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-gray-900 mb-1">
                     {(data.systemMetrics as any).active_mitra ?? 0}
                   </div>
-                  <div className="text-sm text-gray-500">Active Partners</div>
+                  <div className="text-sm text-gray-500">Mitra Aktif</div>
                   <Badge
                     variant="outline"
                     className="mt-2 text-purple-600 border-purple-600"
                   >
-                    Available
+                    Tersedia
                   </Badge>
                 </div>
               </div>
@@ -449,10 +451,10 @@ export default function SystemAnalytics() {
             <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6">
               <div className="font-semibold flex items-center text-white text-xl">
                 <Users className="w-6 h-6 mr-3" />
-                User Registration Trends
+                Tren Registrasi Pengguna
               </div>
               <div className="text-sm text-blue-100 mt-2">
-                Daily user registrations over time
+                Registrasi pengguna harian dari waktu ke waktu
               </div>
             </div>
             <div className="p-6">
@@ -464,9 +466,9 @@ export default function SystemAnalytics() {
                   {
                     dataKey: "total_registrations",
                     stroke: "#3B82F6",
-                    name: "Total Registrations",
+                    name: "Total Registrasi",
                   },
-                  { dataKey: "admin_count", stroke: "#EF4444", name: "Admins" },
+                  { dataKey: "admin_count", stroke: "#EF4444", name: "Admin" },
                   {
                     dataKey: "ketua_tim_count",
                     stroke: "#10B981",
@@ -488,10 +490,10 @@ export default function SystemAnalytics() {
             <div className="bg-gradient-to-r from-green-600 to-teal-600 p-6">
               <div className="font-semibold flex items-center text-white text-xl">
                 <FolderOpen className="w-6 h-6 mr-3" />
-                Project Analytics
+                Analitik Proyek
               </div>
               <div className="text-sm text-green-100 mt-2">
-                Project creation and completion trends
+                Tren pembuatan dan penyelesaian proyek
               </div>
             </div>
             <div className="p-6">
@@ -504,19 +506,19 @@ export default function SystemAnalytics() {
                     dataKey: "projects_created",
                     stroke: "#10B981",
                     fill: "#10B981",
-                    name: "Created",
+                    name: "Dibuat",
                   },
                   {
                     dataKey: "projects_completed",
                     stroke: "#3B82F6",
                     fill: "#3B82F6",
-                    name: "Completed",
+                    name: "Selesai",
                   },
                   {
                     dataKey: "active_projects",
                     stroke: "#F59E0B",
                     fill: "#F59E0B",
-                    name: "Active",
+                    name: "Aktif",
                   },
                 ]}
               />
@@ -529,10 +531,10 @@ export default function SystemAnalytics() {
             <div className="bg-gradient-to-r from-orange-600 to-red-600 p-6">
               <div className="font-semibold flex items-center text-white text-xl">
                 <DollarSign className="w-6 h-6 mr-3" />
-                Financial Analytics
+                Analitik Keuangan
               </div>
               <div className="text-sm text-orange-100 mt-2">
-                Monthly spending breakdown and trends
+                Rincian pengeluaran bulanan dan tren
               </div>
             </div>
             <div className="p-6">

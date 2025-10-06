@@ -30,77 +30,24 @@ export async function GET() {
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
-    // Always include teams where this user is leader
-    const { data: leaderTeams } = await (svc as any)
+    // Fetch ALL teams created by admin and derive user role per team
+    const { data: allTeams } = await (svc as any)
       .from("teams")
       .select(
         `id, name, description, leader_user_id, users!teams_leader_user_id_fkey(nama_lengkap, email)`,
-      )
-      .eq("leader_user_id", user.id as unknown as string);
-
-    // Teams as member via membership (STRICT: only role='member')
-    const { data: memberProjects } = await (svc as any)
-      .from("project_members")
-      .select("project_id, role")
-      .eq("user_id", user.id as unknown as string)
-      .eq("role", "member");
-
-    const memberOnlyProjectIds = (memberProjects || [])
-      .filter((p: { role?: string }) => (p as any).role === "member")
-      .map((p: { project_id: string }) => p.project_id);
-
-    // Fallback: derive from project_assignments if no member-only rows yet
-    let assignmentProjectIds: string[] = [];
-    if (memberOnlyProjectIds.length === 0) {
-      const { data: paRows } = await (svc as any)
-        .from("project_members")
-        .select("project_id")
-        .eq("user_id", user.id as unknown as string);
-      assignmentProjectIds = (paRows || []).map(
-        (r: { project_id: string }) => r.project_id,
       );
-    }
 
-    const allMemberProjectIds = Array.from(
-      new Set([...(memberOnlyProjectIds || []), ...assignmentProjectIds]),
-    );
-
-    // Fetch teams ONLY for projects that are associated with a real team (team_id not null)
-    const { data: memberTeams } = await (svc as any)
-      .from("projects")
-      .select("id, team_id")
-      .in(
-        "id",
-        allMemberProjectIds.length > 0 ? allMemberProjectIds : ["__none__"],
-      )
-      .not("team_id", "is", null);
-
-    const teamIds = Array.from(
-      new Set(
-        (memberTeams || [])
-          .map((p: { team_id: string | null }) => p.team_id)
-          .filter((id: string | null) => Boolean(id)),
-      ),
-    ) as string[];
-
-    // Real team rows (only existing team ids)
-    const { data: teamRows } = await (svc as any)
-      .from("teams")
-      .select(
-        `id, name, description, leader_user_id, users!teams_leader_user_id_fkey(nama_lengkap, email)`,
-      )
-      .in("id", teamIds.length > 0 ? teamIds : ["__none__"]);
-
-    const leaderSet = new Set((leaderTeams || []).map((t: any) => t.id));
-    const merged: TeamRow[] = [
-      ...((leaderTeams || []).map((t: any) => ({
-        ...t,
-        role: "leader" as const,
-      })) as TeamRow[]),
-      ...((teamRows || [])
-        .filter((t: any) => !leaderSet.has(t.id))
-        .map((t: any) => ({ ...t, role: "member" as const })) as TeamRow[]),
-    ];
+    const merged: TeamRow[] = ((allTeams || []) as any[]).map((t: any) => ({
+      id: t.id,
+      name: t.name,
+      description: t.description,
+      leader_user_id: t.leader_user_id,
+      users: t.users || null,
+      role:
+        (t.leader_user_id as string | null) === (user.id as unknown as string)
+          ? ("leader" as const)
+          : ("member" as const),
+    }));
 
     return NextResponse.json({ data: merged });
   } catch (e) {

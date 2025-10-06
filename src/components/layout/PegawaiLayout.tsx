@@ -25,6 +25,7 @@ import {
   Users,
 } from "lucide-react";
 import { useAuthContext } from "@/components/auth/AuthProvider";
+import { useActiveProject } from "@/components/providers";
 
 interface PegawaiLayoutProps {
   children: React.ReactNode;
@@ -49,54 +50,54 @@ async function fetchNotifications(): Promise<NotificationData> {
 
 const navigation = [
   {
-    name: "Team",
+    name: "Tim",
     href: "/pegawai",
     icon: Users,
-    description: "My team list",
+    description: "Daftar tim saya",
     color: "from-blue-500 to-blue-600",
     isDefault: true,
   },
   {
-    name: "Dashboard",
+    name: "Dasbor",
     href: "/pegawai/dashboard",
     icon: Home,
-    description: "Today's focus",
+    description: "Fokus hari ini",
     color: "from-green-500 to-green-600",
   },
   {
-    name: "My Tasks",
+    name: "Tugas Saya",
     href: "/pegawai/tasks",
     icon: ClipboardList,
-    description: "Task management",
+    description: "Manajemen tugas",
     color: "from-orange-500 to-orange-600",
     notification: "urgent_tasks",
   },
   {
-    name: "Schedule",
+    name: "Jadwal",
     href: "/pegawai/schedule",
     icon: Calendar,
-    description: "Personal calendar",
+    description: "Kalender pribadi",
     color: "from-purple-500 to-purple-600",
   },
   {
-    name: "Earnings",
+    name: "Pendapatan",
     href: "/pegawai/earnings",
     icon: DollarSign,
-    description: "Financial tracking",
+    description: "Pelacakan keuangan",
     color: "from-yellow-500 to-yellow-600",
   },
   {
     name: "Transport",
     href: "/pegawai/transport",
     icon: MapPin,
-    description: "Allocate transport dates",
+    description: "Alokasikan tanggal transport",
     color: "from-orange-500 to-red-500",
   },
   {
-    name: "Reviews",
+    name: "Ulasan",
     href: "/pegawai/reviews",
     icon: Star,
-    description: "Mitra evaluation",
+    description: "Penilaian mitra",
     color: "from-pink-500 to-pink-600",
     notification: "pending_reviews",
   },
@@ -105,6 +106,7 @@ const navigation = [
 export function PegawaiLayout({ children }: PegawaiLayoutProps) {
   const { user, userProfile, loading, signOut } = useAuthContext();
   const router = useRouter();
+  const { activeProject } = useActiveProject();
 
   // Force re-render when user changes
   const layoutKey = user?.id || "no-user";
@@ -149,7 +151,7 @@ export function PegawaiLayout({ children }: PegawaiLayoutProps) {
             </div>
             <div>
               <div className="text-white font-bold text-lg">Pegawai Panel</div>
-              <div className="text-green-100 text-sm">Task Management</div>
+              <div className="text-green-100 text-sm">Manajemen Tugas</div>
             </div>
           </div>
         </div>
@@ -204,11 +206,11 @@ export function PegawaiLayout({ children }: PegawaiLayoutProps) {
                 <MapPin className="w-4 h-4 text-orange-600" />
                 <div className="flex-1">
                   <div className="text-sm font-semibold text-orange-900">
-                    Transport Dates Needed
+                    Butuh Tanggal Transport
                   </div>
                   <div className="text-xs text-orange-700">
-                    {notifications.pending_transport_allocations} tasks need
-                    date selection
+                    {notifications.pending_transport_allocations} tugas perlu
+                    pilih tanggal
                   </div>
                 </div>
                 <Badge className="bg-orange-100 text-orange-800 animate-pulse">
@@ -219,19 +221,25 @@ export function PegawaiLayout({ children }: PegawaiLayoutProps) {
           )}
 
           <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-3 mb-4">
-            Navigation
+            Navigasi
           </div>
 
           {navigation.map((item) => {
             const IconComponent = item.icon;
             const notificationCount = getNotificationCount(item.notification);
+            const hrefWithProject =
+              activeProject?.id &&
+              (item.href === "/pegawai/tasks" ||
+                item.href === "/pegawai/dashboard")
+                ? `${item.href}?project_id=${encodeURIComponent(activeProject.id)}`
+                : item.href;
 
             return (
               <Link
                 key={item.name}
-                href={item.href}
+                href={hrefWithProject}
                 prefetch
-                onMouseEnter={() => router.prefetch(item.href)}
+                onMouseEnter={() => router.prefetch(hrefWithProject)}
               >
                 <div className="group flex items-center p-3 rounded-xl hover:bg-gradient-to-r hover:from-green-50 hover:to-teal-50 transition-all duration-300 transform hover:scale-105 cursor-pointer border border-transparent hover:border-green-200">
                   <div
@@ -268,7 +276,7 @@ export function PegawaiLayout({ children }: PegawaiLayoutProps) {
         {/* Quick Actions */}
         <div className="p-4 border-t border-gray-100 mt-auto">
           <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-3 mb-4">
-            Quick Actions
+            Aksi Cepat
           </div>
           <div className="space-y-2">
             <Button
@@ -280,23 +288,31 @@ export function PegawaiLayout({ children }: PegawaiLayoutProps) {
               } text-white`}
             >
               <Link
-                href="/pegawai/tasks?filter=transport"
+                href={
+                  activeProject?.id
+                    ? `/pegawai/tasks?filter=transport&project_id=${activeProject.id}`
+                    : "/pegawai/tasks?filter=transport"
+                }
                 prefetch
                 onMouseEnter={() =>
-                  router.prefetch("/pegawai/tasks?filter=transport")
+                  router.prefetch(
+                    activeProject?.id
+                      ? `/pegawai/tasks?filter=transport&project_id=${activeProject.id}`
+                      : "/pegawai/tasks?filter=transport",
+                  )
                 }
               >
                 {notifications &&
                 notifications.pending_transport_allocations > 0 ? (
                   <>
                     <MapPin className="w-4 h-4 mr-2" />
-                    Select Transport Dates (
+                    Pilih Tanggal Transport (
                     {notifications.pending_transport_allocations})
                   </>
                 ) : (
                   <>
                     <Play className="w-4 h-4 mr-2" />
-                    Start Tasks
+                    Mulai Tugas
                   </>
                 )}
               </Link>
@@ -308,14 +324,22 @@ export function PegawaiLayout({ children }: PegawaiLayoutProps) {
               className="w-full border-2 border-blue-200 text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-300"
             >
               <Link
-                href="/pegawai/tasks?status=completed"
+                href={
+                  activeProject?.id
+                    ? `/pegawai/tasks?status=completed&project_id=${activeProject.id}`
+                    : "/pegawai/tasks?status=completed"
+                }
                 prefetch
                 onMouseEnter={() =>
-                  router.prefetch("/pegawai/tasks?status=completed")
+                  router.prefetch(
+                    activeProject?.id
+                      ? `/pegawai/tasks?status=completed&project_id=${activeProject.id}`
+                      : "/pegawai/tasks?status=completed",
+                  )
                 }
               >
                 <CheckSquare className="w-4 h-4 mr-2" />
-                View Completed
+                Lihat Selesai
               </Link>
             </Button>
           </div>

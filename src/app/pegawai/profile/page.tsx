@@ -160,7 +160,7 @@ export default function ProfilePage() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "Failed to fetch profile");
+        throw new Error(result.error || "Gagal mengambil profil");
       }
 
       setProfileData(result.profile);
@@ -177,7 +177,7 @@ export default function ProfilePage() {
       });
     } catch (error) {
       console.error("Error fetching profile:", error);
-      toast.error("Failed to load profile data");
+      toast.error("Gagal memuat data profil");
     } finally {
       setLoading(false);
     }
@@ -189,19 +189,19 @@ export default function ProfilePage() {
 
   // Handle avatar upload
   const handleAvatarUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>
+    event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     // Validate file
     if (file.size > 5 * 1024 * 1024) {
-      toast.error("File size must be less than 5MB");
+      toast.error("Ukuran file harus kurang dari 5MB");
       return;
     }
 
     if (!file.type.startsWith("image/")) {
-      toast.error("Please select an image file");
+      toast.error("Silakan pilih file gambar");
       return;
     }
 
@@ -218,16 +218,16 @@ export default function ProfilePage() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "Failed to upload avatar");
+        throw new Error(result.error || "Gagal mengunggah avatar");
       }
 
       setProfileData((prev) =>
-        prev ? { ...prev, avatar_url: result.avatar_url } : null
+        prev ? { ...prev, avatar_url: result.avatar_url } : null,
       );
-      toast.success("Avatar updated successfully!");
+      toast.success("Avatar berhasil diperbarui!");
     } catch (error) {
       console.error("Error uploading avatar:", error);
-      toast.error("Failed to upload avatar");
+      toast.error("Gagal mengunggah avatar");
     } finally {
       setUploadingAvatar(false);
     }
@@ -246,15 +246,15 @@ export default function ProfilePage() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "Failed to update profile");
+        throw new Error(result.error || "Gagal memperbarui profil");
       }
 
       setProfileData((prev) => (prev ? { ...prev, ...profileForm } : null));
       setEditingProfile(false);
-      toast.success("Profile updated successfully!");
+      toast.success("Profil berhasil diperbarui!");
     } catch (error) {
       console.error("Error updating profile:", error);
-      toast.error("Failed to update profile");
+      toast.error("Gagal memperbarui profil");
     } finally {
       setUpdating(false);
     }
@@ -263,12 +263,12 @@ export default function ProfilePage() {
   // Handle password change
   const handlePasswordChange = async () => {
     if (passwordForm.new_password !== passwordForm.confirm_password) {
-      toast.error("New passwords do not match");
+      toast.error("Password baru tidak cocok");
       return;
     }
 
     if (passwordForm.new_password.length < 8) {
-      toast.error("Password must be at least 8 characters");
+      toast.error("Password minimal 8 karakter");
       return;
     }
 
@@ -286,7 +286,7 @@ export default function ProfilePage() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "Failed to change password");
+        throw new Error(result.error || "Gagal mengganti password");
       }
 
       setIsPasswordDialogOpen(false);
@@ -295,10 +295,10 @@ export default function ProfilePage() {
         new_password: "",
         confirm_password: "",
       });
-      toast.success("Password changed successfully!");
+      toast.success("Password berhasil diganti!");
     } catch (error) {
       console.error("Error changing password:", error);
-      toast.error("Failed to change password");
+      toast.error("Gagal mengganti password");
     } finally {
       setUpdating(false);
     }
@@ -307,7 +307,7 @@ export default function ProfilePage() {
   // Handle notification settings update
   const handleNotificationUpdate = async (
     key: keyof NotificationSettings,
-    value: boolean
+    value: boolean,
   ) => {
     const updatedSettings = { ...notificationSettings, [key]: value };
     setNotificationSettings(updatedSettings);
@@ -321,13 +321,13 @@ export default function ProfilePage() {
 
       if (!response.ok) {
         const result = await response.json();
-        throw new Error(result.error || "Failed to update notifications");
+        throw new Error(result.error || "Gagal memperbarui notifikasi");
       }
 
-      toast.success("Notification settings updated!");
+      toast.success("Pengaturan notifikasi diperbarui!");
     } catch (error) {
       console.error("Error updating notifications:", error);
-      toast.error("Failed to update notification settings");
+      toast.error("Gagal memperbarui pengaturan notifikasi");
       // Revert on error
       setNotificationSettings((prev) => ({ ...prev, [key]: !value }));
     }
@@ -336,7 +336,7 @@ export default function ProfilePage() {
   // Handle skill addition
   const handleAddSkill = async () => {
     if (!newSkill.name.trim()) {
-      toast.error("Please enter a skill name");
+      toast.error("Silakan masukkan nama keahlian");
       return;
     }
 
@@ -351,15 +351,15 @@ export default function ProfilePage() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "Failed to add skill");
+        throw new Error(result.error || "Gagal menambahkan keahlian");
       }
 
       setSkills((prev) => [...prev, result.skill]);
       setNewSkill({ name: "", level: 1, category: "technical" });
-      toast.success("Skill added successfully!");
+      toast.success("Keahlian berhasil ditambahkan!");
     } catch (error) {
       console.error("Error adding skill:", error);
-      toast.error("Failed to add skill");
+      toast.error("Gagal menambahkan keahlian");
     } finally {
       setIsAddingSkill(false);
     }
@@ -372,19 +372,19 @@ export default function ProfilePage() {
         `/api/pegawai/profile/skills/${encodeURIComponent(skillName)}`,
         {
           method: "DELETE",
-        }
+        },
       );
 
       if (!response.ok) {
         const result = await response.json();
-        throw new Error(result.error || "Failed to remove skill");
+        throw new Error(result.error || "Gagal menghapus keahlian");
       }
 
       setSkills((prev) => prev.filter((skill) => skill.name !== skillName));
-      toast.success("Skill removed successfully!");
+      toast.success("Keahlian berhasil dihapus!");
     } catch (error) {
       console.error("Error removing skill:", error);
-      toast.error("Failed to remove skill");
+      toast.error("Gagal menghapus keahlian");
     }
   };
 
@@ -415,10 +415,10 @@ export default function ProfilePage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold bg-gradient-to-r from-green-600 to-teal-600 bg-clip-text text-transparent">
-              My Profile
+              Profil Saya
             </h1>
             <p className="text-gray-600 text-lg mt-2">
-              Manage your personal information and account settings
+              Kelola informasi pribadi dan pengaturan akun
             </p>
           </div>
           <div className="flex items-center space-x-2">
@@ -428,7 +428,7 @@ export default function ProfilePage() {
             </Badge>
             <Badge className="bg-white text-green-600 border border-green-200">
               <Calendar className="w-3 h-3 mr-1" />
-              Joined{" "}
+              Bergabung{" "}
               {new Date(profileData.joined_date).toLocaleDateString("id-ID", {
                 month: "short",
                 year: "numeric",
@@ -476,7 +476,7 @@ export default function ProfilePage() {
               <p className="text-green-100 mb-4">{profileData.email}</p>
               <div className="flex items-center justify-center space-x-2">
                 <CheckCircle className="w-4 h-4" />
-                <span className="text-sm">Verified Account</span>
+                <span className="text-sm">Akun Terverifikasi</span>
               </div>
             </div>
           </div>
@@ -485,19 +485,19 @@ export default function ProfilePage() {
             <div className="flex items-center space-x-3 text-gray-600">
               <Phone className="w-4 h-4" />
               <span className="text-sm">
-                {profileData.no_telepon || "Not provided"}
+                {profileData.no_telepon || "Belum diisi"}
               </span>
             </div>
             <div className="flex items-center space-x-3 text-gray-600">
               <MapPin className="w-4 h-4" />
               <span className="text-sm">
-                {profileData.alamat || "Not provided"}
+                {profileData.alamat || "Belum diisi"}
               </span>
             </div>
             <div className="flex items-center space-x-3 text-gray-600">
               <Calendar className="w-4 h-4" />
               <span className="text-sm">
-                Last active:{" "}
+                Terakhir aktif:{" "}
                 {new Date(profileData.last_active).toLocaleDateString("id-ID")}
               </span>
             </div>
@@ -519,28 +519,28 @@ export default function ProfilePage() {
                 className="flex-1 gap-1.5 border border-transparent text-sm font-medium whitespace-nowrap focus-visible:ring-[3px] focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:shadow-sm [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 flex items-center justify-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-teal-600 data-[state=active]:text-white rounded-lg px-3 py-2 transition-all duration-200 h-10"
               >
                 <User className="w-4 h-4" />
-                <span>Personal</span>
+                <span>Pribadi</span>
               </TabsTrigger>
               <TabsTrigger
                 value="security"
                 className="flex-1 gap-1.5 border border-transparent text-sm font-medium whitespace-nowrap focus-visible:ring-[3px] focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:shadow-sm [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 flex items-center justify-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-teal-600 data-[state=active]:text-white rounded-lg px-3 py-2 transition-all duration-200 h-10"
               >
                 <Shield className="w-4 h-4" />
-                <span>Security</span>
+                <span>Keamanan</span>
               </TabsTrigger>
               <TabsTrigger
                 value="notifications"
                 className="flex-1 gap-1.5 border border-transparent text-sm font-medium whitespace-nowrap focus-visible:ring-[3px] focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:shadow-sm [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 flex items-center justify-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-teal-600 data-[state=active]:text-white rounded-lg px-3 py-2 transition-all duration-200 h-10"
               >
                 <Bell className="w-4 h-4" />
-                <span>Notifications</span>
+                <span>Notifikasi</span>
               </TabsTrigger>
               <TabsTrigger
                 value="skills"
                 className="flex-1 gap-1.5 border border-transparent text-sm font-medium whitespace-nowrap focus-visible:ring-[3px] focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:shadow-sm [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 flex items-center justify-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-teal-600 data-[state=active]:text-white rounded-lg px-3 py-2 transition-all duration-200 h-10"
               >
                 <Award className="w-4 h-4" />
-                <span>Skills</span>
+                <span>Keahlian</span>
               </TabsTrigger>
             </TabsList>
 
@@ -553,7 +553,7 @@ export default function ProfilePage() {
                 <div className="flex items-center justify-between">
                   <h3 className="text-xl font-bold text-white flex items-center">
                     <User className="w-6 h-6 mr-3" />
-                    Personal Information
+                    Informasi Pribadi
                   </h3>
                   <Button
                     onClick={() => setEditingProfile(!editingProfile)}
@@ -562,7 +562,7 @@ export default function ProfilePage() {
                     className="text-white hover:bg-white hover:bg-opacity-20"
                   >
                     <Edit className="w-4 h-4 mr-2" />
-                    {editingProfile ? "Cancel" : "Edit"}
+                    {editingProfile ? "Batal" : "Ubah"}
                   </Button>
                 </div>
               </div>
@@ -570,7 +570,7 @@ export default function ProfilePage() {
               <div className="p-6 space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <Label htmlFor="nama_lengkap">Full Name</Label>
+                    <Label htmlFor="nama_lengkap">Nama Lengkap</Label>
                     <Input
                       id="nama_lengkap"
                       value={profileForm.nama_lengkap}
@@ -585,7 +585,7 @@ export default function ProfilePage() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="email">Email Address</Label>
+                    <Label htmlFor="email">Alamat Email</Label>
                     <Input
                       id="email"
                       value={profileData.email}
@@ -593,14 +593,14 @@ export default function ProfilePage() {
                       className="mt-2 bg-gray-50"
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      Email cannot be changed
+                      Email tidak dapat diubah
                     </p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <Label htmlFor="no_telepon">Phone Number</Label>
+                    <Label htmlFor="no_telepon">Nomor Telepon</Label>
                     <Input
                       id="no_telepon"
                       value={profileForm.no_telepon}
@@ -611,12 +611,12 @@ export default function ProfilePage() {
                         }))
                       }
                       disabled={!editingProfile}
-                      placeholder="e.g., +62-812-3456-7890"
+                      placeholder="contoh: +62-812-3456-7890"
                       className="mt-2"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="alamat">Address</Label>
+                    <Label htmlFor="alamat">Alamat</Label>
                     <Input
                       id="alamat"
                       value={profileForm.alamat}
@@ -627,7 +627,7 @@ export default function ProfilePage() {
                         }))
                       }
                       disabled={!editingProfile}
-                      placeholder="Your address"
+                      placeholder="Alamat Anda"
                       className="mt-2"
                     />
                   </div>
@@ -645,7 +645,7 @@ export default function ProfilePage() {
                       }))
                     }
                     disabled={!editingProfile}
-                    placeholder="Tell us about yourself..."
+                    placeholder="Ceritakan tentang diri Anda..."
                     rows={4}
                     className="mt-2"
                   />
@@ -661,12 +661,12 @@ export default function ProfilePage() {
                       {updating ? (
                         <>
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Updating...
+                          Memperbarui...
                         </>
                       ) : (
                         <>
                           <Save className="w-4 h-4 mr-2" />
-                          Save Changes
+                          Simpan Perubahan
                         </>
                       )}
                     </Button>
@@ -682,7 +682,7 @@ export default function ProfilePage() {
                       }}
                       variant="outline"
                     >
-                      Cancel
+                      Batal
                     </Button>
                   </div>
                 )}
@@ -697,7 +697,7 @@ export default function ProfilePage() {
               <div className="bg-gradient-to-r from-red-600 to-pink-600 p-6">
                 <h3 className="text-xl font-bold text-white flex items-center">
                   <Shield className="w-6 h-6 mr-3" />
-                  Security Settings
+                  Pengaturan Keamanan
                 </h3>
               </div>
 
@@ -706,11 +706,13 @@ export default function ProfilePage() {
                 <div className="p-4 border border-gray-200 rounded-xl">
                   <div className="flex items-center justify-between mb-4">
                     <div>
-                      <h4 className="font-semibold text-gray-900">Password</h4>
+                      <h4 className="font-semibold text-gray-900">
+                        Kata Sandi
+                      </h4>
                       <p className="text-sm text-gray-500">
-                        Last changed:{" "}
+                        Terakhir diubah:{" "}
                         {new Date(
-                          securitySettings.password_last_changed || Date.now()
+                          securitySettings.password_last_changed || Date.now(),
                         ).toLocaleDateString("id-ID")}
                       </p>
                     </div>
@@ -720,7 +722,7 @@ export default function ProfilePage() {
                       className="border-red-200 text-red-600 hover:bg-red-50"
                     >
                       <Key className="w-4 h-4 mr-2" />
-                      Change Password
+                      Ganti Password
                     </Button>
                   </div>
                 </div>
@@ -730,10 +732,10 @@ export default function ProfilePage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="font-semibold text-gray-900">
-                        Two-Factor Authentication
+                        Autentikasi Dua Faktor
                       </h4>
                       <p className="text-sm text-gray-500">
-                        Add an extra layer of security to your account
+                        Tambahkan lapisan keamanan ekstra pada akun Anda
                       </p>
                     </div>
                     <Switch
@@ -753,10 +755,10 @@ export default function ProfilePage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="font-semibold text-gray-900">
-                        Login Notifications
+                        Notifikasi Login
                       </h4>
                       <p className="text-sm text-gray-500">
-                        Get notified when someone logs into your account
+                        Dapatkan pemberitahuan saat ada yang masuk ke akun Anda
                       </p>
                     </div>
                     <Switch
@@ -776,10 +778,10 @@ export default function ProfilePage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="font-semibold text-gray-900">
-                        Session Timeout
+                        Waktu Habis Sesi
                       </h4>
                       <p className="text-sm text-gray-500">
-                        Automatically log out after period of inactivity
+                        Keluar otomatis setelah periode tidak aktif
                       </p>
                     </div>
                     <Select
@@ -795,11 +797,11 @@ export default function ProfilePage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="60">1 hour</SelectItem>
-                        <SelectItem value="240">4 hours</SelectItem>
-                        <SelectItem value="480">8 hours</SelectItem>
-                        <SelectItem value="720">12 hours</SelectItem>
-                        <SelectItem value="1440">24 hours</SelectItem>
+                        <SelectItem value="60">1 jam</SelectItem>
+                        <SelectItem value="240">4 jam</SelectItem>
+                        <SelectItem value="480">8 jam</SelectItem>
+                        <SelectItem value="720">12 jam</SelectItem>
+                        <SelectItem value="1440">24 jam</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -815,7 +817,7 @@ export default function ProfilePage() {
               <div className="bg-gradient-to-r from-yellow-600 to-orange-600 p-6">
                 <h3 className="text-xl font-bold text-white flex items-center">
                   <Bell className="w-6 h-6 mr-3" />
-                  Notification Preferences
+                  Preferensi Notifikasi
                 </h3>
               </div>
 
@@ -823,38 +825,38 @@ export default function ProfilePage() {
                 {[
                   {
                     key: "email_notifications" as keyof NotificationSettings,
-                    title: "Email Notifications",
-                    description: "Receive notifications via email",
+                    title: "Notifikasi Email",
+                    description: "Terima notifikasi melalui email",
                     icon: Mail,
                   },
                   {
                     key: "task_reminders" as keyof NotificationSettings,
-                    title: "Task Reminders",
-                    description: "Get reminded about upcoming task deadlines",
+                    title: "Pengingat Tugas",
+                    description: "Pengingat tenggat tugas yang akan datang",
                     icon: AlertCircle,
                   },
                   {
                     key: "project_updates" as keyof NotificationSettings,
-                    title: "Project Updates",
-                    description: "Notifications about project status changes",
+                    title: "Pembaruan Proyek",
+                    description: "Notifikasi perubahan status proyek",
                     icon: TrendingUp,
                   },
                   {
                     key: "deadline_alerts" as keyof NotificationSettings,
-                    title: "Deadline Alerts",
-                    description: "Important alerts for approaching deadlines",
+                    title: "Peringatan Tenggat",
+                    description: "Peringatan penting saat tenggat mendekat",
                     icon: Calendar,
                   },
                   {
                     key: "system_announcements" as keyof NotificationSettings,
-                    title: "System Announcements",
-                    description: "Important system updates and announcements",
+                    title: "Pengumuman Sistem",
+                    description: "Pembaruan dan pengumuman penting sistem",
                     icon: Settings,
                   },
                   {
                     key: "mobile_push" as keyof NotificationSettings,
-                    title: "Mobile Push Notifications",
-                    description: "Push notifications on mobile devices",
+                    title: "Notifikasi Push Mobile",
+                    description: "Notifikasi push pada perangkat mobile",
                     icon: Smartphone,
                   },
                 ].map((setting) => {
@@ -899,7 +901,7 @@ export default function ProfilePage() {
               <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-6">
                 <h3 className="text-xl font-bold text-white flex items-center">
                   <Award className="w-6 h-6 mr-3" />
-                  Skills & Competencies
+                  Keahlian & Kompetensi
                 </h3>
               </div>
 
@@ -907,12 +909,12 @@ export default function ProfilePage() {
                 {/* Add New Skill */}
                 <div className="p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl border border-purple-200">
                   <h4 className="font-semibold text-gray-900 mb-4">
-                    Add New Skill
+                    Tambah Keahlian Baru
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="md:col-span-2">
                       <Input
-                        placeholder="Skill name"
+                        placeholder="Nama keahlian"
                         value={newSkill.name}
                         onChange={(e) =>
                           setNewSkill((prev) => ({
@@ -938,7 +940,15 @@ export default function ProfilePage() {
                               key={category.value}
                               value={category.value}
                             >
-                              {category.label}
+                              {category.value === "technical"
+                                ? "Teknis"
+                                : category.value === "management"
+                                  ? "Manajemen"
+                                  : category.value === "communication"
+                                    ? "Komunikasi"
+                                    : category.value === "analytical"
+                                      ? "Analitis"
+                                      : "Kreatif"}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -953,7 +963,7 @@ export default function ProfilePage() {
                         {isAddingSkill ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
                         ) : (
-                          "Add Skill"
+                          "Tambah Keahlian"
                         )}
                       </Button>
                     </div>
@@ -965,9 +975,9 @@ export default function ProfilePage() {
                   {skills.length === 0 ? (
                     <div className="text-center py-8">
                       <Award className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                      <p className="text-gray-500">No skills added yet</p>
+                      <p className="text-gray-500">Belum ada keahlian</p>
                       <p className="text-sm text-gray-400">
-                        Add your first skill above
+                        Tambahkan keahlian pertama Anda di atas
                       </p>
                     </div>
                   ) : (
@@ -982,9 +992,22 @@ export default function ProfilePage() {
                               {skill.name}
                             </h4>
                             <Badge className="mt-1 bg-purple-100 text-purple-800">
-                              {skillCategories.find(
-                                (c) => c.value === skill.category
-                              )?.label || skill.category}
+                              {(() => {
+                                switch (skill.category) {
+                                  case "technical":
+                                    return "Teknis";
+                                  case "management":
+                                    return "Manajemen";
+                                  case "communication":
+                                    return "Komunikasi";
+                                  case "analytical":
+                                    return "Analitis";
+                                  case "creative":
+                                    return "Kreatif";
+                                  default:
+                                    return skill.category;
+                                }
+                              })()}
                             </Badge>
                           </div>
                           <Button
@@ -993,20 +1016,20 @@ export default function ProfilePage() {
                             size="sm"
                             className="border-red-200 text-red-600 hover:bg-red-50"
                           >
-                            Remove
+                            Hapus
                           </Button>
                         </div>
                         <div className="space-y-2">
                           <div className="flex items-center justify-between text-sm">
-                            <span>Proficiency Level</span>
+                            <span>Tingkat Kemahiran</span>
                             <span className="font-semibold">
                               {skill.level}/5
                             </span>
                           </div>
                           <Progress value={skill.level * 20} className="h-2" />
                           <div className="flex justify-between text-xs text-gray-500">
-                            <span>Beginner</span>
-                            <span>Expert</span>
+                            <span>Pemula</span>
+                            <span>Ahli</span>
                           </div>
                         </div>
                       </div>
@@ -1028,16 +1051,16 @@ export default function ProfilePage() {
           <DialogHeader>
             <DialogTitle className="flex items-center">
               <Key className="w-5 h-5 mr-2 text-red-600" />
-              Change Password
+              Ganti Password
             </DialogTitle>
             <DialogDescription>
-              Enter your current password and choose a new secure password.
+              Masukkan kata sandi saat ini dan pilih kata sandi baru yang aman.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div>
-              <Label htmlFor="current_password">Current Password</Label>
+              <Label htmlFor="current_password">Password Saat Ini</Label>
               <div className="relative mt-1">
                 <Input
                   id="current_password"
@@ -1073,7 +1096,7 @@ export default function ProfilePage() {
             </div>
 
             <div>
-              <Label htmlFor="new_password">New Password</Label>
+              <Label htmlFor="new_password">Password Baru</Label>
               <div className="relative mt-1">
                 <Input
                   id="new_password"
@@ -1106,7 +1129,7 @@ export default function ProfilePage() {
             </div>
 
             <div>
-              <Label htmlFor="confirm_password">Confirm New Password</Label>
+              <Label htmlFor="confirm_password">Konfirmasi Password Baru</Label>
               <div className="relative mt-1">
                 <Input
                   id="confirm_password"
@@ -1133,9 +1156,9 @@ export default function ProfilePage() {
                   }
                 >
                   {showPasswords.confirm ? (
-                    <EyeOff className="h-4 w-4" />
+                    <EyeOff className="w-4 h-4" />
                   ) : (
-                    <Eye className="h-4 w-4" />
+                    <Eye className="w-4 h-4" />
                   )}
                 </Button>
               </div>
@@ -1150,7 +1173,7 @@ export default function ProfilePage() {
                       : "text-red-600"
                   }
                 >
-                  • At least 8 characters
+                  • Minimal 8 karakter
                 </p>
                 <p
                   className={
@@ -1159,7 +1182,7 @@ export default function ProfilePage() {
                       : "text-red-600"
                   }
                 >
-                  • Contains uppercase letter
+                  • Mengandung huruf besar
                 </p>
                 <p
                   className={
@@ -1168,7 +1191,7 @@ export default function ProfilePage() {
                       : "text-red-600"
                   }
                 >
-                  • Contains lowercase letter
+                  • Mengandung huruf kecil
                 </p>
                 <p
                   className={
@@ -1177,7 +1200,7 @@ export default function ProfilePage() {
                       : "text-red-600"
                   }
                 >
-                  • Contains number
+                  • Mengandung angka
                 </p>
               </div>
             )}
@@ -1196,7 +1219,7 @@ export default function ProfilePage() {
               }}
               disabled={updating}
             >
-              Cancel
+              Batal
             </Button>
             <Button
               onClick={handlePasswordChange}
@@ -1211,12 +1234,12 @@ export default function ProfilePage() {
               {updating ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Changing...
+                  Mengubah...
                 </>
               ) : (
                 <>
                   <Key className="w-4 h-4 mr-2" />
-                  Change Password
+                  Ganti Password
                 </>
               )}
             </Button>

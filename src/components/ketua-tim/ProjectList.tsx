@@ -195,10 +195,10 @@ export default function ProjectList() {
   };
 
   const statusTabs = [
-    { value: "all", label: "All Projects", count: pagination.total },
-    { value: "upcoming", label: "Upcoming", count: statusCounts.upcoming },
-    { value: "active", label: "Active", count: statusCounts.active },
-    { value: "completed", label: "Completed", count: statusCounts.completed },
+    { value: "all", label: "Semua Proyek", count: pagination.total },
+    { value: "upcoming", label: "Mendatang", count: statusCounts.upcoming },
+    { value: "active", label: "Aktif", count: statusCounts.active },
+    { value: "completed", label: "Selesai", count: statusCounts.completed },
   ];
 
   const handleFinishProject = async (projectId: string) => {
@@ -277,10 +277,10 @@ export default function ProjectList() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-            Project Management
+            Manajemen Proyek
           </h1>
           <p className="text-gray-600 text-lg mt-2">
-            Manage your projects, track progress, and monitor team performance.
+            Kelola proyek Anda, pantau progres, dan monitor kinerja tim.
           </p>
         </div>
 
@@ -294,7 +294,7 @@ export default function ProjectList() {
             onMouseEnter={() => router.prefetch("/ketua-tim/projects/new")}
           >
             <Plus className="w-4 h-4 mr-2" />
-            Create Project
+            Buat Proyek
           </Link>
         </Button>
       </div>
@@ -304,7 +304,7 @@ export default function ProjectList() {
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
           <Input
-            placeholder="Search projects..."
+            placeholder="Cari proyek..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -315,7 +315,7 @@ export default function ProjectList() {
           className="border-2 border-gray-200 text-gray-600 hover:bg-gray-50"
         >
           <Filter className="w-4 h-4 mr-2" />
-          Filters
+          Filter
         </Button>
       </div>
 
@@ -346,18 +346,18 @@ export default function ProjectList() {
         </TabsList>
 
         <TabsContent value={selectedStatus} className="space-y-6">
-          {/* Project Grid */}
+          {/* Grid Proyek */}
           <div className="grid grid-cols-1 gap-6">
             {filteredProjects.length === 0 ? (
               <div className="text-center py-12">
                 <FolderOpen className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  No projects found
+                  Tidak ada proyek ditemukan
                 </h3>
                 <p className="text-gray-500 mb-6">
                   {searchTerm
-                    ? "Try adjusting your search terms"
-                    : "Create your first project to get started"}
+                    ? "Coba ubah kata pencarian Anda"
+                    : "Buat proyek pertama Anda untuk memulai"}
                 </p>
                 <Button
                   asChild
@@ -371,7 +371,7 @@ export default function ProjectList() {
                     }
                   >
                     <Plus className="w-4 h-4 mr-2" />
-                    Create Project
+                    Buat Proyek
                   </Link>
                 </Button>
               </div>
@@ -493,14 +493,14 @@ export default function ProjectList() {
                                 }}
                               >
                                 <Eye className="w-4 h-4" />
-                                <span>View</span>
+                                <span>Lihat</span>
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onSelect={() => router.push(editHref)}
                                 onMouseEnter={() => router.prefetch(editHref)}
                               >
                                 <Edit className="w-4 h-4" />
-                                <span>Edit</span>
+                                <span>Ubah</span>
                               </DropdownMenuItem>
                               {project.status !== "completed" && (
                                 <DropdownMenuItem
@@ -512,12 +512,12 @@ export default function ProjectList() {
                                   {finishingId === project.id ? (
                                     <>
                                       <Loader2 className="w-4 h-4 animate-spin" />
-                                      <span>Finishing...</span>
+                                      <span>Menyelesaikan...</span>
                                     </>
                                   ) : (
                                     <>
                                       <CheckCircle className="w-4 h-4" />
-                                      <span>Finish Project</span>
+                                      <span>Selesaikan Proyek</span>
                                     </>
                                   )}
                                 </DropdownMenuItem>
@@ -531,12 +531,12 @@ export default function ProjectList() {
                                 {deletingId === project.id ? (
                                   <>
                                     <Loader2 className="w-4 h-4 animate-spin" />
-                                    <span>Deleting...</span>
+                                    <span>Menghapus...</span>
                                   </>
                                 ) : (
                                   <>
                                     <AlertTriangle className="w-4 h-4" />
-                                    <span>Delete Project</span>
+                                    <span>Hapus Proyek</span>
                                   </>
                                 )}
                               </DropdownMenuItem>

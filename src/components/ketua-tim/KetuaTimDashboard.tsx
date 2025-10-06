@@ -97,7 +97,7 @@ export default function KetuaTimDashboard() {
   const handleRefresh = async () => {
     const res = await refetch();
     if (res.error) toast.error(res.error.message);
-    else toast.success("Dashboard data refreshed");
+    else toast.success("Data dashboard berhasil diperbarui");
   };
 
   const handlePeriodChange = (newPeriod: string) => {
@@ -150,7 +150,7 @@ export default function KetuaTimDashboard() {
           <div className="text-center space-y-4">
             <AlertCircle className="w-16 h-16 text-red-500 mx-auto" />
             <h2 className="text-2xl font-bold text-gray-900">
-              Failed to Load Dashboard
+              Gagal Memuat Dasbor
             </h2>
             <p className="text-gray-600 max-w-md">{error.message}</p>
             <Button
@@ -160,7 +160,7 @@ export default function KetuaTimDashboard() {
               <RefreshCw
                 className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`}
               />
-              Try Again
+              Coba Lagi
             </Button>
           </div>
         </div>
@@ -174,9 +174,9 @@ export default function KetuaTimDashboard() {
 
   const statsCards = [
     {
-      title: "My Projects",
+      title: "Proyek Saya",
       value: stats.my_projects,
-      description: `${stats.active_projects} currently active`,
+      description: `${stats.active_projects} sedang aktif`,
       icon: FolderOpen,
       color: "from-blue-500 to-blue-600",
       bgColor: "from-blue-50 to-blue-100",
@@ -185,9 +185,9 @@ export default function KetuaTimDashboard() {
       changeType: "neutral" as const,
     },
     {
-      title: "Team Members",
+      title: "Anggota Tim",
       value: stats.team_members,
-      description: "Active team members",
+      description: "Anggota tim aktif",
       icon: Users,
       color: "from-green-500 to-green-600",
       bgColor: "from-green-50 to-green-100",
@@ -196,25 +196,25 @@ export default function KetuaTimDashboard() {
       changeType: "positive" as const,
     },
     {
-      title: "Pending Tasks",
+      title: "Tugas Tertunda",
       value: stats.pending_tasks,
-      description: "Tasks awaiting completion",
+      description: "Tugas menunggu penyelesaian",
       icon: ClipboardList,
       color: "from-orange-500 to-orange-600",
       bgColor: "from-orange-50 to-orange-100",
       href: "/ketua-tim/tasks",
-      change: `${pending_tasks.length} urgent`,
+      change: `${pending_tasks.length} mendesak`,
       changeType: stats.pending_tasks > 10 ? "negative" : ("neutral" as const),
     },
     {
-      title: "Monthly Budget",
+      title: "Anggaran Bulanan",
       value: formatCurrency(stats.monthly_budget),
-      description: "Current month allocation",
+      description: "Alokasi bulan ini",
       icon: DollarSign,
       color: "from-purple-500 to-purple-600",
       bgColor: "from-purple-50 to-purple-100",
       href: "/ketua-tim/financial",
-      change: "This month",
+      change: "Bulan ini",
       changeType: "positive" as const,
     },
   ];
@@ -225,10 +225,11 @@ export default function KetuaTimDashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-            Ketua Tim Dashboard
+            Dasbor Ketua Tim
           </h1>
           <p className="text-gray-600 text-lg mt-2">
-            Welcome back! Here&apos;s your project overview and team status.
+            Selamat datang kembali! Berikut ringkasan proyek dan status tim
+            Anda.
           </p>
         </div>
 
@@ -238,9 +239,9 @@ export default function KetuaTimDashboard() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="7">7 days</SelectItem>
-              <SelectItem value="30">30 days</SelectItem>
-              <SelectItem value="90">90 days</SelectItem>
+              <SelectItem value="7">7 hari</SelectItem>
+              <SelectItem value="30">30 hari</SelectItem>
+              <SelectItem value="90">90 hari</SelectItem>
             </SelectContent>
           </Select>
 
@@ -253,7 +254,7 @@ export default function KetuaTimDashboard() {
             <RefreshCw
               className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`}
             />
-            Refresh
+            Muat Ulang
           </Button>
 
           <Button
@@ -266,7 +267,7 @@ export default function KetuaTimDashboard() {
               onMouseEnter={() => router.prefetch("/ketua-tim/projects/new")}
             >
               <Plus className="w-4 h-4 mr-2" />
-              New Project
+              Proyek Baru
             </Link>
           </Button>
 
@@ -281,7 +282,7 @@ export default function KetuaTimDashboard() {
               onMouseEnter={() => router.prefetch("/ketua-tim/team")}
             >
               <Users className="w-4 h-4 mr-2" />
-              Manage Team
+              Kelola Tim
             </Link>
           </Button>
         </div>
@@ -346,14 +347,14 @@ export default function KetuaTimDashboard() {
             <div className="flex items-center justify-between">
               <div className="flex items-center text-white text-xl font-semibold">
                 <FolderOpen className="w-6 h-6 mr-3" />
-                Recent Projects
+                Proyek Terbaru
               </div>
               <Badge className="bg-white/20 text-white">
                 {recent_projects.length}
               </Badge>
             </div>
             <div className="text-blue-100 mt-2 text-sm">
-              Your latest project activities
+              Aktivitas proyek terbaru Anda
             </div>
           </div>
           <div className="p-6 space-y-4">
@@ -374,11 +375,11 @@ export default function KetuaTimDashboard() {
                           {project.nama_project}
                         </div>
                         <div className="text-sm text-gray-500 group-hover:text-blue-500 mt-1">
-                          Deadline:{" "}
+                          Tenggat:{" "}
                           {new Date(project.deadline).toLocaleDateString(
                             "id-ID",
                           )}{" "}
-                          • {project.team_size} members
+                          • {project.team_size} anggota
                         </div>
                         <div className="mt-2 flex items-center space-x-2">
                           <div className="flex-1 bg-gray-200 rounded-full h-2">
@@ -396,7 +397,11 @@ export default function KetuaTimDashboard() {
                         <Badge
                           className={`${project.status === "active" ? "bg-green-100 text-green-800" : project.status === "upcoming" ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-800"}`}
                         >
-                          {project.status.toUpperCase()}
+                          {project.status === "active"
+                            ? "AKTIF"
+                            : project.status === "upcoming"
+                              ? "MENDATANG"
+                              : "SELESAI"}
                         </Badge>
                       </div>
                     </div>
@@ -415,7 +420,7 @@ export default function KetuaTimDashboard() {
                         router.prefetch("/ketua-tim/projects")
                       }
                     >
-                      View All Projects
+                      Lihat Semua Proyek
                       <ArrowRight className="w-4 h-4 ml-2" />
                     </Link>
                   </Button>
@@ -424,7 +429,7 @@ export default function KetuaTimDashboard() {
             ) : (
               <div className="text-center py-8">
                 <FolderOpen className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500 mb-4">No recent projects</p>
+                <p className="text-gray-500 mb-4">Tidak ada proyek terbaru</p>
                 <Button asChild size="sm">
                   <Link
                     href="/ketua-tim/projects/new"
@@ -434,7 +439,7 @@ export default function KetuaTimDashboard() {
                     }
                   >
                     <Plus className="w-4 h-4 mr-2" />
-                    Create Your First Project
+                    Buat Proyek Pertama Anda
                   </Link>
                 </Button>
               </div>
@@ -448,14 +453,14 @@ export default function KetuaTimDashboard() {
             <div className="flex items-center justify-between">
               <div className="flex items-center text-white text-xl font-semibold">
                 <ClipboardList className="w-6 h-6 mr-3" />
-                Urgent Tasks
+                Tugas Mendesak
               </div>
               <Badge className="bg-white/20 text-white">
                 {pending_tasks.length}
               </Badge>
             </div>
             <div className="text-orange-100 mt-2 text-sm">
-              Tasks due within 7 days
+              Tugas jatuh tempo dalam 7 hari
             </div>
           </div>
           <div className="p-6 space-y-4">
@@ -504,7 +509,13 @@ export default function KetuaTimDashboard() {
                             : "bg-orange-100 text-orange-800"
                         }
                       >
-                        {isOverdue ? "OVERDUE" : task.status.toUpperCase()}
+                        {isOverdue
+                          ? "TERLAMBAT"
+                          : task.status === "pending"
+                            ? "TERTUNDA"
+                            : task.status === "in_progress"
+                              ? "BERJALAN"
+                              : "SELESAI"}
                       </Badge>
                     </div>
                   );
@@ -520,7 +531,7 @@ export default function KetuaTimDashboard() {
                       prefetch
                       onMouseEnter={() => router.prefetch("/ketua-tim/tasks")}
                     >
-                      View All Tasks
+                      Lihat Semua Tugas
                       <ArrowRight className="w-4 h-4 ml-2" />
                     </Link>
                   </Button>
@@ -529,8 +540,10 @@ export default function KetuaTimDashboard() {
             ) : (
               <div className="text-center py-8">
                 <CheckCircle className="w-12 h-12 text-green-300 mx-auto mb-4" />
-                <p className="text-gray-500 mb-2">No urgent tasks!</p>
-                <p className="text-sm text-gray-400">All tasks are on track</p>
+                <p className="text-gray-500 mb-2">Tidak ada tugas mendesak!</p>
+                <p className="text-sm text-gray-400">
+                  Semua tugas berjalan sesuai rencana
+                </p>
               </div>
             )}
           </div>
@@ -555,7 +568,7 @@ export default function KetuaTimDashboard() {
                 %
               </div>
               <div className="text-purple-100 text-sm">
-                Average project progress
+                Rata-rata progres proyek
               </div>
             </div>
             <div className="space-y-2">
@@ -572,7 +585,7 @@ export default function KetuaTimDashboard() {
                 %
               </div>
               <div className="text-purple-100 text-sm">
-                Team utilization rate
+                Tingkat pemanfaatan tim
               </div>
             </div>
             <div className="space-y-2">
@@ -581,7 +594,7 @@ export default function KetuaTimDashboard() {
               </div>
               <div className="text-3xl font-bold">{stats.active_projects}</div>
               <div className="text-purple-100 text-sm">
-                Active projects this month
+                Proyek aktif bulan ini
               </div>
             </div>
             <div className="space-y-2">
@@ -598,7 +611,7 @@ export default function KetuaTimDashboard() {
                       : "4.0"}
               </div>
               <div className="text-purple-100 text-sm">
-                Project management score
+                Skor manajemen proyek
               </div>
             </div>
 

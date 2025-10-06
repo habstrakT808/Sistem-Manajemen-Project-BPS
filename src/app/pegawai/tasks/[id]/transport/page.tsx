@@ -48,7 +48,7 @@ async function fetchTaskData(taskId: string): Promise<TaskData> {
   });
   const result = await response.json();
   if (!response.ok) {
-    throw new Error(result.error || "Failed to fetch task data");
+    throw new Error(result.error || "Gagal mengambil data tugas");
   }
   return result.data;
 }
@@ -108,13 +108,15 @@ export default function TransportAllocationPage({
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center space-y-4">
             <AlertCircle className="w-16 h-16 text-red-500 mx-auto" />
-            <h2 className="text-2xl font-bold text-gray-900">Task Not Found</h2>
+            <h2 className="text-2xl font-bold text-gray-900">
+              Tugas Tidak Ditemukan
+            </h2>
             <p className="text-gray-600 max-w-md">
-              {error?.message || "The requested task could not be found."}
+              {error?.message || "Tugas yang diminta tidak ditemukan."}
             </p>
             <Button onClick={() => router.back()} variant="outline">
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Go Back
+              Kembali
             </Button>
           </div>
         </div>
@@ -129,14 +131,14 @@ export default function TransportAllocationPage({
           <div className="text-center space-y-4">
             <MapPin className="w-16 h-16 text-gray-300 mx-auto" />
             <h2 className="text-2xl font-bold text-gray-900">
-              No Transport Allocation
+              Tidak Ada Alokasi Transport
             </h2>
             <p className="text-gray-600 max-w-md">
-              This task does not include transport allowance.
+              Tugas ini tidak memiliki tunjangan transport.
             </p>
             <Button onClick={() => router.back()} variant="outline">
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Tasks
+              Kembali ke Tugas
             </Button>
           </div>
         </div>
@@ -155,14 +157,14 @@ export default function TransportAllocationPage({
             className="mb-4"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Tasks
+            Kembali ke Tugas
           </Button>
 
           <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-            Transport Date Selection
+            Pemilihan Tanggal Transport
           </h1>
           <p className="text-gray-600 text-lg mt-2">
-            Select your transport allocation date for this task.
+            Pilih tanggal alokasi transport untuk tugas ini.
           </p>
         </div>
       </div>
@@ -172,7 +174,7 @@ export default function TransportAllocationPage({
         <div className="bg-gradient-to-r from-green-600 to-teal-600 p-6">
           <div className="flex items-center text-white text-xl font-semibold">
             <MapPin className="w-6 h-6 mr-3" />
-            Task Information
+            Informasi Tugas
           </div>
         </div>
         <div className="p-6 space-y-4">
@@ -187,7 +189,7 @@ export default function TransportAllocationPage({
             <div className="flex items-center space-x-2">
               <Calendar className="w-4 h-4 text-blue-500" />
               <div className="text-sm">
-                <div className="font-medium text-gray-900">Task Period</div>
+                <div className="font-medium text-gray-900">Periode Tugas</div>
                 <div className="text-gray-500">
                   {new Date(task.start_date).toLocaleDateString("id-ID")} -{" "}
                   {new Date(task.end_date).toLocaleDateString("id-ID")}
@@ -198,7 +200,7 @@ export default function TransportAllocationPage({
             <div className="flex items-center space-x-2">
               <FolderOpen className="w-4 h-4 text-purple-500" />
               <div className="text-sm">
-                <div className="font-medium text-gray-900">Project</div>
+                <div className="font-medium text-gray-900">Proyek</div>
                 <div className="text-gray-500">{task.project.nama_project}</div>
               </div>
             </div>
@@ -207,7 +209,7 @@ export default function TransportAllocationPage({
               <DollarSign className="w-4 h-4 text-green-500" />
               <div className="text-sm">
                 <div className="font-medium text-gray-900">
-                  Transport Amount
+                  Jumlah Transport
                 </div>
                 <div className="text-green-600 font-semibold">
                   {formatCurrency(calculateTransportAmount(task))}

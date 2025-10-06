@@ -69,8 +69,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
               <Shield className="w-6 h-6 text-red-600" />
             </div>
             <div>
-              <div className="text-white font-bold text-lg">Admin Panel</div>
-              <div className="text-red-100 text-sm">System Management</div>
+              <div className="text-white font-bold text-lg">Panel Admin</div>
+              <div className="text-red-100 text-sm">Manajemen Sistem</div>
             </div>
           </div>
         </div>
@@ -87,7 +87,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                     derivedNameFromEmail ||
                     user?.email ||
                     "";
-                  return displayName || (loading ? "Loading..." : "-");
+                  return displayName || (loading ? "Memuat..." : "-");
                 })()}
               </div>
               <div className="text-sm text-gray-500">{user?.email}</div>
@@ -99,7 +99,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         {/* Navigation */}
         <div className="flex-1 p-4 space-y-2 overflow-y-auto">
           <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-3 mb-4">
-            Navigation
+            Navigasi
           </div>
           {/* Dashboard */}
           <Link
@@ -113,10 +113,10 @@ export function AdminLayout({ children }: AdminLayoutProps) {
               </div>
               <div className="flex-1">
                 <div className="font-semibold text-gray-900 group-hover:text-red-600 transition-colors">
-                  Dashboard
+                  Dasbor
                 </div>
                 <div className="text-sm text-gray-500 group-hover:text-red-500 mt-1">
-                  System overview
+                  Ringkasan sistem
                 </div>
               </div>
             </div>
@@ -133,10 +133,10 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             </div>
             <div className="flex-1 text-left">
               <div className="font-semibold text-gray-900 group-hover:text-red-600 transition-colors">
-                Management
+                Manajemen
               </div>
               <div className="text-sm text-gray-500 group-hover:text-red-500 mt-1">
-                Teams, users and partners
+                Tim, pengguna, dan mitra
               </div>
             </div>
             <ChevronDown
@@ -154,9 +154,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                   <Building2 className="w-4 h-4 text-red-600 mr-3" />
                   <div>
                     <div className="font-medium text-gray-900">
-                      Team Management
+                      Manajemen Tim
                     </div>
-                    <div className="text-xs text-gray-500">Manage teams</div>
+                    <div className="text-xs text-gray-500">Kelola tim</div>
                   </div>
                 </div>
               </Link>
@@ -169,9 +169,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                   <Users className="w-4 h-4 text-red-600 mr-3" />
                   <div>
                     <div className="font-medium text-gray-900">
-                      User Management
+                      Manajemen Pengguna
                     </div>
-                    <div className="text-xs text-gray-500">Manage users</div>
+                    <div className="text-xs text-gray-500">Kelola pengguna</div>
                   </div>
                 </div>
               </Link>
@@ -184,9 +184,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                   <UserCheck className="w-4 h-4 text-red-600 mr-3" />
                   <div>
                     <div className="font-medium text-gray-900">
-                      Mitra Management
+                      Manajemen Mitra
                     </div>
-                    <div className="text-xs text-gray-500">Manage partners</div>
+                    <div className="text-xs text-gray-500">Kelola mitra</div>
                   </div>
                 </div>
               </Link>
@@ -204,10 +204,10 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             </div>
             <div className="flex-1 text-left">
               <div className="font-semibold text-gray-900 group-hover:text-red-600 transition-colors">
-                Analytics
+                Analitik
               </div>
               <div className="text-sm text-gray-500 group-hover:text-red-500 mt-1">
-                Insights and reports
+                Wawasan dan laporan
               </div>
             </div>
             <ChevronDown
@@ -227,10 +227,10 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                   <MapPin className="w-4 h-4 text-red-600 mr-3" />
                   <div>
                     <div className="font-medium text-gray-900">
-                      Transport Analytics
+                      Analitik Transportasi
                     </div>
                     <div className="text-xs text-gray-500">
-                      Transport insights
+                      Wawasan transportasi
                     </div>
                   </div>
                 </div>
@@ -244,9 +244,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                   <BarChart3 className="w-4 h-4 text-red-600 mr-3" />
                   <div>
                     <div className="font-medium text-gray-900">
-                      System Analytics
+                      Analitik Sistem
                     </div>
-                    <div className="text-xs text-gray-500">System insights</div>
+                    <div className="text-xs text-gray-500">Wawasan sistem</div>
                   </div>
                 </div>
               </Link>
@@ -265,10 +265,10 @@ export function AdminLayout({ children }: AdminLayoutProps) {
               </div>
               <div className="flex-1">
                 <div className="font-semibold text-gray-900 group-hover:text-red-600 transition-colors">
-                  System Settings
+                  Pengaturan Sistem
                 </div>
                 <div className="text-sm text-gray-500 group-hover:text-red-500 mt-1">
-                  Configure system
+                  Konfigurasi sistem
                 </div>
               </div>
             </div>

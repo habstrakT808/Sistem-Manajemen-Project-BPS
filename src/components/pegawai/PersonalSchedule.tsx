@@ -131,7 +131,7 @@ export default function PersonalSchedule() {
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<"calendar" | "list" | "agenda">(
-    "calendar"
+    "calendar",
   );
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -158,18 +158,18 @@ export default function PersonalSchedule() {
       const year = currentMonth.getFullYear();
 
       const response = await fetch(
-        `/api/pegawai/schedule?month=${month}&year=${year}`
+        `/api/pegawai/schedule?month=${month}&year=${year}`,
       );
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "Failed to fetch schedule");
+        throw new Error(result.error || "Gagal mengambil jadwal");
       }
 
       setScheduleData(result);
     } catch (error) {
       console.error("Error fetching schedule:", error);
-      toast.error("Failed to load schedule");
+      toast.error("Gagal memuat jadwal");
     } finally {
       setLoading(false);
     }
@@ -190,7 +190,7 @@ export default function PersonalSchedule() {
       const cardRect = card.getBoundingClientRect();
       const targetHeight = Math.min(
         cardRect.height,
-        Math.round(window.innerHeight * 0.44)
+        Math.round(window.innerHeight * 0.44),
       );
 
       // Start with a reasonable base, then proportionally fit to target
@@ -200,7 +200,7 @@ export default function PersonalSchedule() {
       // Defer measuring until the DOM applies the base size
       requestAnimationFrame(() => {
         const calendarRoot = content.querySelector(
-          '[data-slot="calendar"]'
+          '[data-slot="calendar"]',
         ) as HTMLElement | null;
         if (!calendarRoot) return;
 
@@ -224,7 +224,7 @@ export default function PersonalSchedule() {
   const handleCreateEvent = async () => {
     try {
       if (!eventForm.title || !eventForm.start_date || !eventForm.end_date) {
-        toast.error("Please fill in all required fields");
+        toast.error("Mohon isi semua kolom yang wajib");
         return;
       }
 
@@ -237,16 +237,16 @@ export default function PersonalSchedule() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "Failed to create event");
+        throw new Error(result.error || "Gagal membuat acara");
       }
 
-      toast.success("Event created successfully");
+      toast.success("Acara berhasil dibuat");
       setShowEventDialog(false);
       resetEventForm();
       fetchScheduleData();
     } catch (error) {
       console.error("Error creating event:", error);
-      toast.error("Failed to create event");
+      toast.error("Gagal membuat acara");
     }
   };
 
@@ -263,17 +263,17 @@ export default function PersonalSchedule() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "Failed to update event");
+        throw new Error(result.error || "Gagal memperbarui acara");
       }
 
-      toast.success("Event updated successfully");
+      toast.success("Acara berhasil diperbarui");
       setShowEventDialog(false);
       setEditingEvent(null);
       resetEventForm();
       fetchScheduleData();
     } catch (error) {
       console.error("Error updating event:", error);
-      toast.error("Failed to update event");
+      toast.error("Gagal memperbarui acara");
     }
   };
 
@@ -285,14 +285,14 @@ export default function PersonalSchedule() {
 
       if (!response.ok) {
         const result = await response.json();
-        throw new Error(result.error || "Failed to delete event");
+        throw new Error(result.error || "Gagal menghapus acara");
       }
 
-      toast.success("Event deleted successfully");
+      toast.success("Acara berhasil dihapus");
       fetchScheduleData();
     } catch (error) {
       console.error("Error deleting event:", error);
-      toast.error("Failed to delete event");
+      toast.error("Gagal menghapus acara");
     }
   };
 
@@ -349,7 +349,7 @@ export default function PersonalSchedule() {
     });
 
     const tasks = scheduleData.tasks.filter((task) =>
-      isSameDay(parseISO(task.tanggal_tugas), date)
+      isSameDay(parseISO(task.tanggal_tugas), date),
     );
 
     return { events, tasks };
@@ -500,10 +500,10 @@ export default function PersonalSchedule() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-            My Schedule
+            Jadwal Saya
           </h1>
           <p className="text-gray-600 text-lg mt-2">
-            Manage your personal calendar, tasks, and project timeline.
+            Kelola kalender pribadi, tugas, dan lini masa proyek.
           </p>
         </div>
 
@@ -521,13 +521,13 @@ export default function PersonalSchedule() {
               <SelectItem value="calendar">
                 <div className="flex items-center">
                   <CalendarIcon className="w-4 h-4 mr-2" />
-                  Calendar
+                  Kalender
                 </div>
               </SelectItem>
               <SelectItem value="list">
                 <div className="flex items-center">
                   <List className="w-4 h-4 mr-2" />
-                  List View
+                  Tampilan Daftar
                 </div>
               </SelectItem>
               <SelectItem value="agenda">
@@ -546,18 +546,18 @@ export default function PersonalSchedule() {
                 className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700"
               >
                 <Plus className="w-4 h-4 mr-2" />
-                Add Event
+                Tambah Acara
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle>
-                  {editingEvent ? "Edit Event" : "Create New Event"}
+                  {editingEvent ? "Ubah Acara" : "Buat Acara Baru"}
                 </DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="title">Title *</Label>
+                  <Label htmlFor="title">Judul *</Label>
                   <Input
                     id="title"
                     className="mt-1"
@@ -568,12 +568,12 @@ export default function PersonalSchedule() {
                         title: e.target.value,
                       }))
                     }
-                    placeholder="Event title"
+                    placeholder="Judul acara"
                   />
                 </div>
 
                 <div>
-                  <Label htmlFor="description">Description</Label>
+                  <Label htmlFor="description">Deskripsi</Label>
                   <Textarea
                     id="description"
                     className="mt-1"
@@ -584,14 +584,14 @@ export default function PersonalSchedule() {
                         description: e.target.value,
                       }))
                     }
-                    placeholder="Event description"
+                    placeholder="Deskripsi acara"
                     rows={3}
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="start_date">Start Date *</Label>
+                    <Label htmlFor="start_date">Tanggal Mulai *</Label>
                     <Input
                       id="start_date"
                       type="datetime-local"
@@ -600,7 +600,7 @@ export default function PersonalSchedule() {
                         eventForm.start_date
                           ? format(
                               parseISO(eventForm.start_date),
-                              "yyyy-MM-dd'T'HH:mm"
+                              "yyyy-MM-dd'T'HH:mm",
                             )
                           : ""
                       }
@@ -613,7 +613,7 @@ export default function PersonalSchedule() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="end_date">End Date *</Label>
+                    <Label htmlFor="end_date">Tanggal Selesai *</Label>
                     <Input
                       id="end_date"
                       type="datetime-local"
@@ -622,7 +622,7 @@ export default function PersonalSchedule() {
                         eventForm.end_date
                           ? format(
                               parseISO(eventForm.end_date),
-                              "yyyy-MM-dd'T'HH:mm"
+                              "yyyy-MM-dd'T'HH:mm",
                             )
                           : ""
                       }
@@ -637,7 +637,7 @@ export default function PersonalSchedule() {
                 </div>
 
                 <div>
-                  <Label htmlFor="event_type">Event Type</Label>
+                  <Label htmlFor="event_type">Jenis Acara</Label>
                   <Select
                     value={eventForm.event_type}
                     onValueChange={(value) =>
@@ -655,7 +655,13 @@ export default function PersonalSchedule() {
                               className="w-3 h-3 rounded-full mr-2"
                               style={{ backgroundColor: type.color }}
                             />
-                            {type.label}
+                            {type.value === "personal"
+                              ? "Pribadi"
+                              : type.value === "meeting"
+                                ? "Rapat"
+                                : type.value === "task"
+                                  ? "Tugas"
+                                  : "Proyek"}
                           </div>
                         </SelectItem>
                       ))}
@@ -664,7 +670,7 @@ export default function PersonalSchedule() {
                 </div>
 
                 <div>
-                  <Label htmlFor="color">Color</Label>
+                  <Label htmlFor="color">Warna</Label>
                   <div className="flex space-x-2 mt-2">
                     {EVENT_COLORS.map((color) => (
                       <button
@@ -697,7 +703,7 @@ export default function PersonalSchedule() {
                     }
                     className="rounded"
                   />
-                  <Label htmlFor="is_all_day">All day event</Label>
+                  <Label htmlFor="is_all_day">Acara seharian</Label>
                 </div>
 
                 <div className="flex justify-end space-x-2 pt-4">
@@ -709,7 +715,7 @@ export default function PersonalSchedule() {
                       resetEventForm();
                     }}
                   >
-                    Cancel
+                    Batal
                   </Button>
                   <Button
                     onClick={
@@ -717,7 +723,7 @@ export default function PersonalSchedule() {
                     }
                     className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700"
                   >
-                    {editingEvent ? "Update" : "Create"}
+                    {editingEvent ? "Perbarui" : "Buat"}
                   </Button>
                 </div>
               </div>
@@ -730,7 +736,7 @@ export default function PersonalSchedule() {
             className="border-2 border-gray-200 hover:bg-gray-50"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
+            Muat Ulang
           </Button>
         </div>
       </div>
@@ -836,10 +842,10 @@ export default function PersonalSchedule() {
                 <h2 className="text-xl font-bold text-white flex items-center">
                   <CalendarDays className="w-6 h-6 mr-3" />
                   {viewMode === "calendar"
-                    ? "Calendar View"
+                    ? "Tampilan Kalender"
                     : viewMode === "list"
-                      ? "List View"
-                      : "Agenda View"}
+                      ? "Tampilan Daftar"
+                      : "Tampilan Agenda"}
                 </h2>
                 <div className="flex items-center space-x-2">
                   <Button
@@ -859,7 +865,7 @@ export default function PersonalSchedule() {
                     onClick={handleToday}
                     className="bg-white/20 text-white hover:bg-white/30"
                   >
-                    Today
+                    Hari ini
                   </Button>
                   <Button
                     variant="ghost"
@@ -949,7 +955,7 @@ export default function PersonalSchedule() {
                 <div className="space-y-4">
                   {filteredTasks
                     .filter((task) =>
-                      isInCurrentMonth(parseISO(task.tanggal_tugas))
+                      isInCurrentMonth(parseISO(task.tanggal_tugas)),
                     )
                     .map((task) => {
                       const TaskStatusIcon = getTaskStatusIcon(task.status);
@@ -975,7 +981,7 @@ export default function PersonalSchedule() {
                                   {format(
                                     parseISO(task.tanggal_tugas),
                                     "dd MMM yyyy",
-                                    { locale: localeId }
+                                    { locale: localeId },
                                   )}
                                 </span>
                               </div>
@@ -983,7 +989,7 @@ export default function PersonalSchedule() {
                                 {task.deskripsi_tugas}
                               </h4>
                               <p className="text-sm text-gray-600">
-                                Project: {task.project_name}
+                                Proyek: {task.project_name}
                               </p>
                             </div>
                           </div>
@@ -999,7 +1005,7 @@ export default function PersonalSchedule() {
                       const monthStart = new Date(
                         currentMonth.getFullYear(),
                         currentMonth.getMonth(),
-                        1
+                        1,
                       );
                       const monthEnd = new Date(
                         currentMonth.getFullYear(),
@@ -1008,7 +1014,7 @@ export default function PersonalSchedule() {
                         23,
                         59,
                         59,
-                        999
+                        999,
                       );
                       return end >= monthStart && start <= monthEnd;
                     })
@@ -1032,7 +1038,7 @@ export default function PersonalSchedule() {
                                   ? format(
                                       parseISO(event.start_date),
                                       "dd MMM yyyy",
-                                      { locale: localeId }
+                                      { locale: localeId },
                                     )
                                   : `${format(parseISO(event.start_date), "dd MMM yyyy HH:mm", { locale: localeId })} - ${format(parseISO(event.end_date), "HH:mm", { locale: localeId })}`}
                               </span>
@@ -1057,14 +1063,14 @@ export default function PersonalSchedule() {
                                 onClick={() => openEditDialog(event)}
                               >
                                 <Edit className="w-4 h-4 mr-2" />
-                                Edit
+                                Ubah
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => handleDeleteEvent(event.id)}
                                 className="text-red-600"
                               >
                                 <Trash2 className="w-4 h-4 mr-2" />
-                                Delete
+                                Hapus
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -1079,12 +1085,12 @@ export default function PersonalSchedule() {
                     const monthStart = new Date(
                       currentMonth.getFullYear(),
                       currentMonth.getMonth(),
-                      1
+                      1,
                     );
                     const monthEnd = new Date(
                       currentMonth.getFullYear(),
                       currentMonth.getMonth() + 1,
-                      0
+                      0,
                     );
                     const items: React.ReactElement[] = [];
                     const cursor = new Date(monthStart);
@@ -1108,11 +1114,10 @@ export default function PersonalSchedule() {
                               {workload && (
                                 <Badge
                                   className={getWorkloadColor(
-                                    workload.workload_level
+                                    workload.workload_level,
                                   )}
                                 >
-                                  {workload.workload_level.toUpperCase()}{" "}
-                                  WORKLOAD
+                                  {workload.workload_level.toUpperCase()} BEBAN
                                 </Badge>
                               )}
                             </div>
@@ -1120,7 +1125,7 @@ export default function PersonalSchedule() {
                             <div className="space-y-2">
                               {tasks.map((task) => {
                                 const TaskStatusIcon = getTaskStatusIcon(
-                                  task.status
+                                  task.status,
                                 );
                                 return (
                                   <div
@@ -1161,19 +1166,19 @@ export default function PersonalSchedule() {
                                     <span className="text-sm text-gray-500">
                                       {format(
                                         parseISO(event.start_date),
-                                        "HH:mm"
+                                        "HH:mm",
                                       )}{" "}
                                       -{" "}
                                       {format(
                                         parseISO(event.end_date),
-                                        "HH:mm"
+                                        "HH:mm",
                                       )}
                                     </span>
                                   )}
                                 </div>
                               ))}
                             </div>
-                          </div>
+                          </div>,
                         );
                       }
                       cursor.setDate(cursor.getDate() + 1);
@@ -1191,18 +1196,18 @@ export default function PersonalSchedule() {
               )}
               {viewMode === "calendar" && (
                 <div className="mt-4 md:mt-6 flex flex-wrap items-center gap-2 md:gap-3 text-xs md:text-sm">
-                  <span className="text-gray-500">Legend:</span>
+                  <span className="text-gray-500">Legenda:</span>
                   <Badge className="bg-green-100 text-green-800 border-green-200">
-                    Low workload
+                    Beban rendah
                   </Badge>
                   <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">
-                    Medium
+                    Sedang
                   </Badge>
                   <Badge className="bg-red-100 text-red-800 border-red-200">
-                    High
+                    Tinggi
                   </Badge>
                   <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200">
-                    Has events/tasks
+                    Ada acara/tugas
                   </Badge>
                 </div>
               )}
@@ -1229,7 +1234,7 @@ export default function PersonalSchedule() {
                     <div className="text-center py-8">
                       <CalendarDays className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                       <p className="text-gray-500 mb-4">
-                        No events or tasks for this date
+                        Tidak ada acara atau tugas pada tanggal ini
                       </p>
                       <Button
                         size="sm"
@@ -1237,7 +1242,7 @@ export default function PersonalSchedule() {
                         className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700"
                       >
                         <Plus className="w-4 h-4 mr-2" />
-                        Add Event
+                        Tambah Acara
                       </Button>
                     </div>
                   );
@@ -1249,19 +1254,19 @@ export default function PersonalSchedule() {
                       <div className="p-2 rounded-lg border-l-4 border-gray-300">
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium text-gray-700">
-                            Workload
+                            Beban kerja
                           </span>
                           <Badge
                             className={getWorkloadColor(
-                              workload.workload_level
+                              workload.workload_level,
                             )}
                           >
                             {workload.workload_level.toUpperCase()}
                           </Badge>
                         </div>
                         <p className="text-xs text-gray-500 mt-1">
-                          {workload.event_count} events, {workload.task_count}{" "}
-                          tasks
+                          {workload.event_count} acara, {workload.task_count}{" "}
+                          tugas
                         </p>
                       </div>
                     )}
@@ -1317,14 +1322,14 @@ export default function PersonalSchedule() {
                                 onClick={() => openEditDialog(event)}
                               >
                                 <Edit className="w-4 h-4 mr-2" />
-                                Edit
+                                Ubah
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => handleDeleteEvent(event.id)}
                                 className="text-red-600"
                               >
                                 <Trash2 className="w-4 h-4 mr-2" />
-                                Delete
+                                Hapus
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -1356,7 +1361,7 @@ export default function PersonalSchedule() {
             <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-4">
               <h3 className="font-bold text-white flex items-center">
                 <Filter className="w-4 h-4 mr-2" />
-                Filter Tasks
+                Filter Tugas
               </h3>
             </div>
             <div className="p-4">
@@ -1365,10 +1370,10 @@ export default function PersonalSchedule() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Tasks</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="in_progress">In Progress</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="all">Semua</SelectItem>
+                  <SelectItem value="pending">Menunggu</SelectItem>
+                  <SelectItem value="in_progress">Berjalan</SelectItem>
+                  <SelectItem value="completed">Selesai</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1379,30 +1384,32 @@ export default function PersonalSchedule() {
             <div className="bg-gradient-to-r from-orange-600 to-red-600 p-4">
               <h3 className="font-bold text-white flex items-center">
                 <Users className="w-4 h-4 mr-2" />
-                Quick Stats
+                Statistik Singkat
               </h3>
             </div>
             <div className="p-4 space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">This Month:</span>
+                <span className="text-sm text-gray-600">Bulan ini:</span>
                 <span className="font-semibold text-gray-900">
-                  {scheduleData?.monthly_summary.total_tasks || 0} tasks
+                  {scheduleData?.monthly_summary.total_tasks || 0} tugas
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Personal Events:</span>
+                <span className="text-sm text-gray-600">Acara Pribadi:</span>
                 <span className="font-semibold text-gray-900">
                   {scheduleData?.monthly_summary.personal_events || 0}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Completion Rate:</span>
+                <span className="text-sm text-gray-600">
+                  Tingkat Penyelesaian:
+                </span>
                 <span className="font-semibold text-green-600">
                   {scheduleData?.monthly_summary.total_tasks
                     ? Math.round(
                         (scheduleData.monthly_summary.completed_tasks /
                           scheduleData.monthly_summary.total_tasks) *
-                          100
+                          100,
                       )
                     : 0}
                   %

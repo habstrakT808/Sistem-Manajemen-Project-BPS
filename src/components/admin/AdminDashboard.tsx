@@ -171,9 +171,9 @@ export default function AdminDashboard() {
 
   const statsCards = [
     {
-      title: "Total Users",
+      title: "Total Pengguna",
       value: stats.total_users,
-      description: "Active users in system",
+      description: "Pengguna aktif di sistem",
       icon: Users,
       color: "from-blue-500 to-blue-600",
       bgColor: "from-blue-50 to-blue-100",
@@ -183,9 +183,9 @@ export default function AdminDashboard() {
       changeType: "neutral",
     },
     {
-      title: "Total Projects",
+      title: "Total Proyek",
       value: stats.total_projects,
-      description: "All projects in system",
+      description: "Semua proyek di sistem",
       icon: FolderOpen,
       color: "from-green-500 to-green-600",
       bgColor: "from-green-50 to-green-100",
@@ -197,7 +197,7 @@ export default function AdminDashboard() {
     {
       title: "Total Mitra",
       value: stats.total_mitra,
-      description: "Registered partners",
+      description: "Mitra terdaftar",
       icon: Building2,
       color: "from-purple-500 to-purple-600",
       bgColor: "from-purple-50 to-purple-100",
@@ -207,9 +207,9 @@ export default function AdminDashboard() {
       changeType: "neutral",
     },
     {
-      title: "Monthly Transport",
+      title: "Transport Bulanan",
       value: formatCurrency(stats.monthly_transport),
-      description: "This month transport costs",
+      description: "Biaya transport bulan ini",
       icon: DollarSign,
       color: "from-orange-500 to-orange-600",
       bgColor: "from-orange-50 to-orange-100",
@@ -222,29 +222,29 @@ export default function AdminDashboard() {
 
   const quickActions = [
     {
-      title: "Manage Users",
-      description: "Add, edit, or remove system users",
+      title: "Kelola Pengguna",
+      description: "Tambah, ubah, atau hapus pengguna sistem",
       icon: Users,
       href: "/admin/users",
       color: "from-blue-500 to-blue-600",
     },
     {
-      title: "Manage Mitra",
-      description: "Handle partner registrations",
+      title: "Kelola Mitra",
+      description: "Kelola pendaftaran mitra",
       icon: Building2,
       href: "/admin/mitra",
       color: "from-purple-500 to-purple-600",
     },
     {
-      title: "View Analytics",
-      description: "System performance insights",
+      title: "Lihat Analitik",
+      description: "Wawasan performa sistem",
       icon: TrendingUp,
       href: "/admin/analytics",
       color: "from-green-500 to-green-600",
     },
     {
-      title: "System Settings",
-      description: "Configure system parameters",
+      title: "Pengaturan Sistem",
+      description: "Konfigurasi parameter sistem",
       icon: AlertCircle,
       href: "/admin/settings",
       color: "from-orange-500 to-orange-600",
@@ -322,7 +322,7 @@ export default function AdminDashboard() {
           <div className="text-center space-y-4">
             <AlertCircle className="w-16 h-16 text-red-500 mx-auto" />
             <h2 className="text-2xl font-bold text-gray-900">
-              Failed to Load Dashboard
+              Gagal Memuat Dasbor
             </h2>
             <p className="text-gray-600 max-w-md">{error}</p>
             <Button
@@ -330,7 +330,7 @@ export default function AdminDashboard() {
               className="bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700"
             >
               <Activity className="w-4 h-4 mr-2" />
-              Retry
+              Coba Lagi
             </Button>
           </div>
         </div>
@@ -344,10 +344,10 @@ export default function AdminDashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-            Admin Dashboard
+            Dasbor Admin
           </h1>
           <p className="text-gray-600 text-lg mt-2">
-            Welcome back! Here&apos;s what&apos;s happening in your system.
+            Selamat datang kembali! Berikut yang terjadi di sistem Anda.
           </p>
         </div>
 
@@ -362,7 +362,7 @@ export default function AdminDashboard() {
               onMouseEnter={() => router.prefetch("/admin/users")}
             >
               <UserPlus className="w-4 h-4 mr-2" />
-              Manage Users
+              Kelola Pengguna
             </Link>
           </Button>
           <Button
@@ -376,7 +376,7 @@ export default function AdminDashboard() {
               onMouseEnter={() => router.prefetch("/admin/mitra")}
             >
               <Plus className="w-4 h-4 mr-2" />
-              Manage Mitra
+              Kelola Mitra
             </Link>
           </Button>
         </div>

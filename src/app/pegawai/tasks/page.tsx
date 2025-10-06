@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { RefreshCw, Calendar, AlertCircle } from "lucide-react";
 import TaskInterface from "@/components/pegawai/TaskInterface";
 import { toast } from "sonner";
+import { useActiveProject } from "@/components/providers";
 
 interface Task {
   id: string;
@@ -41,11 +42,14 @@ interface Task {
   } | null;
 }
 
-async function fetchTasksRequest(): Promise<Task[]> {
-  const response = await fetch("/api/pegawai/tasks", { cache: "no-store" });
+async function fetchTasksRequest(projectId?: string | null): Promise<Task[]> {
+  const qs = projectId ? `?project_id=${encodeURIComponent(projectId)}` : "";
+  const response = await fetch(`/api/pegawai/tasks${qs}`, {
+    cache: "no-store",
+  });
   const result = await response.json();
   if (!response.ok) {
-    throw new Error(result.error || "Failed to fetch tasks");
+    throw new Error(result.error || "Gagal mengambil tugas");
   }
   return result.data || [];
 }
@@ -53,9 +57,13 @@ async function fetchTasksRequest(): Promise<Task[]> {
 export default function TasksPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { activeProject } = useActiveProject();
   const [activeTab, setActiveTab] = useState(
     searchParams.get("status") || "all",
   );
+
+  const selectedProjectId =
+    searchParams.get("project_id") || activeProject?.id || null;
 
   const {
     data: tasks = [],
@@ -64,24 +72,37 @@ export default function TasksPage() {
     error,
     refetch,
   } = useQuery<Task[], Error>({
-    queryKey: ["pegawai", "tasks"],
-    queryFn: fetchTasksRequest,
+    queryKey: ["pegawai", "tasks", { projectId: selectedProjectId }],
+    queryFn: () => fetchTasksRequest(selectedProjectId),
     staleTime: 5 * 60 * 1000,
   });
 
+  // Apply project filter on the client as a safety net
+  const projectScopedTasks = useMemo(() => {
+    if (!selectedProjectId) return tasks;
+    return tasks.filter(
+      (t) =>
+        t.projects?.id === selectedProjectId ||
+        (t as unknown as { project_id?: string }).project_id ===
+          selectedProjectId,
+    );
+  }, [tasks, selectedProjectId]);
+
   const taskCounts = useMemo(
     () => ({
-      all: tasks.length,
-      pending: tasks.filter((t) => t.status === "pending").length,
-      in_progress: tasks.filter((t) => t.status === "in_progress").length,
-      completed: tasks.filter((t) => t.status === "completed").length,
+      all: projectScopedTasks.length,
+      pending: projectScopedTasks.filter((t) => t.status === "pending").length,
+      in_progress: projectScopedTasks.filter((t) => t.status === "in_progress")
+        .length,
+      completed: projectScopedTasks.filter((t) => t.status === "completed")
+        .length,
     }),
-    [tasks],
+    [projectScopedTasks],
   );
 
   const getFilteredTasks = (status: string) => {
-    if (status === "all") return tasks;
-    return tasks.filter((task) => task.status === status);
+    if (status === "all") return projectScopedTasks;
+    return projectScopedTasks.filter((task) => task.status === status);
   };
 
   const handleRefresh = async () => {
@@ -89,7 +110,7 @@ export default function TasksPage() {
     if (res.error) {
       toast.error(res.error.message);
     } else {
-      toast.success("Tasks refreshed");
+      toast.success("Tugas diperbarui");
     }
   };
 
@@ -108,7 +129,7 @@ export default function TasksPage() {
           <div className="text-center space-y-4">
             <AlertCircle className="w-16 h-16 text-red-500 mx-auto" />
             <h2 className="text-2xl font-bold text-gray-900">
-              Failed to Load Tasks
+              Gagal Memuat Tugas
             </h2>
             <p className="text-gray-600 max-w-md">{error.message}</p>
             <Button
@@ -118,7 +139,7 @@ export default function TasksPage() {
               <RefreshCw
                 className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`}
               />
-              Try Again
+              Coba Lagi
             </Button>
           </div>
         </div>
@@ -132,10 +153,10 @@ export default function TasksPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-            My Tasks
+            Tugas Saya
           </h1>
           <p className="text-gray-600 text-lg mt-2">
-            Manage your assigned tasks and track progress.
+            Kelola tugas yang ditugaskan dan pantau progres.
           </p>
         </div>
 
@@ -149,7 +170,7 @@ export default function TasksPage() {
             <RefreshCw
               className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`}
             />
-            Refresh
+            Muat Ulang
           </Button>
 
           <Button
@@ -158,7 +179,7 @@ export default function TasksPage() {
             className="border-2 border-green-200 text-green-600 hover:bg-green-50"
           >
             <Calendar className="w-4 h-4 mr-2" />
-            Calendar View
+            Lihat Kalender
           </Button>
         </div>
       </div>
@@ -174,7 +195,7 @@ export default function TasksPage() {
             value="all"
             className="flex items-center justify-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-teal-500 data-[state=active]:text-white rounded-lg px-3 py-2 transition-all duration-200 h-10"
           >
-            <span className="text-sm font-medium">All Tasks</span>
+            <span className="text-sm font-medium">Semua</span>
             <Badge className="bg-gray-100 text-gray-800 text-xs px-1.5 py-0.5">
               {taskCounts.all}
             </Badge>
@@ -183,7 +204,7 @@ export default function TasksPage() {
             value="pending"
             className="flex items-center justify-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-yellow-500 data-[state=active]:to-orange-500 data-[state=active]:text-white rounded-lg px-3 py-2 transition-all duration-200 h-10"
           >
-            <span className="text-sm font-medium">Pending</span>
+            <span className="text-sm font-medium">Menunggu</span>
             <Badge className="bg-yellow-100 text-yellow-800 text-xs px-1.5 py-0.5">
               {taskCounts.pending}
             </Badge>
@@ -192,7 +213,7 @@ export default function TasksPage() {
             value="in_progress"
             className="flex items-center justify-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-indigo-500 data-[state=active]:text-white rounded-lg px-3 py-2 transition-all duration-200 h-10"
           >
-            <span className="text-sm font-medium">In Progress</span>
+            <span className="text-sm font-medium">Berjalan</span>
             <Badge className="bg-blue-100 text-blue-800 text-xs px-1.5 py-0.5">
               {taskCounts.in_progress}
             </Badge>
@@ -201,7 +222,7 @@ export default function TasksPage() {
             value="completed"
             className="flex items-center justify-center space-x-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-emerald-500 data-[state=active]:text-white rounded-lg px-3 py-2 transition-all duration-200 h-10"
           >
-            <span className="text-sm font-medium">Completed</span>
+            <span className="text-sm font-medium">Selesai</span>
             <Badge className="bg-green-100 text-green-800 text-xs px-1.5 py-0.5">
               {taskCounts.completed}
             </Badge>

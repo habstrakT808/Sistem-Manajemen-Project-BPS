@@ -129,7 +129,16 @@ export async function GET(
       return NextResponse.json({ error: "Member not found" }, { status: 404 });
     }
 
-    // Get current projects for this member (across all projects) - using project_members
+    // Determine projects owned by this ketua tim (scope data)
+    const { data: ownedProjects } = await (svc as any)
+      .from("projects")
+      .select("id, nama_project")
+      .or(`ketua_tim_id.eq.${user.id},leader_user_id.eq.${user.id}`);
+    const ownedProjectIds: string[] = (ownedProjects || []).map(
+      (p: any) => p.id,
+    );
+
+    // Get current projects for this member within owned projects
     const { data: projectAssignments } = await (svc as any)
       .from("project_members")
       .select(
@@ -144,7 +153,8 @@ export async function GET(
         )
       `,
       )
-      .eq("user_id", memberId);
+      .eq("user_id", memberId)
+      .in("projects.id", ownedProjectIds);
 
     console.log("🔍 DEBUG: Project assignments:", projectAssignments);
 
@@ -162,12 +172,12 @@ export async function GET(
         }) => {
           const project = assignment.projects;
 
-          // Get tasks for this project and member - using assignee_user_id
+          // Get tasks for this project and member - support legacy pegawai_id
           const { data: projectTasks } = await (svc as any)
             .from("tasks")
-            .select("status")
+            .select("status, assignee_user_id, pegawai_id")
             .eq("project_id", project.id)
-            .eq("assignee_user_id", memberId);
+            .or(`assignee_user_id.eq.${memberId},pegawai_id.eq.${memberId}`);
 
           const taskCount = (projectTasks || []).length;
           const completedTasks = (projectTasks || []).filter(
@@ -176,15 +186,15 @@ export async function GET(
           const progress =
             taskCount > 0 ? Math.round((completedTasks / taskCount) * 100) : 0;
 
-          // Get transport amount from earnings_ledger - try different approaches
-          const { data: transportEarnings } = await (svc as any)
-            .from("earnings_ledger")
-            .select("amount")
+          // Get transport amount from allocations for this project (sum all allocations on its tasks)
+          const { data: projectAllocations } = await (svc as any)
+            .from("task_transport_allocations")
+            .select(`amount, task:tasks!inner(project_id)`)
             .eq("user_id", memberId)
-            .eq("type", "transport");
+            .eq("task.project_id", project.id);
 
-          const uangTransport = (transportEarnings || []).reduce(
-            (sum: number, record: { amount: number }) => sum + record.amount,
+          const uangTransport = (projectAllocations || []).reduce(
+            (sum: number, r: { amount: number }) => sum + (r?.amount || 0),
             0,
           );
 
@@ -203,19 +213,14 @@ export async function GET(
       ),
     );
 
-    // Get all tasks for this member (across all projects) - using assignee_user_id
+    // Get all tasks for this member within owned projects (assignee_user_id OR pegawai_id)
     const { data: allTasks } = await (svc as any)
       .from("tasks")
       .select(
-        `
-        id,
-        status,
-        created_at,
-        updated_at,
-        projects!inner (ketua_tim_id)
-      `,
+        `id, status, created_at, updated_at, project_id, assignee_user_id, pegawai_id`,
       )
-      .eq("assignee_user_id", memberId);
+      .in("project_id", ownedProjectIds)
+      .or(`assignee_user_id.eq.${memberId},pegawai_id.eq.${memberId}`);
 
     console.log("🔍 DEBUG: All tasks:", allTasks);
 
@@ -257,45 +262,37 @@ export async function GET(
           )
         : 0;
 
-    // Get monthly earnings - using earnings_ledger
+    // Get monthly earnings - from allocations within owned projects
     const currentMonth = new Date().getMonth() + 1;
     const currentYear = new Date().getFullYear();
 
-    const { data: currentMonthEarnings } = await (svc as any)
-      .from("earnings_ledger")
+    const monthStart = new Date(currentYear, currentMonth - 1, 1)
+      .toISOString()
+      .split("T")[0];
+    const nextMonthStart = new Date(currentYear, currentMonth, 1)
+      .toISOString()
+      .split("T")[0];
+
+    const { data: currentMonthAllocations } = await (svc as any)
+      .from("task_transport_allocations")
       .select(
-        `
-        amount,
-        occurred_on,
-        tasks!inner (
-          projects!inner (nama_project, ketua_tim_id)
-        )
-      `,
+        `amount, allocation_date, task:tasks!inner(project_id, projects:projects!inner(nama_project))`,
       )
       .eq("user_id", memberId)
-      .eq("type", "transport")
-      .gte(
-        "occurred_on",
-        new Date(currentYear, currentMonth - 1, 1).toISOString(),
-      )
-      .lt("occurred_on", new Date(currentYear, currentMonth, 1).toISOString());
+      .in("task.project_id", ownedProjectIds)
+      .gte("allocation_date", monthStart)
+      .lt("allocation_date", nextMonthStart);
 
-    const currentMonthTotal = (currentMonthEarnings || []).reduce(
-      (sum: number, record: { amount: number }) => sum + record.amount,
+    const currentMonthTotal = (currentMonthAllocations || []).reduce(
+      (sum: number, r: { amount: number }) => sum + (r?.amount || 0),
       0,
     );
 
-    const earningsBreakdown = (currentMonthEarnings || []).map(
-      (record: {
-        amount: number;
-        occurred_on: string;
-        tasks: { projects: { nama_project: string } };
-      }) => ({
-        project_name: record.tasks.projects.nama_project,
-        amount: record.amount,
-        date: record.occurred_on,
-      }),
-    );
+    const earningsBreakdown = (currentMonthAllocations || []).map((r: any) => ({
+      project_name: r.task.projects.nama_project,
+      amount: r.amount,
+      date: r.allocation_date,
+    }));
 
     // Get historical earnings (last 6 months)
     const historicalEarnings = [];
@@ -437,34 +434,23 @@ export async function GET(
 
       const { data: monthTasks } = await (svc as any)
         .from("tasks")
-        .select(
-          `
-          status,
-          projects!inner (ketua_tim_id)
-        `,
-        )
-        .eq("assignee_user_id", memberId)
+        .select(`status, project_id, assignee_user_id, pegawai_id`)
+        .in("project_id", ownedProjectIds)
+        .or(`assignee_user_id.eq.${memberId},pegawai_id.eq.${memberId}`)
         .eq("status", "completed")
         .gte("updated_at", monthStart.toISOString())
         .lte("updated_at", monthEnd.toISOString());
 
-      const { data: monthEarnings } = await (svc as any)
-        .from("earnings_ledger")
-        .select(
-          `
-          amount,
-          tasks!inner (
-            projects!inner (ketua_tim_id)
-          )
-        `,
-        )
+      const { data: monthAllocations } = await (svc as any)
+        .from("task_transport_allocations")
+        .select(`amount, allocation_date, task:tasks!inner(project_id)`)
         .eq("user_id", memberId)
-        .eq("type", "transport")
-        .gte("occurred_on", monthStart.toISOString())
-        .lte("occurred_on", monthEnd.toISOString());
+        .in("task.project_id", ownedProjectIds)
+        .gte("allocation_date", monthStart.toISOString().split("T")[0])
+        .lte("allocation_date", monthEnd.toISOString().split("T")[0]);
 
-      const monthEarningsTotal = (monthEarnings || []).reduce(
-        (sum: number, record: { amount: number }) => sum + record.amount,
+      const monthEarningsTotal = (monthAllocations || []).reduce(
+        (sum: number, r: { amount: number }) => sum + (r?.amount || 0),
         0,
       );
 

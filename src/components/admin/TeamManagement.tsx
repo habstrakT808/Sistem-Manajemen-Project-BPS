@@ -75,7 +75,7 @@ const initialFormData: TeamFormData = {
 async function fetchTeams(): Promise<Team[]> {
   const response = await fetch("/api/admin/teams", { cache: "no-store" });
   const result = await response.json();
-  if (!response.ok) throw new Error(result.error || "Failed to fetch teams");
+  if (!response.ok) throw new Error(result.error || "Gagal mengambil data tim");
   return result.data;
 }
 
@@ -84,7 +84,8 @@ async function fetchPegawaiUsers(): Promise<PegawaiUser[]> {
     cache: "no-store",
   });
   const result = await response.json();
-  if (!response.ok) throw new Error(result.error || "Failed to fetch users");
+  if (!response.ok)
+    throw new Error(result.error || "Gagal mengambil data pengguna");
   return result.data;
 }
 
@@ -112,7 +113,7 @@ export default function TeamManagement() {
 
   const handleCreateTeam = async () => {
     if (!formData.name.trim()) {
-      toast.error("Team name is required");
+      toast.error("Nama tim wajib diisi");
       return;
     }
 
@@ -126,10 +127,10 @@ export default function TeamManagement() {
 
       const result = await response.json();
       if (!response.ok) {
-        throw new Error(result.error || "Failed to create team");
+        throw new Error(result.error || "Gagal membuat tim");
       }
 
-      toast.success("Team created successfully!");
+      toast.success("Tim berhasil dibuat!");
       setFormData(initialFormData);
       setIsCreateDialogOpen(false);
 
@@ -138,9 +139,7 @@ export default function TeamManagement() {
       queryClient.invalidateQueries({ queryKey: ["admin", "analytics"] });
     } catch (error) {
       console.error("Error creating team:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to create team"
-      );
+      toast.error(error instanceof Error ? error.message : "Gagal membuat tim");
     } finally {
       setCreating(false);
     }
@@ -149,7 +148,7 @@ export default function TeamManagement() {
   const handleUpdateTeam = async () => {
     if (!editingTeamId) return;
     if (!formData.name.trim()) {
-      toast.error("Team name is required");
+      toast.error("Nama tim wajib diisi");
       return;
     }
     setCreating(true);
@@ -161,8 +160,8 @@ export default function TeamManagement() {
       });
       const result = await response.json();
       if (!response.ok)
-        throw new Error(result.error || "Failed to update team");
-      toast.success("Team updated successfully!");
+        throw new Error(result.error || "Gagal memperbarui tim");
+      toast.success("Tim berhasil diperbarui!");
       setIsCreateDialogOpen(false);
       setEditingTeamId(null);
       setFormData(initialFormData);
@@ -170,7 +169,7 @@ export default function TeamManagement() {
     } catch (error) {
       console.error("Error updating team:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to update team"
+        error instanceof Error ? error.message : "Gagal memperbarui tim",
       );
     } finally {
       setCreating(false);
@@ -180,21 +179,20 @@ export default function TeamManagement() {
   const handleDeleteTeam = async (teamId: string) => {
     try {
       const confirmed = window.confirm(
-        "Delete this team? This action cannot be undone."
+        "Hapus tim ini? Tindakan ini tidak dapat dibatalkan.",
       );
       if (!confirmed) return;
       const response = await fetch(`/api/admin/teams?id=${teamId}`, {
         method: "DELETE",
       });
       const result = await response.json();
-      if (!response.ok)
-        throw new Error(result.error || "Failed to delete team");
-      toast.success("Team deleted successfully");
+      if (!response.ok) throw new Error(result.error || "Gagal menghapus tim");
+      toast.success("Tim berhasil dihapus");
       queryClient.invalidateQueries({ queryKey: ["admin", "teams"] });
     } catch (error) {
       console.error("Error deleting team:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to delete team"
+        error instanceof Error ? error.message : "Gagal menghapus tim",
       );
     }
   };
@@ -207,7 +205,7 @@ export default function TeamManagement() {
     (team) =>
       team.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       team.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      team.users?.nama_lengkap.toLowerCase().includes(searchTerm.toLowerCase())
+      team.users?.nama_lengkap.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   if (!mounted) {
@@ -219,7 +217,7 @@ export default function TeamManagement() {
       <div className="space-y-8">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
-          <p>Loading teams...</p>
+          <p>Memuat data tim...</p>
         </div>
       </div>
     );
@@ -231,10 +229,10 @@ export default function TeamManagement() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-            Team Management
+            Manajemen Tim
           </h1>
           <p className="text-gray-600 text-lg mt-2">
-            Create and manage teams with designated leaders.
+            Buat dan kelola tim dengan penunjukan ketua.
           </p>
         </div>
 
@@ -251,36 +249,36 @@ export default function TeamManagement() {
           <DialogTrigger asChild>
             <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300">
               <Plus className="w-4 h-4 mr-2" />
-              Create Team
+              Buat Tim
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>
-                {editingTeamId ? "Edit Team" : "Create New Team"}
+                {editingTeamId ? "Ubah Tim" : "Buat Tim Baru"}
               </DialogTitle>
               <DialogDescription>
                 {editingTeamId
-                  ? "Update team information and leader assignment."
-                  : "Create a team and assign a team leader (optional)."}
+                  ? "Perbarui informasi tim dan penunjukan ketua."
+                  : "Buat tim dan tetapkan ketua tim (opsional)."}
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="name">Team Name *</Label>
+                <Label htmlFor="name">Nama Tim *</Label>
                 <Input
                   id="name"
                   value={formData.name}
                   onChange={(e) =>
                     setFormData((prev) => ({ ...prev, name: e.target.value }))
                   }
-                  placeholder="Enter team name"
+                  placeholder="Masukkan nama tim"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
+                <Label htmlFor="description">Deskripsi</Label>
                 <Textarea
                   id="description"
                   value={formData.description}
@@ -290,13 +288,13 @@ export default function TeamManagement() {
                       description: e.target.value,
                     }))
                   }
-                  placeholder="Describe the team's purpose and responsibilities"
+                  placeholder="Deskripsikan tujuan dan tanggung jawab tim"
                   rows={3}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="leader">Team Leader</Label>
+                <Label htmlFor="leader">Ketua Tim</Label>
                 <Select
                   value={formData.leader_user_id || undefined}
                   onValueChange={(value) =>
@@ -307,10 +305,10 @@ export default function TeamManagement() {
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select team leader (optional)" />
+                    <SelectValue placeholder="Pilih ketua tim (opsional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">No leader assigned</SelectItem>
+                    <SelectItem value="none">Tidak ada ketua tim</SelectItem>
                     {(pegawaiUsers || []).map((user) => (
                       <SelectItem key={user.id} value={user.id}>
                         <div className="flex items-center space-x-2">

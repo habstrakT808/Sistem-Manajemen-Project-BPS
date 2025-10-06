@@ -105,13 +105,13 @@ export default function SystemSettings() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "Failed to fetch settings");
+        throw new Error(result.error || "Gagal mengambil pengaturan");
       }
 
       setConfig(result.data);
     } catch (error) {
       console.error("Error fetching settings:", error);
-      toast.error("Failed to load system settings");
+      toast.error("Gagal memuat pengaturan sistem");
     } finally {
       setLoading(false);
     }
@@ -131,14 +131,14 @@ export default function SystemSettings() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "Failed to save settings");
+        throw new Error(result.error || "Gagal menyimpan pengaturan");
       }
 
       setHasChanges(false);
-      toast.success("System settings saved successfully");
+      toast.success("Pengaturan sistem berhasil disimpan");
     } catch (error) {
       console.error("Error saving settings:", error);
-      toast.error("Failed to save system settings");
+      toast.error("Gagal menyimpan pengaturan sistem");
     } finally {
       setSaving(false);
     }
@@ -147,14 +147,14 @@ export default function SystemSettings() {
   const resetSettings = useCallback(() => {
     setConfig(defaultConfig);
     setHasChanges(true);
-    toast.info("Settings reset to defaults");
+    toast.info("Pengaturan diatur ulang ke bawaan");
   }, []);
 
   const updateConfig = useCallback(
     (
       section: keyof SystemConfig,
       key: string,
-      value: string | number | boolean
+      value: string | number | boolean,
     ) => {
       setConfig((prev) => ({
         ...prev,
@@ -165,7 +165,7 @@ export default function SystemSettings() {
       }));
       setHasChanges(true);
     },
-    []
+    [],
   );
 
   useEffect(() => {
@@ -196,10 +196,10 @@ export default function SystemSettings() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-            System Settings
+            Pengaturan Sistem
           </h1>
           <p className="text-gray-600 text-lg mt-2">
-            Configure system parameters and preferences
+            Konfigurasi parameter dan preferensi sistem
           </p>
         </div>
 
@@ -210,7 +210,7 @@ export default function SystemSettings() {
             className="border-2 border-orange-200 text-orange-600 hover:bg-orange-50"
           >
             <RotateCcw className="w-4 h-4 mr-2" />
-            Reset to Defaults
+            Atur Ulang ke Bawaan
           </Button>
           <Button
             onClick={saveSettings}
@@ -222,7 +222,7 @@ export default function SystemSettings() {
             ) : (
               <Save className="w-4 h-4 mr-2" />
             )}
-            {saving ? "Saving..." : "Save Changes"}
+            {saving ? "Menyimpan..." : "Simpan Perubahan"}
           </Button>
         </div>
       </div>
@@ -234,8 +234,8 @@ export default function SystemSettings() {
             <div className="flex items-center space-x-2">
               <AlertTriangle className="w-5 h-5 text-amber-600" />
               <span className="text-amber-800 font-medium">
-                You have unsaved changes. Don&apos;t forget to save your
-                settings.
+                Anda memiliki perubahan yang belum disimpan. Jangan lupa
+                menyimpan pengaturan.
               </span>
             </div>
           </CardContent>
@@ -296,7 +296,7 @@ export default function SystemSettings() {
                       updateConfig(
                         "financial",
                         "mitra_monthly_limit",
-                        parseInt(e.target.value)
+                        parseInt(e.target.value),
                       )
                     }
                     className="text-lg font-semibold"
@@ -319,7 +319,7 @@ export default function SystemSettings() {
                       updateConfig(
                         "financial",
                         "default_transport_amount",
-                        parseInt(e.target.value)
+                        parseInt(e.target.value),
                       )
                     }
                     className="text-lg font-semibold"
@@ -389,7 +389,7 @@ export default function SystemSettings() {
                       updateConfig(
                         "workload",
                         "low_threshold",
-                        parseInt(e.target.value)
+                        parseInt(e.target.value),
                       )
                     }
                     className="text-lg font-semibold"
@@ -414,7 +414,7 @@ export default function SystemSettings() {
                       updateConfig(
                         "workload",
                         "medium_threshold",
-                        parseInt(e.target.value)
+                        parseInt(e.target.value),
                       )
                     }
                     className="text-lg font-semibold"
@@ -439,7 +439,7 @@ export default function SystemSettings() {
                       updateConfig(
                         "workload",
                         "high_threshold",
-                        parseInt(e.target.value)
+                        parseInt(e.target.value),
                       )
                     }
                     className="text-lg font-semibold"
@@ -536,7 +536,7 @@ export default function SystemSettings() {
                       updateConfig(
                         "notifications",
                         "task_deadline_reminder",
-                        checked
+                        checked,
                       )
                     }
                   />
@@ -558,7 +558,7 @@ export default function SystemSettings() {
                       updateConfig(
                         "notifications",
                         "project_deadline_reminder",
-                        checked
+                        checked,
                       )
                     }
                   />
@@ -580,7 +580,7 @@ export default function SystemSettings() {
                       updateConfig(
                         "notifications",
                         "financial_limit_warning",
-                        checked
+                        checked,
                       )
                     }
                   />
@@ -602,7 +602,7 @@ export default function SystemSettings() {
                       updateConfig(
                         "notifications",
                         "system_maintenance_notice",
-                        checked
+                        checked,
                       )
                     }
                   />
@@ -635,7 +635,7 @@ export default function SystemSettings() {
                       updateConfig(
                         "system",
                         "data_retention_days",
-                        parseInt(e.target.value)
+                        parseInt(e.target.value),
                       )
                     }
                     className="text-lg font-semibold"
@@ -682,7 +682,7 @@ export default function SystemSettings() {
                       updateConfig(
                         "system",
                         "auto_project_status_update",
-                        checked
+                        checked,
                       )
                     }
                   />
@@ -757,7 +757,7 @@ export default function SystemSettings() {
                       updateConfig(
                         "security",
                         "session_timeout_minutes",
-                        parseInt(e.target.value)
+                        parseInt(e.target.value),
                       )
                     }
                     className="text-lg font-semibold"
@@ -779,7 +779,7 @@ export default function SystemSettings() {
                       updateConfig(
                         "security",
                         "password_min_length",
-                        parseInt(e.target.value)
+                        parseInt(e.target.value),
                       )
                     }
                     className="text-lg font-semibold"
@@ -801,7 +801,7 @@ export default function SystemSettings() {
                       updateConfig(
                         "security",
                         "require_password_change_days",
-                        parseInt(e.target.value)
+                        parseInt(e.target.value),
                       )
                     }
                     className="text-lg font-semibold"
@@ -821,7 +821,7 @@ export default function SystemSettings() {
                       updateConfig(
                         "security",
                         "max_login_attempts",
-                        parseInt(e.target.value)
+                        parseInt(e.target.value),
                       )
                     }
                     className="text-lg font-semibold"

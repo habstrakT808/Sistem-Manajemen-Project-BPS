@@ -71,7 +71,7 @@ export function KetuaTimLayout({ children }: KetuaTimLayoutProps) {
               <div className="text-white font-bold text-lg">
                 Ketua Tim Panel
               </div>
-              <div className="text-blue-100 text-sm">Project Management</div>
+              <div className="text-blue-100 text-sm">Manajemen Proyek</div>
             </div>
           </div>
         </div>
@@ -88,7 +88,7 @@ export function KetuaTimLayout({ children }: KetuaTimLayoutProps) {
                     derivedNameFromEmail ||
                     user?.email ||
                     "";
-                  return displayName || (loading ? "Loading..." : "-");
+                  return displayName || (loading ? "Memuat..." : "-");
                 })()}
               </div>
               <div className="text-sm text-gray-500">{user?.email}</div>
@@ -100,7 +100,7 @@ export function KetuaTimLayout({ children }: KetuaTimLayoutProps) {
         {/* Navigation */}
         <div className="flex-1 p-4 space-y-2 overflow-y-auto">
           <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-3 mb-4">
-            Navigation
+            Navigasi
           </div>
           {/* Dashboard */}
           <Link
@@ -114,7 +114,7 @@ export function KetuaTimLayout({ children }: KetuaTimLayoutProps) {
               </div>
               <div className="flex-1">
                 <div className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                  Dashboard
+                  Dasbor
                 </div>
                 <div className="text-sm text-gray-500 group-hover:text-blue-500 mt-1">
                   Overview sistem
@@ -134,10 +134,10 @@ export function KetuaTimLayout({ children }: KetuaTimLayoutProps) {
             </div>
             <div className="flex-1 text-left">
               <div className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                Management
+                Manajemen
               </div>
               <div className="text-sm text-gray-500 group-hover:text-blue-500 mt-1">
-                Projects, tasks, and team
+                Proyek, tugas, dan tim
               </div>
             </div>
             <ChevronDown
@@ -147,6 +147,21 @@ export function KetuaTimLayout({ children }: KetuaTimLayoutProps) {
           {openManagement && (
             <div className="ml-4 space-y-2">
               <Link
+                href="/ketua-tim/team"
+                prefetch
+                onMouseEnter={() => router.prefetch("/ketua-tim/team")}
+              >
+                <div className="flex items-center p-3 rounded-xl hover:bg-blue-50 transition-all cursor-pointer">
+                  <Users className="w-4 h-4 text-blue-600 mr-3" />
+                  <div>
+                    <div className="font-medium text-gray-900">
+                      Manajemen Tim
+                    </div>
+                    <div className="text-xs text-gray-500">Kelola tim</div>
+                  </div>
+                </div>
+              </Link>
+              <Link
                 href="/ketua-tim/projects"
                 prefetch
                 onMouseEnter={() => router.prefetch("/ketua-tim/projects")}
@@ -155,9 +170,9 @@ export function KetuaTimLayout({ children }: KetuaTimLayoutProps) {
                   <FolderOpen className="w-4 h-4 text-blue-600 mr-3" />
                   <div>
                     <div className="font-medium text-gray-900">
-                      Projects Management
+                      Manajemen Proyek
                     </div>
-                    <div className="text-xs text-gray-500">Kelola projects</div>
+                    <div className="text-xs text-gray-500">Kelola proyek</div>
                   </div>
                 </div>
               </Link>
@@ -170,24 +185,9 @@ export function KetuaTimLayout({ children }: KetuaTimLayoutProps) {
                   <ClipboardList className="w-4 h-4 text-blue-600 mr-3" />
                   <div>
                     <div className="font-medium text-gray-900">
-                      Task Management
+                      Manajemen Tugas
                     </div>
                     <div className="text-xs text-gray-500">Kelola tugas</div>
-                  </div>
-                </div>
-              </Link>
-              <Link
-                href="/ketua-tim/team"
-                prefetch
-                onMouseEnter={() => router.prefetch("/ketua-tim/team")}
-              >
-                <div className="flex items-center p-3 rounded-xl hover:bg-blue-50 transition-all cursor-pointer">
-                  <Users className="w-4 h-4 text-blue-600 mr-3" />
-                  <div>
-                    <div className="font-medium text-gray-900">
-                      Team Management
-                    </div>
-                    <div className="text-xs text-gray-500">Kelola tim</div>
                   </div>
                 </div>
               </Link>
@@ -206,7 +206,7 @@ export function KetuaTimLayout({ children }: KetuaTimLayoutProps) {
               </div>
               <div className="flex-1">
                 <div className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                  Financial Report
+                  Laporan Keuangan
                 </div>
                 <div className="text-sm text-gray-500 group-hover:text-blue-500 mt-1">
                   Laporan keuangan
@@ -227,7 +227,7 @@ export function KetuaTimLayout({ children }: KetuaTimLayoutProps) {
               </div>
               <div className="flex-1">
                 <div className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                  Analytics
+                  Analitik
                 </div>
                 <div className="text-sm text-gray-500 group-hover:text-blue-500 mt-1">
                   Analisis performa
@@ -240,7 +240,7 @@ export function KetuaTimLayout({ children }: KetuaTimLayoutProps) {
         {/* Quick Actions */}
         <div className="p-4 border-t border-gray-100 mt-auto">
           <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-3 mb-4">
-            Quick Actions
+            Aksi Cepat
           </div>
           <div className="space-y-2">
             <Button
@@ -253,15 +253,8 @@ export function KetuaTimLayout({ children }: KetuaTimLayoutProps) {
                 onMouseEnter={() => router.prefetch("/ketua-tim/projects/new")}
               >
                 <Plus className="w-4 h-4 mr-2" />
-                Create Project
+                Buat Proyek
               </Link>
-            </Button>
-            <Button
-              variant="outline"
-              className="w-full border-2 border-orange-200 text-orange-600 hover:bg-orange-50 rounded-xl transition-all duration-300"
-            >
-              <Calendar className="w-4 h-4 mr-2" />
-              Schedule Meeting
             </Button>
           </div>
         </div>

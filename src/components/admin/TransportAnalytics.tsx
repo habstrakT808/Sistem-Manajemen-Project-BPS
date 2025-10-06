@@ -65,17 +65,17 @@ interface TransportAnalytics {
 }
 
 async function fetchTransportAnalytics(
-  period: string
+  period: string,
 ): Promise<TransportAnalytics> {
   const response = await fetch(
     `/api/admin/analytics/transport?period=${period}`,
     {
       cache: "no-store",
-    }
+    },
   );
   const result = await response.json();
   if (!response.ok) {
-    throw new Error(result._error || "Failed to fetch transport analytics");
+    throw new Error(result._error || "Gagal mengambil analitik transport");
   }
   return result.data;
 }
@@ -106,7 +106,7 @@ export default function TransportAnalytics() {
   const handleExport = async () => {
     try {
       const response = await fetch(
-        `/api/admin/analytics/transport/export?period=${selectedPeriod}`
+        `/api/admin/analytics/transport/export?period=${selectedPeriod}`,
       );
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
@@ -117,10 +117,10 @@ export default function TransportAnalytics() {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      toast.success("Export downloaded successfully");
+      toast.success("Ekspor berhasil diunduh");
     } catch (error) {
       console.error("Export failed:", error);
-      toast.error("Failed to export data");
+      toast.error("Gagal mengekspor data");
     }
   };
 
@@ -172,35 +172,35 @@ export default function TransportAnalytics() {
     {
       title: "Total Transport",
       value: formatCurrency(summary.total_amount),
-      description: `${summary.total_allocations} allocations`,
+      description: `${summary.total_allocations} alokasi`,
       icon: DollarSign,
       color: "from-green-500 to-green-600",
       bgColor: "from-green-50 to-green-100",
     },
     {
-      title: "Active Users",
+      title: "Pengguna Aktif",
       value: summary.unique_users,
-      description: "Users with transport",
+      description: "Pengguna dengan transport",
       icon: Users,
       color: "from-blue-500 to-blue-600",
       bgColor: "from-blue-50 to-blue-100",
     },
     {
-      title: "Active Projects",
+      title: "Proyek Aktif",
       value: summary.unique_projects,
-      description: "Projects with transport",
+      description: "Proyek dengan transport",
       icon: FolderOpen,
       color: "from-purple-500 to-purple-600",
       bgColor: "from-purple-50 to-purple-100",
     },
     {
-      title: "Avg per User",
+      title: "Rata-rata per Pengguna",
       value: formatCurrency(
         summary.unique_users > 0
           ? summary.total_amount / summary.unique_users
-          : 0
+          : 0,
       ),
-      description: "Average allocation",
+      description: "Rata-rata alokasi",
       icon: TrendingUp,
       color: "from-orange-500 to-orange-600",
       bgColor: "from-orange-50 to-orange-100",
@@ -213,10 +213,10 @@ export default function TransportAnalytics() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-            Transport Analytics
+            Analitik Transport
           </h1>
           <p className="text-gray-600 text-lg mt-2">
-            Monitor transport allocations, usage patterns, and financial impact.
+            Pantau alokasi transport, pola penggunaan, dan dampak finansial.
           </p>
         </div>
 
@@ -226,10 +226,10 @@ export default function TransportAnalytics() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="7">7 days</SelectItem>
-              <SelectItem value="30">30 days</SelectItem>
-              <SelectItem value="90">90 days</SelectItem>
-              <SelectItem value="365">1 year</SelectItem>
+              <SelectItem value="7">7 hari</SelectItem>
+              <SelectItem value="30">30 hari</SelectItem>
+              <SelectItem value="90">90 hari</SelectItem>
+              <SelectItem value="365">1 tahun</SelectItem>
             </SelectContent>
           </Select>
 
@@ -242,7 +242,7 @@ export default function TransportAnalytics() {
             <RefreshCw
               className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`}
             />
-            Refresh
+            Muat Ulang
           </Button>
 
           <Button
@@ -250,7 +250,7 @@ export default function TransportAnalytics() {
             className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
           >
             <Download className="w-4 h-4 mr-2" />
-            Export CSV
+            Ekspor CSV
           </Button>
         </div>
       </div>
@@ -297,10 +297,10 @@ export default function TransportAnalytics() {
           <div className="bg-gradient-to-r from-green-600 to-teal-600 p-6">
             <h2 className="text-xl font-bold text-white flex items-center">
               <TrendingUp className="w-6 h-6 mr-3" />
-              Daily Transport Trend
+              Tren Transport Harian
             </h2>
             <p className="text-green-100 text-sm mt-1">
-              Last 14 days allocation pattern
+              Pola alokasi 14 hari terakhir
             </p>
           </div>
           <div className="p-6">
@@ -334,10 +334,10 @@ export default function TransportAnalytics() {
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6">
             <h2 className="text-xl font-bold text-white flex items-center">
               <Users className="w-6 h-6 mr-3" />
-              Top Transport Recipients
+              Penerima Transport Teratas
             </h2>
             <p className="text-blue-100 text-sm mt-1">
-              Highest transport allocations
+              Alokasi transport tertinggi
             </p>
           </div>
           <div className="p-6 space-y-4">
@@ -355,7 +355,7 @@ export default function TransportAnalytics() {
                   <div>
                     <div className="font-medium text-gray-900">{user.name}</div>
                     <div className="text-sm text-gray-500">
-                      {user.count} allocations
+                      {user.count} alokasi
                     </div>
                   </div>
                 </div>
@@ -375,10 +375,10 @@ export default function TransportAnalytics() {
         <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-6">
           <h2 className="text-xl font-bold text-white flex items-center">
             <FolderOpen className="w-6 h-6 mr-3" />
-            Transport by Task
+            Transport berdasarkan Tugas
           </h2>
           <p className="text-purple-100 text-sm mt-1">
-            Task-wise transport allocation breakdown
+            Rincian alokasi transport per tugas
           </p>
         </div>
         <div className="p-6">
@@ -394,7 +394,7 @@ export default function TransportAnalytics() {
                       {project.name}
                     </div>
                     <div className="text-sm text-gray-500">
-                      {project.count} allocations
+                      {project.count} alokasi
                     </div>
                   </div>
                   <div className="text-right">

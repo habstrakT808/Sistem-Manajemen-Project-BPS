@@ -33,6 +33,8 @@ import { toast } from "sonner";
 import { useActiveProject } from "@/components/providers";
 import { useAuthContext } from "@/components/auth/AuthProvider";
 import { Progress } from "@/components/ui/progress";
+import { useActiveTeam } from "@/components/providers";
+import { Users } from "lucide-react";
 
 interface ProjectData {
   id: string;
@@ -54,8 +56,13 @@ interface ProjectData {
   my_transport_earnings: number;
 }
 
-async function fetchProjectsRequest(): Promise<ProjectData[]> {
-  const response = await fetch("/api/pegawai/projects", { cache: "no-store" });
+async function fetchProjectsRequest(
+  teamId?: string | null,
+): Promise<ProjectData[]> {
+  const qs = teamId ? `?team_id=${encodeURIComponent(teamId)}` : "";
+  const response = await fetch(`/api/pegawai/projects${qs}`, {
+    cache: "no-store",
+  });
   const result = await response.json();
   if (!response.ok) {
     throw new Error(result.error || "Failed to fetch projects");
@@ -65,7 +72,13 @@ async function fetchProjectsRequest(): Promise<ProjectData[]> {
 
 export default function ProjectListView() {
   const router = useRouter();
+  const searchParams =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search)
+      : null;
+  const teamId = searchParams?.get("team_id") || null;
   const { setActiveProject } = useActiveProject();
+  const { setActiveTeam } = useActiveTeam();
   const { userProfile } = useAuthContext();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -78,10 +91,24 @@ export default function ProjectListView() {
     error,
     refetch,
   } = useQuery<ProjectData[], Error>({
-    queryKey: ["pegawai", "projects"],
-    queryFn: fetchProjectsRequest,
+    queryKey: ["pegawai", "projects", { teamId }],
+    queryFn: () => fetchProjectsRequest(teamId),
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
+
+  // Fetch team info to render the same team card as on /pegawai
+  const { data: teams = [] } = useQuery<any[], Error>({
+    queryKey: ["pegawai", "teams"],
+    queryFn: async () => {
+      const res = await fetch("/api/pegawai/teams", { cache: "no-store" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to fetch teams");
+      return json.data || [];
+    },
+    staleTime: 2 * 60 * 1000,
+  });
+
+  const selectedTeam = teams.find((t) => t.id === teamId);
 
   const filteredProjects = useMemo(() => {
     return projects.filter((project) => {
@@ -110,7 +137,7 @@ export default function ProjectListView() {
       leader: projects.filter((p) => p.user_role === "leader").length,
       member: projects.filter((p) => p.user_role === "member").length,
     }),
-    [projects]
+    [projects],
   );
 
   const handleRefresh = async () => {
@@ -278,8 +305,8 @@ export default function ProjectListView() {
                   {formatCurrency(
                     projects.reduce(
                       (sum, p) => sum + p.my_transport_earnings,
-                      0
-                    )
+                      0,
+                    ),
                   )}
                 </p>
               </div>
@@ -335,8 +362,28 @@ export default function ProjectListView() {
         </Button>
       </div>
 
-      {/* Project List */}
+      {/* Project List as Pegawai */}
       <div className="grid grid-cols-1 gap-6">
+        {selectedTeam && selectedTeam.role === "leader" && (
+          <div
+            className={`group rounded-xl border border-gray-200 bg-white p-6 shadow-sm hover:shadow-lg transition hover:-translate-y-0.5`}
+            onClick={() => router.push("/ketua-tim")}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <Badge className="bg-purple-100 text-purple-800 border font-medium">
+                LEADER
+              </Badge>
+            </div>
+            <h3 className="text-xl font-medium text-gray-900 mb-1">
+              {selectedTeam.name}
+            </h3>
+            <p className="text-gray-600 mb-2 line-clamp-2">
+              {selectedTeam.description ||
+                "Masuk sebagai Ketua Tim untuk mengelola proyek."}
+            </p>
+            <div className="text-sm text-gray-500">Peran: Ketua Tim</div>
+          </div>
+        )}
         {isLoading && projects.length === 0 ? (
           // Loading skeleton
           Array.from({ length: 3 }).map((_, i) => (
@@ -359,17 +406,18 @@ export default function ProjectListView() {
               </div>
             </div>
           ))
-        ) : filteredProjects.length === 0 ? (
+        ) : projects.filter((p) => p.user_role !== "leader").length === 0 ? (
           <div className="text-center py-16 rounded-xl border border-dashed border-gray-300 bg-white">
             <FolderOpen className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-xl font-medium text-gray-900 mb-2">
-              Belum ada project
+              Belum ada project sebagai pegawai
             </h3>
             <p className="text-gray-500 mb-6">
               {searchTerm
                 ? "Coba ubah kata kunci pencarian Anda"
-                : "Anda belum ditugaskan ke project apa pun"}
+                : "Anda belum ditugaskan ke proyek di tim ini"}
             </p>
+            {/** removed leader full-width card inside empty state as requested **/}
             <Button
               onClick={handleRefresh}
               variant="outline"
@@ -382,77 +430,84 @@ export default function ProjectListView() {
             </Button>
           </div>
         ) : (
-          filteredProjects.map((project) => {
-            const isOverdue =
-              new Date(project.deadline) < new Date() &&
-              project.status !== "completed";
-            return (
-              <div
-                key={project.id}
-                onClick={() => {
-                  setActiveProject({ id: project.id, role: project.user_role });
-                  // Only allow ketua_tim users to access ketua-tim pages
-                  console.log("Project click:", {
-                    projectRole: project.user_role,
-                    userRole: userProfile?.role,
-                  });
-                  if (project.user_role === "leader") {
-                    // Allow access to ketua-tim pages if user is leader in this project
-                    router.push(`/ketua-tim/projects/${project.id}`);
-                  } else {
-                    router.push(`/pegawai/projects/${project.id}`);
-                  }
-                }}
-                className={`group rounded-xl border border-gray-200 bg-white p-6 shadow-sm hover:shadow-lg transition hover:-translate-y-0.5 ${
-                  isOverdue ? "ring-2 ring-red-200" : ""
-                }`}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <Badge
-                    className={`${getStatusColor(project.status)} border font-medium`}
-                  >
-                    {project.status.toUpperCase()}
-                  </Badge>
-                  <Badge
-                    className={`${getRoleColor(project.user_role)} border font-medium`}
-                  >
-                    {project.user_role.toUpperCase()}
-                  </Badge>
-                </div>
-                <h3 className="text-xl font-medium text-gray-900 mb-1">
-                  {project.nama_project}
-                </h3>
-                <p className="text-gray-600 mb-2 line-clamp-2">
-                  {project.deskripsi}
-                </p>
-                <div className="text-sm text-gray-500">
-                  Leader: {project.ketua_tim.nama_lengkap} • Team:{" "}
-                  {project.team_size} • Deadline:{" "}
-                  {new Date(project.deadline).toLocaleDateString("id-ID")}
-                </div>
-                <div className="mt-4">
-                  <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-                    <span>Progress</span>
-                    <span>
-                      {project.my_tasks.completed}/{project.my_tasks.total}{" "}
-                      selesai
-                    </span>
-                  </div>
-                  <Progress
-                    value={
-                      project.my_tasks.total > 0
-                        ? Math.round(
-                            (project.my_tasks.completed /
-                              project.my_tasks.total) *
-                              100
-                          )
-                        : 0
+          projects
+            .filter((p) => p.user_role !== "leader")
+            .map((project) => {
+              const isOverdue =
+                new Date(project.deadline) < new Date() &&
+                project.status !== "completed";
+              return (
+                <div
+                  key={project.id}
+                  onClick={() => {
+                    setActiveProject({
+                      id: project.id,
+                      role: project.user_role,
+                    });
+                    // Only allow ketua_tim users to access ketua-tim pages
+                    console.log("Project click:", {
+                      projectRole: project.user_role,
+                      userRole: userProfile?.role,
+                    });
+                    if (project.user_role === "leader") {
+                      // Allow access to ketua-tim pages if user is leader in this project
+                      router.push(`/ketua-tim/projects/${project.id}`);
+                    } else {
+                      router.push(
+                        `/pegawai/dashboard?project_id=${project.id}`,
+                      );
                     }
-                  />
+                  }}
+                  className={`group rounded-xl border border-gray-200 bg-white p-6 shadow-sm hover:shadow-lg transition hover:-translate-y-0.5 ${
+                    isOverdue ? "ring-2 ring-red-200" : ""
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <Badge
+                      className={`${getStatusColor(project.status)} border font-medium`}
+                    >
+                      {project.status.toUpperCase()}
+                    </Badge>
+                    <Badge
+                      className={`${getRoleColor(project.user_role)} border font-medium`}
+                    >
+                      {project.user_role.toUpperCase()}
+                    </Badge>
+                  </div>
+                  <h3 className="text-xl font-medium text-gray-900 mb-1">
+                    {project.nama_project}
+                  </h3>
+                  <p className="text-gray-600 mb-2 line-clamp-2">
+                    {project.deskripsi}
+                  </p>
+                  <div className="text-sm text-gray-500">
+                    Leader: {project.ketua_tim.nama_lengkap} • Team:{" "}
+                    {project.team_size} • Deadline:{" "}
+                    {new Date(project.deadline).toLocaleDateString("id-ID")}
+                  </div>
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                      <span>Progress</span>
+                      <span>
+                        {project.my_tasks.completed}/{project.my_tasks.total}{" "}
+                        selesai
+                      </span>
+                    </div>
+                    <Progress
+                      value={
+                        project.my_tasks.total > 0
+                          ? Math.round(
+                              (project.my_tasks.completed /
+                                project.my_tasks.total) *
+                                100,
+                            )
+                          : 0
+                      }
+                    />
+                  </div>
                 </div>
-              </div>
-            );
-          })
+              );
+            })
         )}
       </div>
 

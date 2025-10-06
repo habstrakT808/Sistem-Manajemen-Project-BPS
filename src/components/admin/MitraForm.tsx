@@ -117,11 +117,11 @@ export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
         const result = await response.json();
 
         if (!response.ok) {
-          toast.error(result.error || "Failed to update mitra");
+          toast.error(result.error || "Gagal memperbarui mitra");
           return;
         }
 
-        toast.success("Mitra updated successfully");
+        toast.success("Mitra berhasil diperbarui");
       } else {
         // Create new mitra
         const response = await fetch("/api/admin/mitra", {
@@ -148,17 +148,17 @@ export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
         const result = await response.json();
 
         if (!response.ok) {
-          toast.error(result.error || "Failed to create mitra");
+          toast.error(result.error || "Gagal membuat mitra");
           return;
         }
 
-        toast.success("Mitra created successfully");
+        toast.success("Mitra berhasil dibuat");
       }
 
       onSuccess();
     } catch (error) {
       console.error("Error saving mitra:", error);
-      toast.error("Failed to save mitra");
+      toast.error("Gagal menyimpan mitra");
     } finally {
       setLoading(false);
     }
@@ -170,16 +170,16 @@ export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
       <div className="flex items-center space-x-4">
         <Button variant="ghost" onClick={onClose}>
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Mitra
+          Kembali ke Mitra
         </Button>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            {isEditing ? "Edit Mitra" : "Create New Mitra"}
+            {isEditing ? "Ubah Mitra" : "Tambah Mitra Baru"}
           </h1>
           <p className="text-gray-600">
             {isEditing
-              ? "Update partner information and details"
-              : "Add a new business partner or contractor"}
+              ? "Perbarui informasi dan detail mitra"
+              : "Tambahkan mitra bisnis atau kontraktor baru"}
           </p>
         </div>
       </div>
@@ -190,11 +190,11 @@ export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
         <div className="lg:col-span-2">
           <div className="border-0 shadow-xl rounded-xl overflow-hidden bg-white">
             <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-6">
-              <div className="font-semibold text-xl">Partner Information</div>
+              <div className="font-semibold text-xl">Informasi Mitra</div>
               <div className="text-muted-foreground text-sm">
                 {isEditing
-                  ? "Update the partner details below"
-                  : "Enter the partner details below"}
+                  ? "Perbarui detail mitra di bawah ini"
+                  : "Masukkan detail mitra di bawah ini"}
               </div>
             </div>
             <div className="p-6 bg-white">
@@ -202,14 +202,14 @@ export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Partner Name */}
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="nama_mitra">Partner Name *</Label>
+                    <Label htmlFor="nama_mitra">Nama Mitra *</Label>
                     <Input
                       id="nama_mitra"
                       value={formData.nama_mitra}
                       onChange={(e) =>
                         setFormData({ ...formData, nama_mitra: e.target.value })
                       }
-                      placeholder="e.g., PT Teknologi Maju or Ahmad Consultant"
+                      placeholder="contoh: PT Teknologi Maju atau Ahmad Konsultan"
                       required
                       className="rounded-xl border-2 focus:border-purple-300"
                     />
@@ -217,7 +217,7 @@ export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
 
                   {/* Status */}
                   <div className="space-y-2">
-                    <Label htmlFor="is_active">Partner Status</Label>
+                    <Label htmlFor="is_active">Status Mitra</Label>
                     <div className="flex items-center space-x-2 p-3 rounded-xl border-2 border-gray-200">
                       <Switch
                         id="is_active"
@@ -231,36 +231,36 @@ export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
                         className="text-sm font-medium"
                       >
                         {formData.is_active
-                          ? "Active Partner"
-                          : "Inactive Partner"}
+                          ? "Mitra Aktif"
+                          : "Mitra Tidak Aktif"}
                       </Label>
                     </div>
                   </div>
 
                   {/* Contact */}
                   <div className="space-y-2">
-                    <Label htmlFor="kontak">Contact Information</Label>
+                    <Label htmlFor="kontak">Informasi Kontak</Label>
                     <Input
                       id="kontak"
                       value={formData.kontak}
                       onChange={(e) =>
                         setFormData({ ...formData, kontak: e.target.value })
                       }
-                      placeholder="Phone, email, or WhatsApp"
+                      placeholder="Telepon, email, atau WhatsApp"
                       className="rounded-xl border-2 focus:border-purple-300"
                     />
                   </div>
 
                   {/* Address */}
                   <div className="space-y-2">
-                    <Label htmlFor="alamat">Address</Label>
+                    <Label htmlFor="alamat">Alamat</Label>
                     <Input
                       id="alamat"
                       value={formData.alamat}
                       onChange={(e) =>
                         setFormData({ ...formData, alamat: e.target.value })
                       }
-                      placeholder="Business or home address"
+                      placeholder="Alamat bisnis atau rumah"
                       className="rounded-xl border-2 focus:border-purple-300"
                     />
                   </div>
@@ -340,14 +340,67 @@ export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
                         <SelectContent>
                           {occupations.map((o) => (
                             <SelectItem key={o.id} value={o.id}>
-                              {o.name}
+                              <div className="flex items-center gap-3">
+                                <span className="truncate">{o.name}</span>
+                                <button
+                                  type="button"
+                                  className="ml-auto shrink-0 text-red-500 hover:text-red-700"
+                                  onPointerDownCapture={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                  }}
+                                  onPointerUpCapture={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                  }}
+                                  onClick={async (e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    const res = await fetch(
+                                      `/api/admin/mitra-occupations?id=${o.id}&force=1`,
+                                      { method: "DELETE" },
+                                    );
+                                    const json = await res
+                                      .json()
+                                      .catch(() => ({}));
+                                    if (!res.ok) {
+                                      toast.error(
+                                        (json as any)?.error ||
+                                          "Gagal menghapus pekerjaan",
+                                      );
+                                      return;
+                                    }
+                                    setOccupations((prev) =>
+                                      prev.filter((x) => x.id !== o.id),
+                                    );
+                                    setFormData((prev) => ({
+                                      ...prev,
+                                      pekerjaan_id:
+                                        prev.pekerjaan_id === o.id
+                                          ? null
+                                          : prev.pekerjaan_id,
+                                    }));
+                                    toast.success("Pekerjaan dihapus");
+                                  }}
+                                  onKeyDown={(e) => {
+                                    // Prevent Space/Enter selecting the item
+                                    if (e.key === "Enter" || e.key === " ") {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                    }
+                                  }}
+                                  aria-label={`Hapus ${o.name}`}
+                                >
+                                  ×
+                                </button>
+                              </div>
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
 
                       <Input
-                        placeholder="Or type new occupation"
+                        placeholder="Atau ketik pekerjaan baru"
                         value={formData.pekerjaan_nama || ""}
                         onChange={(e) =>
                           setFormData({
@@ -382,10 +435,10 @@ export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
                               ...formData,
                               pekerjaan_id: json.data.id,
                             });
-                            toast.success("Occupation added");
+                            toast.success("Pekerjaan berhasil ditambahkan");
                           } else
                             toast.error(
-                              json.error || "Failed to add occupation",
+                              json.error || "Gagal menambahkan pekerjaan",
                             );
                         }}
                       >
@@ -402,7 +455,7 @@ export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
                       onChange={(e) =>
                         setFormData({ ...formData, sobat_id: e.target.value })
                       }
-                      placeholder="Unique ID from client"
+                      placeholder="ID unik dari klien"
                       className="rounded-xl border-2 focus:border-purple-300"
                     />
                   </div>
@@ -416,7 +469,7 @@ export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
                       onChange={(e) =>
                         setFormData({ ...formData, email: e.target.value })
                       }
-                      placeholder="email@example.com"
+                      placeholder="email@contoh.com"
                       className="rounded-xl border-2 focus:border-purple-300"
                     />
                   </div>
@@ -430,7 +483,7 @@ export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
                     onClick={onClose}
                     className="rounded-xl"
                   >
-                    Cancel
+                    Batal
                   </Button>
                   <Button
                     type="submit"
@@ -440,13 +493,13 @@ export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
                     {loading ? (
                       <div className="flex items-center space-x-2">
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        <span>Saving...</span>
+                        <span>Menyimpan...</span>
                       </div>
                     ) : (
                       <div className="flex items-center space-x-2">
                         <Save className="w-4 h-4" />
                         <span>
-                          {isEditing ? "Update Mitra" : "Create Mitra"}
+                          {isEditing ? "Perbarui Mitra" : "Buat Mitra"}
                         </span>
                       </div>
                     )}
@@ -464,22 +517,22 @@ export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
             <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-6">
               <div className="font-semibold text-lg flex items-center">
                 <DollarSign className="w-5 h-5 mr-2" />
-                Financial Limits
+                Batas Keuangan
               </div>
             </div>
             <div className="p-6 bg-white">
               <div className="p-4 bg-white rounded-xl">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-semibold text-orange-900">
-                    Monthly Limit
+                    Batas Bulanan
                   </span>
                   <span className="text-2xl font-bold text-orange-600">
                     3.3M
                   </span>
                 </div>
                 <p className="text-sm text-orange-700">
-                  Maximum honor per mitra per month is Rp 3,300,000. System will
-                  automatically prevent assignments that exceed this limit.
+                  Honor maksimum per mitra per bulan adalah Rp 3.300.000. Sistem
+                  akan otomatis mencegah penugasan yang melebihi batas ini.
                 </p>
               </div>
             </div>
@@ -491,7 +544,7 @@ export function MitraForm({ mitra, onClose, onSuccess }: MitraFormProps) {
               <CardHeader className="bg-gradient-to-r from-yellow-50 to-yellow-100">
                 <CardTitle className="text-lg flex items-center">
                   <Star className="w-5 h-5 mr-2" />
-                  Performance
+                  Performa
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6">

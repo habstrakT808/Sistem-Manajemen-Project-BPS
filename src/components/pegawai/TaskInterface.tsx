@@ -127,12 +127,12 @@ export default function TaskInterface({
         throw new Error(error.error || "Failed to start task");
       }
 
-      toast.success("Task started successfully!");
+      toast.success("Tugas berhasil dimulai!");
       onTaskUpdate(task.id);
     } catch (error) {
       console.error("Error starting task:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to start task",
+        error instanceof Error ? error.message : "Gagal memulai tugas",
       );
     } finally {
       setUpdating(false);
@@ -169,7 +169,7 @@ export default function TaskInterface({
         throw new Error(error.error || "Failed to complete task");
       }
 
-      toast.success("Task completed successfully!");
+      toast.success("Tugas berhasil diselesaikan!");
       setIsExecuteDialogOpen(false);
       setSelectedTask(null);
       setResponse("");
@@ -177,7 +177,7 @@ export default function TaskInterface({
     } catch (error) {
       console.error("Error completing task:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to complete task",
+        error instanceof Error ? error.message : "Gagal menyelesaikan tugas",
       );
     } finally {
       setUpdating(false);
@@ -206,7 +206,7 @@ export default function TaskInterface({
         throw new Error(error.error || "Failed to update response");
       }
 
-      toast.success("Response updated successfully!");
+      toast.success("Respon berhasil diperbarui!");
       setIsEditDialogOpen(false);
       setSelectedTask(null);
       setResponse("");
@@ -214,7 +214,7 @@ export default function TaskInterface({
     } catch (error) {
       console.error("Error updating response:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to update response",
+        error instanceof Error ? error.message : "Gagal memperbarui respon",
       );
     } finally {
       setUpdating(false);
@@ -301,7 +301,7 @@ export default function TaskInterface({
       <div className="flex items-center space-x-4 bg-white p-4 rounded-xl shadow-lg">
         <div className="flex-1">
           <Input
-            placeholder="Search tasks..."
+            placeholder="Cari tugas..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="border-gray-200"
@@ -309,18 +309,18 @@ export default function TaskInterface({
         </div>
         <Select value={filterStatus} onValueChange={setFilterStatus}>
           <SelectTrigger className="w-48">
-            <SelectValue placeholder="Filter by status" />
+            <SelectValue placeholder="Filter berdasarkan status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Tasks ({taskCounts.all})</SelectItem>
+            <SelectItem value="all">Semua ({taskCounts.all})</SelectItem>
             <SelectItem value="pending">
-              Pending ({taskCounts.pending})
+              Menunggu ({taskCounts.pending})
             </SelectItem>
             <SelectItem value="in_progress">
-              In Progress ({taskCounts.in_progress})
+              Berjalan ({taskCounts.in_progress})
             </SelectItem>
             <SelectItem value="completed">
-              Completed ({taskCounts.completed})
+              Selesai ({taskCounts.completed})
             </SelectItem>
           </SelectContent>
         </Select>
@@ -332,12 +332,12 @@ export default function TaskInterface({
           <div className="text-center py-12 bg-white rounded-xl shadow-lg">
             <ClipboardList className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              No tasks found
+              Tidak ada tugas ditemukan
             </h3>
             <p className="text-gray-500">
               {searchTerm
-                ? "Try adjusting your search terms"
-                : "No tasks available"}
+                ? "Coba sesuaikan kata pencarian"
+                : "Tidak ada tugas tersedia"}
             </p>
           </div>
         ) : (
@@ -417,7 +417,7 @@ export default function TaskInterface({
                           <Calendar className="w-4 h-4 text-blue-500" />
                           <div className="text-sm">
                             <div className="font-medium text-gray-900">
-                              Task Period
+                              Periode Tugas
                             </div>
                             <div
                               className={`${isOverdue ? "text-red-600 font-semibold" : "text-gray-500"}`}
@@ -437,7 +437,7 @@ export default function TaskInterface({
                           <FolderOpen className="w-4 h-4 text-purple-500" />
                           <div className="text-sm">
                             <div className="font-medium text-gray-900">
-                              Project
+                              Proyek
                             </div>
                             <div className="text-gray-500">
                               {task.projects.nama_project}
@@ -449,7 +449,7 @@ export default function TaskInterface({
                           <User className="w-4 h-4 text-green-500" />
                           <div className="text-sm">
                             <div className="font-medium text-gray-900">
-                              Team Leader
+                              Ketua Tim
                             </div>
                             <div className="text-gray-500">
                               {task.projects.users.nama_lengkap}
@@ -472,12 +472,12 @@ export default function TaskInterface({
                               <MapPin className="w-4 h-4 text-gray-600" />
                               <div>
                                 <div className="text-sm font-medium text-gray-900">
-                                  Transport Allowance
+                                  Tunjangan Transport
                                 </div>
                                 <div className="text-sm text-gray-700">
                                   {isTransportAllocated
-                                    ? `All ${task.transport_days} days allocated`
-                                    : `${allocatedDays}/${task.transport_days} days allocated`}
+                                    ? `Semua ${task.transport_days} hari teralokasi`
+                                    : `${allocatedDays}/${task.transport_days} hari teralokasi`}
                                 </div>
                               </div>
                             </div>
@@ -494,12 +494,12 @@ export default function TaskInterface({
                                   className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white"
                                 >
                                   <Calendar className="w-3 h-3 mr-1" />
-                                  Select Date
+                                  Pilih Tanggal
                                 </Button>
                               )}
                               {isTransportAllocated && (
                                 <Badge className="bg-blue-100 text-blue-800 border-blue-200">
-                                  Allocated
+                                  Teralokasi
                                 </Badge>
                               )}
                             </div>
@@ -512,7 +512,7 @@ export default function TaskInterface({
                           <div className="flex items-center justify-between mb-2">
                             <div className="text-sm font-medium text-green-900 flex items-center">
                               <MessageSquare className="w-4 h-4 mr-2" />
-                              My Response:
+                              Respon Saya:
                             </div>
                             {task.status !== "completed" && (
                               <Button
@@ -522,7 +522,7 @@ export default function TaskInterface({
                                 className="border-green-200 text-green-600 hover:bg-green-50"
                               >
                                 <Edit className="w-3 h-3 mr-1" />
-                                Edit
+                                Ubah
                               </Button>
                             )}
                           </div>
@@ -541,7 +541,7 @@ export default function TaskInterface({
                           className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
                         >
                           <Play className="w-4 h-4 mr-2" />
-                          Start Task
+                          Mulai Tugas
                         </Button>
                       )}
 
@@ -552,7 +552,7 @@ export default function TaskInterface({
                           className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
                         >
                           <CheckSquare className="w-4 h-4 mr-2" />
-                          Complete
+                          Selesaikan
                         </Button>
                       )}
 
@@ -560,7 +560,7 @@ export default function TaskInterface({
                         <div className="text-center">
                           <CheckCircle className="w-8 h-8 text-green-500 mx-auto mb-2" />
                           <div className="text-sm font-semibold text-green-600">
-                            Completed
+                            Selesai
                           </div>
                           <div className="text-xs text-gray-500">
                             {new Date(task.updated_at).toLocaleDateString(
@@ -576,7 +576,7 @@ export default function TaskInterface({
                           className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 animate-pulse"
                         >
                           <MapPin className="w-4 h-4 mr-2" />
-                          Select Transport Date
+                          Pilih Tanggal Transport
                         </Button>
                       )}
 
@@ -584,10 +584,10 @@ export default function TaskInterface({
                         <div className="text-center">
                           <MapPin className="w-8 h-8 text-blue-500 mx-auto mb-2" />
                           <div className="text-sm font-semibold text-blue-600">
-                            Transport Allocated
+                            Transport Teralokasi
                           </div>
                           <div className="text-xs text-gray-500">
-                            {allocatedDays} of {task.transport_days} days
+                            {allocatedDays} dari {task.transport_days} hari
                           </div>
                         </div>
                       )}
@@ -595,9 +595,9 @@ export default function TaskInterface({
                   </div>
 
                   <div className="text-xs text-gray-400 border-t pt-4">
-                    Created:{" "}
+                    Dibuat:{" "}
                     {new Date(task.created_at).toLocaleDateString("id-ID")} •
-                    Updated:{" "}
+                    Diperbarui:{" "}
                     {new Date(task.updated_at).toLocaleDateString("id-ID")}
                   </div>
                 </div>
@@ -613,10 +613,10 @@ export default function TaskInterface({
           <DialogHeader>
             <DialogTitle className="flex items-center">
               <CheckSquare className="w-5 h-5 mr-2 text-green-600" />
-              Complete Task
+              Selesaikan Tugas
             </DialogTitle>
             <DialogDescription>
-              Add your response and mark this task as completed.
+              Tambahkan respon Anda dan tandai tugas ini sebagai selesai.
             </DialogDescription>
           </DialogHeader>
 
@@ -626,7 +626,7 @@ export default function TaskInterface({
                 htmlFor="task-title"
                 className="text-sm font-medium text-gray-700"
               >
-                Task Title
+                Judul Tugas
               </Label>
               <div className="mt-2 p-3 bg-gray-50 rounded-lg text-sm font-semibold text-gray-900">
                 {selectedTask?.title}
@@ -638,7 +638,7 @@ export default function TaskInterface({
                 htmlFor="task-description"
                 className="text-sm font-medium text-gray-700"
               >
-                Task Description
+                Deskripsi Tugas
               </Label>
               <div className="mt-2 p-3 bg-gray-50 rounded-lg text-sm text-gray-700">
                 {selectedTask?.deskripsi_tugas}
@@ -650,13 +650,13 @@ export default function TaskInterface({
                 htmlFor="response"
                 className="text-sm font-medium text-gray-700"
               >
-                Your Response (Optional)
+                Respon Anda (Opsional)
               </Label>
               <Textarea
                 id="response"
                 value={response}
                 onChange={(e) => setResponse(e.target.value)}
-                placeholder="Describe what you accomplished, any issues encountered, or additional notes..."
+                placeholder="Jelaskan apa yang Anda kerjakan, kendala yang ditemui, atau catatan tambahan..."
                 rows={4}
                 className="mt-2"
               />
@@ -672,7 +672,7 @@ export default function TaskInterface({
               }}
               disabled={updating}
             >
-              Cancel
+              Batal
             </Button>
             <Button
               onClick={handleSubmitCompletion}
@@ -682,12 +682,12 @@ export default function TaskInterface({
               {updating ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Completing...
+                  Menyelesaikan...
                 </>
               ) : (
                 <>
                   <CheckSquare className="w-4 h-4 mr-2" />
-                  Complete Task
+                  Selesaikan Tugas
                 </>
               )}
             </Button>
@@ -701,21 +701,21 @@ export default function TaskInterface({
           <DialogHeader>
             <DialogTitle className="flex items-center">
               <Edit className="w-5 h-5 mr-2 text-blue-600" />
-              Edit Response
+              Ubah Respon
             </DialogTitle>
             <DialogDescription>
-              Update your response for this task.
+              Perbarui respon Anda untuk tugas ini.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div>
-              <Label htmlFor="edit-response">Your Response</Label>
+              <Label htmlFor="edit-response">Respon Anda</Label>
               <Textarea
                 id="edit-response"
                 value={response}
                 onChange={(e) => setResponse(e.target.value)}
-                placeholder="Update your response..."
+                placeholder="Perbarui respon Anda..."
                 rows={4}
                 className="mt-1"
               />
@@ -731,7 +731,7 @@ export default function TaskInterface({
               }}
               disabled={updating}
             >
-              Cancel
+              Batal
             </Button>
             <Button
               onClick={handleUpdateResponse}
@@ -741,12 +741,12 @@ export default function TaskInterface({
               {updating ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Updating...
+                  Memperbarui...
                 </>
               ) : (
                 <>
                   <Save className="w-4 h-4 mr-2" />
-                  Update Response
+                  Perbarui Respon
                 </>
               )}
             </Button>
@@ -760,7 +760,7 @@ export default function TaskInterface({
           <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">
-                Transport Date Selection
+                Pemilihan Tanggal Transport
               </h2>
               <Button
                 variant="outline"
@@ -769,7 +769,7 @@ export default function TaskInterface({
                   setSelectedTask(null);
                 }}
               >
-                Close
+                Tutup
               </Button>
             </div>
             <TransportCalendar

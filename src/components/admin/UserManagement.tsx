@@ -83,7 +83,7 @@ export function UserManagement() {
   const fetchUsers = useCallback(async () => {
     const res = await fetch("/api/admin/users", { cache: "no-store" });
     const result = await res.json();
-    if (!res.ok) throw new Error(result.error || "Failed to fetch users");
+    if (!res.ok) throw new Error(result.error || "Gagal mengambil pengguna");
     const data = (result.data || []) as UserRow[];
     const usersWithMeta: UserWithMeta[] = data.map((u) => ({
       ...u,
@@ -114,15 +114,15 @@ export function UserManagement() {
       });
       const result = await response.json();
       if (!response.ok) {
-        toast.error(result.error || "Failed to delete user");
+        toast.error(result.error || "Gagal menghapus pengguna");
         return;
       }
-      toast.success("User deleted successfully");
+      toast.success("Pengguna berhasil dihapus");
       await refetch();
       setDeletingUser(null);
     } catch (error) {
       console.error("Error deleting user:", error);
-      toast.error("Failed to delete user");
+      toast.error("Gagal menghapus pengguna");
     }
   };
 
@@ -135,10 +135,10 @@ export function UserManagement() {
       });
       const result = await response.json();
       if (!response.ok) {
-        toast.error(result.error || "Failed to update user status");
+        toast.error(result.error || "Gagal memperbarui status pengguna");
         return;
       }
-      toast.success("User status updated");
+      toast.success("Status pengguna diperbarui");
       await refetch();
     } catch (error) {
       console.error("Error updating user status:", error);
@@ -161,10 +161,10 @@ export function UserManagement() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-            User Management
+            Manajemen Pengguna
           </h1>
           <p className="text-gray-600 text-lg mt-2">
-            Manage users and access controls.
+            Kelola pengguna dan kontrol akses.
           </p>
         </div>
         <Button
@@ -175,7 +175,7 @@ export function UserManagement() {
           className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
         >
           <UserPlus className="w-4 h-4 mr-2" />
-          Add User
+          Tambah Pengguna
         </Button>
       </div>
 
@@ -184,7 +184,7 @@ export function UserManagement() {
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
           <Input
-            placeholder="Search users..."
+            placeholder="Cari pengguna..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -195,32 +195,32 @@ export function UserManagement() {
           className="border-2 border-gray-200 text-gray-600 hover:bg-gray-50"
         >
           <Filter className="w-4 h-4 mr-2" />
-          Filters
+          Filter
         </Button>
       </div>
 
       {/* Users Table */}
       <div className="border-0 shadow-xl rounded-xl overflow-hidden bg-white">
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6">
-          <div className="text-white text-xl font-semibold">Users</div>
+          <div className="text-white text-xl font-semibold">Pengguna</div>
         </div>
         <div className="p-6 bg-white">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
+                <TableHead>Nama</TableHead>
                 <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Projects</TableHead>
+                <TableHead>Peran</TableHead>
+                <TableHead>Proyek</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="w-[120px]">Actions</TableHead>
+                <TableHead className="w-[120px]">Aksi</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-8">
-                    Loading users...
+                    Memuat pengguna...
                   </TableCell>
                 </TableRow>
               ) : filteredUsers.length === 0 ? (
@@ -229,7 +229,7 @@ export function UserManagement() {
                     colSpan={6}
                     className="text-center py-8 text-gray-500"
                   >
-                    No users found
+                    Tidak ada pengguna
                   </TableCell>
                 </TableRow>
               ) : (
@@ -265,7 +265,7 @@ export function UserManagement() {
                               : "bg-gray-100 text-gray-700"
                           }
                         >
-                          {user.is_active ? "Active" : "Inactive"}
+                          {user.is_active ? "Aktif" : "Tidak Aktif"}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -286,18 +286,19 @@ export function UserManagement() {
                                 setShowUserForm(true);
                               }}
                             >
-                              <Edit className="w-4 h-4 mr-2" /> Edit
+                              <Edit className="w-4 h-4 mr-2" /> Ubah
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => handleToggleUserStatus(user)}
                             >
                               {user.is_active ? (
                                 <>
-                                  <EyeOff className="w-4 h-4 mr-2" /> Deactivate
+                                  <EyeOff className="w-4 h-4 mr-2" />{" "}
+                                  Nonaktifkan
                                 </>
                               ) : (
                                 <>
-                                  <Eye className="w-4 h-4 mr-2" /> Activate
+                                  <Eye className="w-4 h-4 mr-2" /> Aktifkan
                                 </>
                               )}
                             </DropdownMenuItem>
@@ -306,7 +307,7 @@ export function UserManagement() {
                               onClick={() => setDeletingUser(user)}
                               className="text-red-600"
                             >
-                              <Trash2 className="w-4 h-4 mr-2" /> Delete
+                              <Trash2 className="w-4 h-4 mr-2" /> Hapus
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -339,19 +340,19 @@ export function UserManagement() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete User</AlertDialogTitle>
+            <AlertDialogTitle>Hapus Pengguna</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the
-              user and remove their data from the servers.
+              Tindakan ini tidak dapat dibatalkan. Ini akan menghapus pengguna
+              secara permanen dan menghapus datanya dari server.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deletingUser && handleDeleteUser(deletingUser)}
               className="bg-red-600 hover:bg-red-700"
             >
-              Delete
+              Hapus
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

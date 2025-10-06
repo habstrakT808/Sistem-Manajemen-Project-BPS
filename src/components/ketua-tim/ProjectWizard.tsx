@@ -94,14 +94,14 @@ export default function ProjectWizard() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "Failed to fetch team data");
+        throw new Error(result.error || "Gagal mengambil data tim");
       }
 
       setPegawaiData(result.pegawai || []);
       setMitraData(result.mitra || []);
     } catch (error) {
       console.error("Error fetching team data:", error);
-      toast.error("Failed to load team data");
+      toast.error("Gagal memuat data tim");
     } finally {
       setLoading(false);
     }
@@ -252,7 +252,7 @@ export default function ProjectWizard() {
     if (validateStep(currentStep)) {
       setCurrentStep((prev) => Math.min(prev + 1, 4));
     } else {
-      toast.error("Please fill in all required fields");
+      toast.error("Harap lengkapi semua field yang wajib diisi");
     }
   };
 
@@ -262,7 +262,7 @@ export default function ProjectWizard() {
 
   const handleSubmit = async () => {
     if (!validateStep(currentStep)) {
-      toast.error("Please complete all required fields");
+      toast.error("Harap lengkapi semua field yang wajib diisi");
       return;
     }
 
@@ -279,10 +279,10 @@ export default function ProjectWizard() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "Failed to create project");
+        throw new Error(result.error || "Gagal membuat proyek");
       }
 
-      toast.success("Project created successfully!");
+      toast.success("Proyek berhasil dibuat!");
 
       // Invalidate related caches so other pages update instantly
       queryClient.invalidateQueries({ queryKey: ["ketua", "projects"] });
@@ -299,7 +299,7 @@ export default function ProjectWizard() {
     } catch (error) {
       console.error("Error creating project:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to create project",
+        error instanceof Error ? error.message : "Gagal membuat proyek",
       );
     } finally {
       setSubmitting(false);
@@ -307,9 +307,9 @@ export default function ProjectWizard() {
   };
 
   const steps = [
-    { number: 1, title: "Project Details", icon: Calendar },
-    { number: 2, title: "Team Selection", icon: Users },
-    { number: 3, title: "Review & Create", icon: CheckCircle },
+    { number: 1, title: "Detail Proyek", icon: Calendar },
+    { number: 2, title: "Pemilihan Tim", icon: Users },
+    { number: 3, title: "Tinjau & Buat", icon: CheckCircle },
   ];
 
   if (loading) {
@@ -317,7 +317,7 @@ export default function ProjectWizard() {
       <div className="space-y-8">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
-          <p>Loading team data...</p>
+          <p>Memuat data tim...</p>
         </div>
       </div>
     );
@@ -328,11 +328,11 @@ export default function ProjectWizard() {
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-          Create New Project
+          Buat Proyek Baru
         </h1>
         <p className="text-gray-600 text-lg mt-2">
-          Follow the steps to create a new project with team assignments and
-          budget allocation.
+          Ikuti langkah-langkah untuk membuat proyek baru beserta penugasan tim
+          dan alokasi anggaran.
         </p>
       </div>
 
@@ -394,36 +394,36 @@ export default function ProjectWizard() {
             <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6">
               <div className="flex items-center text-white text-xl font-semibold">
                 <Calendar className="w-6 h-6 mr-3" />
-                Project Details
+                Detail Proyek
               </div>
               <div className="text-blue-100 mt-2 text-sm">
-                Enter basic project information and timeline
+                Masukkan informasi dasar proyek dan lini masa
               </div>
             </div>
             <div className="p-6 space-y-6">
               <div className="grid grid-cols-1 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="nama_project">Project Name *</Label>
+                  <Label htmlFor="nama_project">Nama Proyek *</Label>
                   <Input
                     id="nama_project"
                     value={formData.nama_project}
                     onChange={(e) =>
                       updateFormData("nama_project", e.target.value)
                     }
-                    placeholder="Enter project name"
+                    placeholder="Masukkan nama proyek"
                     className="text-lg"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="deskripsi">Project Description *</Label>
+                  <Label htmlFor="deskripsi">Deskripsi Proyek *</Label>
                   <Textarea
                     id="deskripsi"
                     value={formData.deskripsi}
                     onChange={(e) =>
                       updateFormData("deskripsi", e.target.value)
                     }
-                    placeholder="Describe the project objectives and scope"
+                    placeholder="Jelaskan tujuan dan ruang lingkup proyek"
                     rows={4}
                     className="text-lg"
                   />
@@ -431,7 +431,7 @@ export default function ProjectWizard() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="tanggal_mulai">Start Date *</Label>
+                    <Label htmlFor="tanggal_mulai">Tanggal Mulai *</Label>
                     <Input
                       id="tanggal_mulai"
                       type="date"
@@ -444,7 +444,7 @@ export default function ProjectWizard() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="deadline">Deadline *</Label>
+                    <Label htmlFor="deadline">Tenggat Waktu *</Label>
                     <Input
                       id="deadline"
                       type="date"
@@ -468,10 +468,10 @@ export default function ProjectWizard() {
             <div className="bg-gradient-to-r from-green-600 to-teal-600 p-6">
               <div className="flex items-center text-white text-xl font-semibold">
                 <Users className="w-6 h-6 mr-3" />
-                Team Selection
+                Pemilihan Tim
               </div>
               <div className="text-green-100 mt-2 text-sm">
-                Select team members and partners for this project
+                Pilih anggota tim dan mitra untuk proyek ini
               </div>
             </div>
             <div className="p-6 space-y-8">
@@ -479,10 +479,11 @@ export default function ProjectWizard() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-gray-900">
-                    Team Members (Pegawai)
+                    Anggota Tim (Pegawai)
                   </h3>
                   <div className="text-sm text-gray-500">
-                    {filteredPegawaiData.length} of {pegawaiData.length} members
+                    {filteredPegawaiData.length} dari {pegawaiData.length}{" "}
+                    anggota
                   </div>
                 </div>
 
@@ -490,7 +491,7 @@ export default function ProjectWizard() {
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                   <Input
-                    placeholder="Search team members by name or email..."
+                    placeholder="Cari anggota tim berdasarkan nama atau email..."
                     value={pegawaiSearchTerm}
                     onChange={(e) => setPegawaiSearchTerm(e.target.value)}
                     className="pl-10 border-2 border-gray-200 focus:border-blue-500"
@@ -503,8 +504,8 @@ export default function ProjectWizard() {
                       <Users className="w-12 h-12 text-gray-300 mx-auto mb-2" />
                       <p>
                         {pegawaiSearchTerm.trim()
-                          ? "No team members found matching your search"
-                          : "No team members available"}
+                          ? "Tidak ada anggota tim yang sesuai dengan pencarian"
+                          : "Tidak ada anggota tim"}
                       </p>
                     </div>
                   ) : (
@@ -549,11 +550,9 @@ export default function ProjectWizard() {
               {/* Mitra Selection */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Partners (Mitra)
-                  </h3>
+                  <h3 className="text-lg font-semibold text-gray-900">Mitra</h3>
                   <div className="text-sm text-gray-500">
-                    {filteredMitraData.length} of {mitraData.length} partners
+                    {filteredMitraData.length} dari {mitraData.length} mitra
                   </div>
                 </div>
 
@@ -561,7 +560,7 @@ export default function ProjectWizard() {
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                   <Input
-                    placeholder="Search partners by name or type..."
+                    placeholder="Cari mitra berdasarkan nama atau jenis..."
                     value={mitraSearchTerm}
                     onChange={(e) => setMitraSearchTerm(e.target.value)}
                     className="pl-10 border-2 border-gray-200 focus:border-purple-500"
@@ -628,33 +627,33 @@ export default function ProjectWizard() {
             <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-6">
               <div className="flex items-center text-white text-xl font-semibold">
                 <CheckCircle className="w-6 h-6 mr-3" />
-                Review & Create
+                Tinjau & Buat
               </div>
               <div className="text-purple-100 mt-2 text-sm">
-                Review all project details before creating
+                Tinjau semua detail proyek sebelum membuat
               </div>
             </div>
             <div className="p-6 space-y-6">
               {/* Project Details Review */}
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-gray-900">
-                  Project Details
+                  Detail Proyek
                 </h3>
                 <div className="bg-gray-50 rounded-xl p-4 space-y-2">
                   <div>
-                    <strong>Name:</strong> {formData.nama_project}
+                    <strong>Nama:</strong> {formData.nama_project}
                   </div>
                   <div>
-                    <strong>Description:</strong> {formData.deskripsi}
+                    <strong>Deskripsi:</strong> {formData.deskripsi}
                   </div>
                   <div>
-                    <strong>Start Date:</strong>{" "}
+                    <strong>Tanggal Mulai:</strong>{" "}
                     {new Date(formData.tanggal_mulai).toLocaleDateString(
                       "id-ID",
                     )}
                   </div>
                   <div>
-                    <strong>Deadline:</strong>{" "}
+                    <strong>Tenggat Waktu:</strong>{" "}
                     {new Date(formData.deadline).toLocaleDateString("id-ID")}
                   </div>
                 </div>
@@ -663,13 +662,13 @@ export default function ProjectWizard() {
               {/* Team Review */}
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-gray-900">
-                  Team Assignment
+                  Penugasan Tim
                 </h3>
                 <div className="bg-gray-50 rounded-xl p-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <h4 className="font-semibold mb-2">
-                        Team Members ({formData.pegawai_assignments.length})
+                        Anggota Tim ({formData.pegawai_assignments.length})
                       </h4>
                       <ul className="space-y-1">
                         {formData.pegawai_assignments.map((assignment) => {
@@ -686,7 +685,7 @@ export default function ProjectWizard() {
                     </div>
                     <div>
                       <h4 className="font-semibold mb-2">
-                        Partners ({formData.mitra_assignments.length})
+                        Mitra ({formData.mitra_assignments.length})
                       </h4>
                       <ul className="space-y-1">
                         {formData.mitra_assignments.map((assignment) => {
@@ -718,7 +717,7 @@ export default function ProjectWizard() {
           className="border-2 border-gray-200 text-gray-600 hover:bg-gray-50"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Previous
+          Sebelumnya
         </Button>
 
         <div className="flex space-x-4">
@@ -728,7 +727,7 @@ export default function ProjectWizard() {
             onClick={() => router.push("/ketua-tim/projects")}
             className="border-2 border-red-200 text-red-600 hover:bg-red-50"
           >
-            Cancel
+            Batal
           </Button>
 
           {currentStep < 3 ? (
@@ -737,7 +736,7 @@ export default function ProjectWizard() {
               disabled={!validateStep(currentStep)}
               className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
             >
-              Next
+              Berikutnya
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           ) : (
@@ -749,12 +748,12 @@ export default function ProjectWizard() {
               {submitting ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Creating...
+                  Membuat...
                 </>
               ) : (
                 <>
                   <CheckCircle className="w-4 h-4 mr-2" />
-                  Create Project
+                  Buat Proyek
                 </>
               )}
             </Button>

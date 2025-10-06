@@ -325,7 +325,7 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
       <div className="space-y-8">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
-          <p>Loading project details...</p>
+          <p>Memuat detail proyek...</p>
         </div>
       </div>
     );
@@ -336,15 +336,13 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
       <div className="text-center py-12">
         <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
         <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          Project not found
+          Proyek tidak ditemukan
         </h3>
-        <p className="text-gray-500 mb-6">
-          The project you&apos;re looking for doesn&apos;t exist.
-        </p>
+        <p className="text-gray-500 mb-6">Proyek yang Anda cari tidak ada.</p>
         <Button asChild>
           <Link href="/ketua-tim/projects">
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Projects
+            Kembali ke Proyek
           </Link>
         </Button>
       </div>
@@ -368,12 +366,12 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
             className="border-2 border-gray-200 text-gray-600 hover:bg-gray-50"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back
+            Kembali
           </Button>
           <div>
             <div className="flex items-center space-x-3 mb-2">
               <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-                Edit Project
+                Ubah Proyek
               </h1>
               <Badge
                 className={`${getStatusColor(formData.status)} border flex items-center space-x-1`}
@@ -383,7 +381,7 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
               </Badge>
             </div>
             <p className="text-gray-600 text-lg">
-              Update project details and team assignments
+              Perbarui detail proyek dan penugasan tim
             </p>
           </div>
         </div>
@@ -399,7 +397,7 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
             ) : (
               <Save className="w-4 h-4 mr-2" />
             )}
-            Save Changes
+            Simpan Perubahan
           </Button>
         </div>
       </div>
@@ -420,9 +418,9 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
               </div>
               <div className="ml-3">
                 <div className="text-sm font-medium text-gray-900">
-                  {step === 1 && "Basic Info"}
-                  {step === 2 && "Team & Partners"}
-                  {step === 3 && "Review"}
+                  {step === 1 && "Informasi Dasar"}
+                  {step === 2 && "Tim & Mitra"}
+                  {step === 3 && "Tinjau"}
                 </div>
               </div>
               {step < 3 && (
@@ -445,9 +443,9 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
         onValueChange={(value) => setCurrentStep(parseInt(value))}
       >
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="1">Basic Info</TabsTrigger>
-          <TabsTrigger value="2">Team & Partners</TabsTrigger>
-          <TabsTrigger value="3">Review</TabsTrigger>
+          <TabsTrigger value="1">Informasi Dasar</TabsTrigger>
+          <TabsTrigger value="2">Tim & Mitra</TabsTrigger>
+          <TabsTrigger value="3">Tinjau</TabsTrigger>
         </TabsList>
 
         {/* Step 1: Basic Information */}
@@ -456,14 +454,14 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
             <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6">
               <div className="leading-none font-semibold flex items-center">
                 <FileText className="w-5 h-5 mr-2" />
-                Project Information
+                Informasi Proyek
               </div>
             </div>
             <div className="p-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label htmlFor="nama_project" className="text-sm font-medium">
-                    Project Name *
+                    Nama Proyek *
                   </Label>
                   <Input
                     id="nama_project"
@@ -471,7 +469,7 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
                     onChange={(e) =>
                       setFormData({ ...formData, nama_project: e.target.value })
                     }
-                    placeholder="Enter project name"
+                    placeholder="Masukkan nama proyek"
                     className="border-2 border-gray-200 focus:border-blue-500"
                   />
                 </div>
@@ -499,7 +497,7 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
 
               <div className="space-y-2">
                 <Label htmlFor="deskripsi" className="text-sm font-medium">
-                  Description *
+                  Deskripsi *
                 </Label>
                 <Textarea
                   id="deskripsi"
@@ -507,7 +505,7 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
                   onChange={(e) =>
                     setFormData({ ...formData, deskripsi: e.target.value })
                   }
-                  placeholder="Enter project description"
+                  placeholder="Masukkan deskripsi proyek"
                   rows={4}
                   className="border-2 border-gray-200 focus:border-blue-500"
                 />
@@ -519,7 +517,7 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
                     htmlFor="tanggal_mulai"
                     className="text-sm font-medium"
                   >
-                    Start Date *
+                    Tanggal Mulai *
                   </Label>
                   <Input
                     id="tanggal_mulai"
@@ -536,7 +534,7 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="deadline" className="text-sm font-medium">
-                    Deadline *
+                    Tenggat Waktu *
                   </Label>
                   <Input
                     id="deadline"
@@ -561,15 +559,17 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
               <div className="bg-gradient-to-r from-green-600 to-teal-600 text-white p-6">
                 <div className="leading-none font-semibold flex items-center">
                   <Users className="w-5 h-5 mr-2" />
-                  Team Members
+                  Anggota Tim
                 </div>
               </div>
               <div className="p-6 space-y-4">
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">Add Team Member</Label>
+                  <Label className="text-sm font-medium">
+                    Tambah Anggota Tim
+                  </Label>
                   <Select onValueChange={addPegawai}>
                     <SelectTrigger className="border-2 border-gray-200 focus:border-green-500">
-                      <SelectValue placeholder="Select team member" />
+                      <SelectValue placeholder="Pilih anggota tim" />
                     </SelectTrigger>
                     <SelectContent>
                       {users
@@ -626,15 +626,15 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
               <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6">
                 <div className="leading-none font-semibold flex items-center">
                   <Users className="w-5 h-5 mr-2" />
-                  Partners
+                  Mitra
                 </div>
               </div>
               <div className="p-6 space-y-4">
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">Add Partner</Label>
+                  <Label className="text-sm font-medium">Tambah Mitra</Label>
                   <Select onValueChange={addMitra}>
                     <SelectTrigger className="border-2 border-gray-200 focus:border-purple-500">
-                      <SelectValue placeholder="Select partner" />
+                      <SelectValue placeholder="Pilih mitra" />
                     </SelectTrigger>
                     <SelectContent>
                       {mitra
@@ -702,17 +702,17 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold text-gray-900">
-                    Team Assignment
+                    Penugasan Tim
                   </h3>
                   <div className="space-y-2">
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Team Members:</span>
+                      <span className="text-gray-600">Anggota Tim:</span>
                       <span className="font-medium">
                         {selectedPegawai.length}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Partners:</span>
+                      <span className="text-gray-600">Mitra:</span>
                       <span className="font-medium">
                         {selectedMitra.length}
                       </span>
@@ -722,11 +722,11 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
 
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold text-gray-900">
-                    Project Details
+                    Detail Proyek
                   </h3>
                   <div className="space-y-2">
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Name:</span>
+                      <span className="text-gray-600">Nama:</span>
                       <span className="font-medium">
                         {formData.nama_project}
                       </span>
@@ -738,7 +738,7 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
                       </Badge>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Start Date:</span>
+                      <span className="text-gray-600">Tanggal Mulai:</span>
                       <span className="font-medium">
                         {new Date(formData.tanggal_mulai).toLocaleDateString(
                           "id-ID",
@@ -746,7 +746,7 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Deadline:</span>
+                      <span className="text-gray-600">Tenggat Waktu:</span>
                       <span className="font-medium">
                         {new Date(formData.deadline).toLocaleDateString(
                           "id-ID",
@@ -759,7 +759,7 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
 
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-gray-900">
-                  Description
+                  Deskripsi
                 </h3>
                 <p className="text-gray-700 bg-gray-50 p-4 rounded-lg">
                   {formData.deskripsi}
