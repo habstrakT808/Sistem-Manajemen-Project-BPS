@@ -394,10 +394,13 @@ async function getComprehensiveScheduleData(
       id,
       deskripsi_tugas,
       tanggal_tugas,
+      start_date,
+      end_date,
       status,
       project_id,
       assignee_user_id,
-      pegawai_id
+      pegawai_id,
+      updated_at
     `,
     )
     .or(`assignee_user_id.eq.${userId},pegawai_id.eq.${userId}`)
@@ -496,17 +499,47 @@ async function getComprehensiveScheduleData(
   }
 
   // Format tasks
-  const formattedTasks: ScheduleTask[] =
-    (tasks as any[] | null)?.map((task) => ({
-      id: task.id,
-      deskripsi_tugas: task.deskripsi_tugas,
-      tanggal_tugas: task.tanggal_tugas,
-      status: task.status,
-      project_name:
-        projectDetails[task.project_id]?.nama_project || "Unknown Project",
-      project_status: projectDetails[task.project_id]?.status || "unknown",
-      project_id: task.project_id,
-    })) || [];
+  let formattedTasks: ScheduleTask[] =
+    (tasks as any[] | null)?.map((task) => {
+      const start = (task as any).start_date || task.tanggal_tugas;
+      const rawEnd = (task as any).end_date || task.tanggal_tugas;
+      let effectiveEnd = rawEnd;
+      if (task.status === "completed" && task.updated_at) {
+        const completedDay = String(task.updated_at).slice(0, 10);
+        if (completedDay && completedDay < rawEnd) {
+          effectiveEnd = completedDay;
+        }
+      }
+      return {
+        id: task.id,
+        deskripsi_tugas: task.deskripsi_tugas,
+        tanggal_tugas: task.tanggal_tugas,
+        start_date: start,
+        end_date: rawEnd,
+        effective_end_date: effectiveEnd,
+        updated_at: task.updated_at,
+        status: task.status,
+        project_name:
+          projectDetails[task.project_id]?.nama_project || "Unknown Project",
+        project_status: projectDetails[task.project_id]?.status || "unknown",
+        project_id: task.project_id,
+      } as any;
+    }) || [];
+
+  // Filter out any legacy testing artifacts that might still exist in DB
+  // e.g., English placeholder tasks used previously for transport testing
+  const TEST_TITLES = new Set<string>([
+    "This task has pending transport allocations",
+    "This task has allocated transport",
+  ]);
+  formattedTasks = formattedTasks.filter((t) => {
+    const desc = (t.deskripsi_tugas || "").trim();
+    const isTestTitle = TEST_TITLES.has(desc);
+    const isTestProject =
+      (t.project_name || "").toLowerCase() ===
+      "test project for transport".toLowerCase();
+    return !isTestTitle && !isTestProject;
+  });
 
   // Format events
   const formattedEvents: PersonalEvent[] =
@@ -535,6 +568,30 @@ async function getComprehensiveScheduleData(
       .length,
   };
 
+  // Build task span indicators per day within the month window
+  // We will return them piggybacking on workload_indicators to avoid schema change
+  const taskSpanCounts: Record<string, number> = {};
+  const monthStartLocal = parseYMDToLocalDate(startDate);
+  const monthEndParsed = parseYMDToLocalDate(endDate);
+  for (const t of formattedTasks as any[]) {
+    const spanStart = parseYMDToLocalDate(
+      (t.start_date as string).slice(0, 10),
+    );
+    const spanEnd = parseYMDToLocalDate(
+      ((t as any).effective_end_date as string).slice(0, 10),
+    );
+    const s = spanStart > monthStartLocal ? spanStart : monthStartLocal;
+    const e = spanEnd < monthEndParsed ? spanEnd : monthEndParsed;
+    if (isNaN(s.getTime()) || isNaN(e.getTime()) || s > e) continue;
+    const cursor = new Date(s.getFullYear(), s.getMonth(), s.getDate());
+    const endInc = new Date(e.getFullYear(), e.getMonth(), e.getDate());
+    while (cursor <= endInc) {
+      const key = formatYMDLocal(cursor);
+      taskSpanCounts[key] = (taskSpanCounts[key] || 0) + 1;
+      cursor.setDate(cursor.getDate() + 1);
+    }
+  }
+
   // Compute project spans per day within the month for assigned projects
   let projectSpans: ProjectSpanDay[] = [];
   try {
@@ -548,10 +605,43 @@ async function getComprehensiveScheduleData(
     console.warn("Project spans calculation error:", error);
   }
 
+  // Build a full-month indicator list driven by task span counts
+  const monthStartObj = parseYMDToLocalDate(startDate);
+  const monthEndObj = parseYMDToLocalDate(endDate);
+  const indicatorDays: any[] = [];
+  {
+    const cursor = new Date(
+      monthStartObj.getFullYear(),
+      monthStartObj.getMonth(),
+      monthStartObj.getDate(),
+    );
+    const endInc = new Date(
+      monthEndObj.getFullYear(),
+      monthEndObj.getMonth(),
+      monthEndObj.getDate(),
+    );
+    while (cursor <= endInc) {
+      const key = formatYMDLocal(cursor);
+      const spanCount = taskSpanCounts[key] || 0;
+      let level: "low" | "medium" | "high";
+      if (spanCount <= 2) level = "low";
+      else if (spanCount <= 4) level = "medium";
+      else level = "high";
+      indicatorDays.push({
+        date: key,
+        workload_level: level,
+        event_count: 0,
+        task_count: 0,
+        task_span_count: spanCount,
+      });
+      cursor.setDate(cursor.getDate() + 1);
+    }
+  }
+
   return {
     tasks: formattedTasks,
     events: formattedEvents,
-    workload_indicators: workloadData || [],
+    workload_indicators: indicatorDays,
     project_spans: projectSpans,
     monthly_summary: monthlySummary,
     month,

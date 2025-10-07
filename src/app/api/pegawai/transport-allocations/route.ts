@@ -3,9 +3,11 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import type { Database } from "@/../database/types/database.types";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const supabase = await createClient();
+    const { searchParams } = new URL(request.url);
+    const projectIdFilter = searchParams.get("project_id");
     const serviceClient = createServiceClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -73,6 +75,10 @@ export async function GET() {
 
       // Create lookup map
       tasks?.forEach((task: any) => {
+        // Apply project filter early if provided
+        if (projectIdFilter && String(task.project_id) !== projectIdFilter) {
+          return;
+        }
         taskDetails[task.id] = {
           title: task.title || "Unknown Task",
           project_id: task.project_id,
@@ -92,8 +98,7 @@ export async function GET() {
       const { data: projects, error: projectsError } = await serviceClient
         .from("projects")
         .select("id, nama_project, team_id")
-        .in("id", projectIds)
-        .not("team_id", "is", null);
+        .in("id", projectIds);
 
       if (projectsError) {
         console.error("Error fetching projects:", projectsError);
@@ -116,12 +121,24 @@ export async function GET() {
       allocations
         ?.filter((allocation: any) => {
           const task = taskDetails[allocation.task_id];
-          // keep only allocations whose task.project is still in projectDetails (team still exists)
-          return task && projectDetails[task.project_id];
+          if (!task) return false;
+          if (projectIdFilter && String(task.project_id) !== projectIdFilter) {
+            return false;
+          }
+          const project = projectDetails[task.project_id];
+          // remove known dummy/test titles or projects
+          const isDummyTitle = String(task.title || "")
+            .toLowerCase()
+            .includes("task with ");
+          const isDummyProject = String(project?.nama_project || "")
+            .toLowerCase()
+            .includes("test project for transport");
+          if (isDummyTitle || isDummyProject) return false;
+          return true;
         })
         .map((allocation: any) => {
           const task = taskDetails[allocation.task_id];
-          const project = task ? projectDetails[task.project_id] : null;
+          const project = projectDetails[task.project_id];
 
           return {
             id: allocation.id,
@@ -131,16 +148,38 @@ export async function GET() {
             allocated_at: allocation.allocated_at,
             canceled_at: allocation.canceled_at,
             task: {
-              title: task?.title || "Unknown Task",
-              project_name: project?.nama_project || "Unknown Project",
-              start_date: task?.start_date || "",
-              end_date: task?.end_date || "",
+              title: task.title || "",
+              project_name: project?.nama_project || "",
+              start_date: task.start_date || "",
+              end_date: task.end_date || "",
             },
           };
         }) || [];
 
+    // Build global locked dates across all projects for this user, excluding dummy/test data
+    const lockedDates = Array.from(
+      new Set(
+        (allocations || [])
+          .filter((a: any) => a.allocation_date && !a.canceled_at)
+          .filter((a: any) => {
+            const task = taskDetails[a.task_id];
+            if (!task) return false;
+            const project = projectDetails[task.project_id];
+            const isDummyTitle = String(task.title || "")
+              .toLowerCase()
+              .includes("task with ");
+            const isDummyProject = String(project?.nama_project || "")
+              .toLowerCase()
+              .includes("test project for transport");
+            return !(isDummyTitle || isDummyProject);
+          })
+          .map((a: any) => String(a.allocation_date).slice(0, 10)),
+      ),
+    );
+
     return NextResponse.json({
       allocations: transformedAllocations,
+      locked_dates: lockedDates,
     });
   } catch (error) {
     console.error("Transport allocations error:", error);

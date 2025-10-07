@@ -79,7 +79,8 @@ export default function MitraReviews() {
   const [items, setItems] = useState<MitraListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
-  const [jenis, setJenis] = useState<string>("all");
+  // Star filter: "all" or "0".."5"
+  const [stars, setStars] = useState<string>("all");
   const [selected, setSelected] = useState<MitraListItem | null>(null);
   const [detail, setDetail] = useState<MitraDetail | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -89,7 +90,7 @@ export default function MitraReviews() {
     try {
       const params = new URLSearchParams();
       if (search) params.set("search", search);
-      if (jenis) params.set("jenis", jenis);
+      if (stars && stars !== "all") params.set("stars", stars);
       const res = await fetch(
         `/api/ketua-tim/mitra-reviews?${params.toString()}`,
       );
@@ -105,7 +106,7 @@ export default function MitraReviews() {
     } finally {
       setLoading(false);
     }
-  }, [search, jenis]);
+  }, [search, stars]);
 
   const openDetail = useCallback(async (item: MitraListItem) => {
     setSelected(item);
@@ -178,14 +179,18 @@ export default function MitraReviews() {
             className="pl-10"
           />
         </div>
-        <Select value={jenis} onValueChange={setJenis}>
+        <Select value={stars} onValueChange={setStars}>
           <SelectTrigger className="w-48">
-            <SelectValue placeholder="Jenis Mitra" />
+            <SelectValue placeholder="Filter Bintang" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Semua</SelectItem>
-            <SelectItem value="perusahaan">Perusahaan</SelectItem>
-            <SelectItem value="individu">Individu</SelectItem>
+            <SelectItem value="all">Semua Bintang</SelectItem>
+            <SelectItem value="0">Bintang 0</SelectItem>
+            <SelectItem value="1">Bintang 1</SelectItem>
+            <SelectItem value="2">Bintang 2</SelectItem>
+            <SelectItem value="3">Bintang 3</SelectItem>
+            <SelectItem value="4">Bintang 4</SelectItem>
+            <SelectItem value="5">Bintang 5</SelectItem>
           </SelectContent>
         </Select>
         <Button
@@ -270,7 +275,7 @@ export default function MitraReviews() {
       </div>
 
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="max-w-5xl p-0 overflow-hidden">
+        <DialogContent className="w-full sm:max-w-lg md:max-w-2xl lg:max-w-3xl p-0 overflow-hidden">
           <DialogHeader>
             <div className="p-6 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600">
               <div className="flex items-start justify-between">

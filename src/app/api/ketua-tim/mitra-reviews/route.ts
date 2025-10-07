@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient();
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search")?.trim().toLowerCase() || "";
-    const jenis = searchParams.get("jenis"); // perusahaan | individu | all
+    const starsParam = searchParams.get("stars"); // "0".."5" or undefined
 
     // Auth check
     const {
@@ -35,28 +35,20 @@ export async function GET(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
-    // Check if user is ketua_tim in any team (team-specific role validation)
-    const { data: teamMemberships, error: _membershipError } = await svc
-      .from("project_members")
-      .select(
-        `
-        role,
-        projects!inner (
-          ketua_tim_id
-        )
-      `,
-      )
-      .eq("user_id", user.id)
-      .eq("role", "leader");
+    // Check ownership: user must be ketua or leader for any project
+    const { data: ownedProjects } = await svc
+      .from("projects")
+      .select("id")
+      .or(`ketua_tim_id.eq.${user.id},leader_user_id.eq.${user.id}`)
+      .limit(1);
 
-    // Check if user is a leader in any team
-    const isKetuaTim = (teamMemberships || []).length > 0;
+    const isOwner = (ownedProjects || []).length > 0;
 
-    if (!isKetuaTim) {
+    if (!isOwner) {
       return NextResponse.json(
         {
           error: "Forbidden",
-          details: "User must be a team leader to access this endpoint",
+          details: "User must be a project leader to access this endpoint",
         },
         { status: 403 },
       );
@@ -129,8 +121,12 @@ export async function GET(request: NextRequest) {
       }),
     );
 
-    if (jenis && jenis !== "all") {
-      items = items.filter((i) => i.jenis === jenis);
+    // Star filter by floored average rating (e.g., 4.5 => 4)
+    if (typeof starsParam === "string" && starsParam !== "all") {
+      const target = Math.max(0, Math.min(5, Number(starsParam)));
+      if (!Number.isNaN(target)) {
+        items = items.filter((i) => Math.floor(i.rating_average) === target);
+      }
     }
     if (search) {
       items = items.filter((i) => i.nama_mitra.toLowerCase().includes(search));

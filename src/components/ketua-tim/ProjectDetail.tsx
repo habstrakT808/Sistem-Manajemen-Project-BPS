@@ -39,6 +39,8 @@ interface ProjectDetailData {
     assignee_id: string;
     uang_transport: number | null;
     honor: number | null;
+    calculated_transport_total?: number; // computed on server from earnings_ledger
+    calculated_honor_total?: number; // computed on server from tasks.honor_amount
     users?: { nama_lengkap: string; email: string };
     mitra?: { nama_mitra: string; jenis: string; rating_average: number };
   }>;
@@ -48,6 +50,11 @@ interface ProjectDetailData {
     role: "leader" | "member";
     user?: { nama_lengkap: string; email: string } | null;
   }>;
+  // Progress fields computed on server
+  progress_overall_percent?: number;
+  tasks_completed?: number;
+  tasks_in_progress?: number;
+  tasks_pending?: number;
 }
 
 interface ProjectDetailProps {
@@ -111,7 +118,9 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
     if (!project) return 0;
     const assignments = project.project_assignments || [];
     return assignments.reduce((total, a) => {
-      return total + (a.uang_transport || 0) + (a.honor || 0);
+      const transport = a.calculated_transport_total ?? a.uang_transport ?? 0;
+      const honor = a.calculated_honor_total ?? a.honor ?? 0;
+      return total + transport + honor;
     }, 0);
   };
 
@@ -396,10 +405,12 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
                 </div>
                 <div className="text-lg font-semibold text-gray-900">
                   {formatCurrency(
-                    pegawaiAssignments.reduce(
-                      (sum, a) => sum + (a.uang_transport || 0),
-                      0,
-                    ),
+                    pegawaiAssignments.reduce((sum, a) => {
+                      const val =
+                        (a as any).calculated_transport_total ??
+                        (a.uang_transport || 0);
+                      return sum + val;
+                    }, 0),
                   )}
                 </div>
               </div>
@@ -407,10 +418,11 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
                 <div className="text-sm font-medium text-gray-600">Honor</div>
                 <div className="text-lg font-semibold text-gray-900">
                   {formatCurrency(
-                    mitraAssignments.reduce(
-                      (sum, a) => sum + (a.honor || 0),
-                      0,
-                    ),
+                    mitraAssignments.reduce((sum, a) => {
+                      const val =
+                        (a as any).calculated_honor_total ?? (a.honor || 0);
+                      return sum + val;
+                    }, 0),
                   )}
                 </div>
               </div>
@@ -496,7 +508,10 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
                         </div>
                         <div className="text-right">
                           <div className="font-semibold text-gray-900">
-                            {formatCurrency(assignment.uang_transport || 0)}
+                            {formatCurrency(
+                              (assignment as any).calculated_transport_total ??
+                                (assignment.uang_transport || 0),
+                            )}
                           </div>
                           <div className="text-sm text-gray-500">Transport</div>
                         </div>
@@ -559,7 +574,10 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
                         </div>
                         <div className="text-right">
                           <div className="font-semibold text-gray-900">
-                            {formatCurrency(assignment.honor || 0)}
+                            {formatCurrency(
+                              (assignment as any).calculated_honor_total ??
+                                (assignment.honor || 0),
+                            )}
                           </div>
                           <div className="text-sm text-gray-500">Honor</div>
                         </div>
@@ -584,13 +602,15 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
               <div className="space-y-6">
                 <div className="text-center">
                   <div className="text-4xl font-bold text-green-600 mb-2">
-                    0%
+                    {`${project.progress_overall_percent ?? 0}%`}
                   </div>
                   <div className="text-gray-500">Overall Progress</div>
                   <div className="w-full bg-gray-200 rounded-full h-3 mt-4">
                     <div
                       className="bg-gradient-to-r from-green-500 to-teal-500 h-3 rounded-full transition-all duration-300"
-                      style={{ width: "0%" }}
+                      style={{
+                        width: `${project.progress_overall_percent ?? 0}%`,
+                      }}
                     ></div>
                   </div>
                 </div>
@@ -598,13 +618,13 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="text-center p-4 bg-blue-50 rounded-xl">
                     <div className="text-2xl font-bold text-blue-600 mb-1">
-                      0
+                      {project.tasks_completed ?? 0}
                     </div>
                     <div className="text-sm text-blue-700">Tasks Completed</div>
                   </div>
                   <div className="text-center p-4 bg-orange-50 rounded-xl">
                     <div className="text-2xl font-bold text-orange-600 mb-1">
-                      0
+                      {project.tasks_in_progress ?? 0}
                     </div>
                     <div className="text-sm text-orange-700">
                       Tasks In Progress
@@ -612,7 +632,7 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
                   </div>
                   <div className="text-center p-4 bg-gray-50 rounded-xl">
                     <div className="text-2xl font-bold text-gray-600 mb-1">
-                      0
+                      {project.tasks_pending ?? 0}
                     </div>
                     <div className="text-sm text-gray-700">Tasks Pending</div>
                   </div>

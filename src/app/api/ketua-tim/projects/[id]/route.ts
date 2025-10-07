@@ -177,6 +177,89 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       ...mitraAssignments,
     ];
 
+    // Compute actual spending and progress from tasks and ledger
+    // 1) Gather tasks for this project
+    const { data: projectTasks } = await (svc as any)
+      .from("tasks")
+      .select(
+        "id, project_id, assignee_user_id, assignee_mitra_id, status, honor_amount",
+      )
+      .eq("project_id", projectId);
+
+    // Task progress
+    const totalTasks = (projectTasks || []).length;
+    const tasksCompleted = (projectTasks || []).filter(
+      (t: any) => t.status === "completed",
+    ).length;
+    const tasksInProgress = (projectTasks || []).filter(
+      (t: any) => t.status === "in_progress",
+    ).length;
+    const tasksPending = (projectTasks || []).filter(
+      (t: any) => t.status === "pending",
+    ).length;
+    const progressOverallPercent = totalTasks
+      ? Math.round((tasksCompleted / totalTasks) * 100)
+      : 0;
+
+    // 2) Transport actuals via allocations + earnings_ledger
+    const taskIds = (projectTasks || []).map((t: any) => t.id);
+    const { data: allocations } = taskIds.length
+      ? await (svc as any)
+          .from("task_transport_allocations")
+          .select("id, task_id")
+          .in("task_id", taskIds)
+          .is("canceled_at", null)
+      : { data: [] };
+    const allocationIds = (allocations || []).map((a: any) => a.id);
+    const { data: ledgerRows } = allocationIds.length
+      ? await (svc as any)
+          .from("earnings_ledger")
+          .select("user_id, amount, source_id")
+          .eq("type", "transport")
+          .in("source_id", allocationIds)
+      : { data: [] };
+    const transportByUser = new Map<string, number>();
+    (ledgerRows || []).forEach((e: any) => {
+      const uid = e.user_id as string;
+      const amt = Number(e.amount || 0);
+      transportByUser.set(uid, (transportByUser.get(uid) || 0) + amt);
+    });
+
+    // 3) Mitra honor actuals via tasks.honor_amount
+    const honorByMitra = new Map<string, number>();
+    (projectTasks || [])
+      .filter(
+        (t: any) => t.assignee_mitra_id && Number(t.honor_amount || 0) > 0,
+      )
+      .forEach((t: any) => {
+        const mid = t.assignee_mitra_id as string;
+        honorByMitra.set(
+          mid,
+          (honorByMitra.get(mid) || 0) + Number(t.honor_amount || 0),
+        );
+      });
+
+    // Attach computed totals into assignments if present
+    (project as any).project_assignments = (
+      project as any
+    ).project_assignments.map((a: any) => {
+      if (a.assignee_type === "pegawai") {
+        const computed = transportByUser.get(a.assignee_id) || 0;
+        return { ...a, calculated_transport_total: computed };
+      }
+      if (a.assignee_type === "mitra") {
+        const computed = honorByMitra.get(a.assignee_id) || 0;
+        return { ...a, calculated_honor_total: computed };
+      }
+      return a;
+    });
+
+    // Expose progress summary fields
+    (project as any).progress_overall_percent = progressOverallPercent;
+    (project as any).tasks_completed = tasksCompleted;
+    (project as any).tasks_in_progress = tasksInProgress;
+    (project as any).tasks_pending = tasksPending;
+
     return NextResponse.json({ data: project });
   } catch (error) {
     console.error("Project detail fetch error:", error);

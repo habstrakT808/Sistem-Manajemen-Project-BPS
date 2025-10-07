@@ -225,12 +225,20 @@ export async function GET(request: Request) {
       });
     }
 
-    // Remove known testing/dummy tasks from results
-    const cleanedTasks = scopedTasks.filter(
-      (t) =>
-        t.title !== "Task with Allocated Transport" &&
-        t.title !== "Task with Pending Transport",
-    );
+    // Remove known testing/dummy tasks & projects from results
+    const cleanedTasks = scopedTasks.filter((t) => {
+      const title = (t.title || "").toLowerCase();
+      const desc = (t.deskripsi_tugas || "").toLowerCase();
+      const projectName = (
+        projectDetails[t.project_id]?.nama_project || ""
+      ).toLowerCase();
+      const isDummyTitle =
+        title.includes("task with allocated transport") ||
+        title.includes("task with pending transport");
+      const isDummyProject = projectName.includes("test project for transport");
+      const isDummyDesc = desc.includes("dummy") || desc.includes("testing");
+      return !(isDummyTitle || isDummyProject || isDummyDesc);
+    });
 
     // Format response
     const formattedTasks = cleanedTasks.map((task) => ({

@@ -27,12 +27,22 @@ interface TransportAllocation {
   };
 }
 
+function buildGlobalLockedDates(allocs: TransportAllocation[]): Set<string> {
+  const s = new Set<string>();
+  allocs.forEach((a) => {
+    if (a.allocation_date && !a.canceled_at) s.add(String(a.allocation_date));
+  });
+  return s;
+}
+
 interface TransportCalendarProps {
   onAllocationUpdate?: () => void;
+  projectId?: string | null;
 }
 
 export default function TransportCalendar({
   onAllocationUpdate,
+  projectId,
 }: TransportCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [allocations, setAllocations] = useState<TransportAllocation[]>([]);
@@ -41,6 +51,7 @@ export default function TransportCalendar({
     useState<TransportAllocation | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [isEditMode, setIsEditMode] = useState(false);
+  const [lockedDates, setLockedDates] = useState<Set<string>>(new Set());
 
   // Get first day of current month
   const firstDayOfMonth = new Date(
@@ -71,12 +82,57 @@ export default function TransportCalendar({
 
   const fetchAllocations = async () => {
     try {
-      // Use real route for production data
-      const response = await fetch("/api/pegawai/transport-allocations");
+      // 1) Always load global locked dates first
+      const globalRes = await fetch(`/api/pegawai/transport-allocations`, {
+        cache: "no-store",
+      });
+      if (globalRes.ok) {
+        const globalJson = await globalRes.json();
+        if (Array.isArray(globalJson.locked_dates)) {
+          setLockedDates(new Set(globalJson.locked_dates as string[]));
+          console.log(
+            "[TransportCalendar] GLOBAL locked_dates:",
+            globalJson.locked_dates,
+          );
+        } else if (Array.isArray(globalJson.allocations)) {
+          setLockedDates(buildGlobalLockedDates(globalJson.allocations));
+          console.log(
+            "[TransportCalendar] GLOBAL locked from allocations (fallback)",
+          );
+        }
+      }
+
+      // 2) Then load allocations for selected project (or all)
+      const qs = projectId
+        ? `?project_id=${encodeURIComponent(projectId)}`
+        : "";
+      const response = await fetch(`/api/pegawai/transport-allocations${qs}`, {
+        cache: "no-store",
+      });
       if (!response.ok) throw new Error("Failed to fetch allocations");
 
       const data = await response.json();
-      setAllocations(data.allocations || []);
+      const arr = Array.isArray(data.allocations) ? data.allocations : [];
+      setAllocations(arr);
+      // Jika endpoint per-proyek mengirim locked_dates non-kosong, gabungkan (union) dengan global agar tidak hilang
+      if (
+        Array.isArray(data.locked_dates) &&
+        (data.locked_dates as any[]).length > 0
+      ) {
+        setLockedDates((prev) => {
+          const merged = new Set(prev);
+          (data.locked_dates as string[]).forEach((d) => merged.add(d));
+          return merged;
+        });
+        console.log(
+          "[TransportCalendar] PROJECT locked_dates (merged):",
+          data.locked_dates,
+        );
+      } else {
+        console.log(
+          "[TransportCalendar] PROJECT locked_dates empty, keep GLOBAL",
+        );
+      }
     } catch (error) {
       console.error("Error fetching allocations:", error);
       toast.error("Failed to load transport allocations");
@@ -87,7 +143,7 @@ export default function TransportCalendar({
 
   useEffect(() => {
     fetchAllocations();
-  }, []);
+  }, [projectId]);
 
   const handleAllocateTransport = async () => {
     if (!selectedAllocation || !selectedDate) return;
@@ -169,12 +225,15 @@ export default function TransportCalendar({
     );
   };
 
+  const isLockedDate = (day: number) => {
+    const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    return lockedDates.has(dateStr);
+  };
+
   const getPendingAllocations = () => {
     const pending = allocations.filter(
       (allocation) => !allocation.allocation_date && !allocation.canceled_at,
     );
-    console.log("🔍 DEBUG: All allocations:", allocations);
-    console.log("🔍 DEBUG: Pending allocations:", pending);
     return pending;
   };
 
@@ -274,16 +333,16 @@ export default function TransportCalendar({
 
   if (loading) {
     return (
-      <Card>
+      <Card className="border-green-100">
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
+          <CardTitle className="flex items-center space-x-2 text-emerald-800">
             <Calendar className="w-5 h-5" />
-            <span>Transport Calendar</span>
+            <span>Kalender Transport</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
           </div>
         </CardContent>
       </Card>
@@ -291,14 +350,17 @@ export default function TransportCalendar({
   }
 
   return (
-    <div className="space-y-6">
+    <div
+      className="space-y-6"
+      data-lock-debug={JSON.stringify(Array.from(lockedDates))}
+    >
       {/* Pending Allocations */}
       {pendingAllocationsByTask.length > 0 && (
-        <Card className="border-orange-200 bg-orange-50">
+        <Card className="border-emerald-200 bg-emerald-50">
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2 text-orange-800">
+            <CardTitle className="flex items-center space-x-2 text-emerald-800">
               <AlertCircle className="w-5 h-5" />
-              <span>Pending Transport Allocations</span>
+              <span>Alokasi Transport Menunggu</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -306,7 +368,7 @@ export default function TransportCalendar({
               {pendingAllocationsByTask.map((taskGroup) => (
                 <div
                   key={taskGroup.task.title}
-                  className="p-4 bg-white rounded-lg border border-orange-200"
+                  className="p-4 bg-white rounded-lg border border-emerald-200"
                 >
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex-1">
@@ -316,23 +378,23 @@ export default function TransportCalendar({
                       <p className="text-sm text-gray-600">
                         {taskGroup.task.project_name}
                       </p>
-                      <p className="text-sm font-medium text-orange-600">
-                        {taskGroup.allocations.length} of{" "}
-                        {taskGroup.requiredDays} transport days pending • Total:
-                        Rp {taskGroup.totalAmount.toLocaleString()}
+                      <p className="text-sm font-medium text-emerald-700">
+                        {taskGroup.allocations.length} dari{" "}
+                        {taskGroup.requiredDays} hari transport belum
+                        dialokasikan • Total: Rp{" "}
+                        {taskGroup.totalAmount.toLocaleString()}
                       </p>
-                      <div className="w-full bg-orange-200 rounded-full h-2 mt-2">
+                      <div className="w-full bg-emerald-200 rounded-full h-2 mt-2">
                         <div
-                          className="bg-orange-600 h-2 rounded-full transition-all duration-300"
+                          className="bg-emerald-600 h-2 rounded-full transition-all duration-300"
                           style={{
                             width: `${((taskGroup.requiredDays - taskGroup.allocations.length) / taskGroup.requiredDays) * 100}%`,
                           }}
                         ></div>
                       </div>
-                      <p className="text-xs text-orange-500 mt-1">
+                      <p className="text-xs text-emerald-600 mt-1">
                         {taskGroup.requiredDays - taskGroup.allocations.length}{" "}
-                        days allocated, {taskGroup.allocations.length} days
-                        remaining
+                        hari teralokasi, {taskGroup.allocations.length} tersisa
                       </p>
                     </div>
                   </div>
@@ -342,10 +404,11 @@ export default function TransportCalendar({
                         key={allocation.id}
                         onClick={() => setSelectedAllocation(allocation)}
                         size="sm"
-                        className="bg-orange-600 hover:bg-orange-700"
+                        className="bg-emerald-600 hover:bg-emerald-700"
                       >
                         <MapPin className="w-3 h-3 mr-1" />
-                        Allocate Day {index + 1} of {taskGroup.requiredDays}
+                        Alokasikan Hari {index + 1} dari{" "}
+                        {taskGroup.requiredDays}
                       </Button>
                     ))}
                   </div>
@@ -356,102 +419,21 @@ export default function TransportCalendar({
         </Card>
       )}
 
-      {/* Allocated Allocations */}
-      {allocatedAllocationsByTask.length > 0 && (
-        <Card className="border-green-200 bg-green-50">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2 text-green-800">
-              <MapPin className="w-5 h-5" />
-              <span>Allocated Transport</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {allocatedAllocationsByTask.map((taskGroup) => (
-                <div
-                  key={taskGroup.task.title}
-                  className="p-4 bg-white rounded-lg border border-green-200"
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-gray-900">
-                        {taskGroup.task.title}
-                      </h4>
-                      <p className="text-sm text-gray-600">
-                        {taskGroup.task.project_name}
-                      </p>
-                      <p className="text-sm font-medium text-green-600">
-                        {taskGroup.allocations.length} of{" "}
-                        {taskGroup.requiredDays} transport days allocated •
-                        Total: Rp {taskGroup.totalAmount.toLocaleString()}
-                      </p>
-                      <div className="w-full bg-green-200 rounded-full h-2 mt-2">
-                        <div
-                          className="bg-green-600 h-2 rounded-full transition-all duration-300"
-                          style={{
-                            width: `${(taskGroup.allocations.length / taskGroup.requiredDays) * 100}%`,
-                          }}
-                        ></div>
-                      </div>
-                      <p className="text-xs text-green-500 mt-1">
-                        {taskGroup.allocations.length === taskGroup.requiredDays
-                          ? "All transport days allocated!"
-                          : `${taskGroup.requiredDays - taskGroup.allocations.length} days remaining`}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {taskGroup.allocations.map((allocation, index) => (
-                      <div
-                        key={allocation.id}
-                        className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-100"
-                      >
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-green-700">
-                            Day {index + 1} of {taskGroup.requiredDays}:{" "}
-                            {new Date(
-                              allocation.allocation_date!,
-                            ).toLocaleDateString("id-ID")}
-                          </p>
-                          <p className="text-xs text-green-600">
-                            Rp {allocation.amount.toLocaleString()}
-                          </p>
-                        </div>
-                        <Button
-                          onClick={() => {
-                            setSelectedAllocation(allocation);
-                            setSelectedDate(allocation.allocation_date!);
-                            setIsEditMode(true);
-                          }}
-                          size="sm"
-                          variant="outline"
-                          className="border-green-600 text-green-600 hover:bg-green-50"
-                        >
-                          <Calendar className="w-3 h-3 mr-1" />
-                          Edit
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Allocated Allocations removed as requested to keep UI clean */}
 
       {/* Calendar */}
-      <Card>
+      <Card className="border-green-100">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 text-emerald-800">
               <Calendar className="w-5 h-5" />
-              <span>Transport Calendar - {formatDate(currentDate)}</span>
+              <span>Kalender Transport - {formatDate(currentDate)}</span>
             </div>
             <div className="flex space-x-2">
               <Button
                 variant="outline"
                 size="sm"
+                className="border-green-200 hover:bg-emerald-50"
                 onClick={() => navigateMonth("prev")}
               >
                 <ChevronLeft className="w-4 h-4" />
@@ -459,6 +441,7 @@ export default function TransportCalendar({
               <Button
                 variant="outline"
                 size="sm"
+                className="border-green-200 hover:bg-emerald-50"
                 onClick={() => navigateMonth("next")}
               >
                 <ChevronRight className="w-4 h-4" />
@@ -471,7 +454,7 @@ export default function TransportCalendar({
             {["Ming", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"].map((day) => (
               <div
                 key={day}
-                className="p-2 text-center text-sm font-medium text-gray-500"
+                className="p-2 text-center text-sm font-medium text-emerald-700"
               >
                 {day}
               </div>
@@ -485,6 +468,7 @@ export default function TransportCalendar({
               }
 
               const isAllocatedDay = isAllocated(day);
+              const locked = isLockedDate(day);
               const allocationForDate = getAllocationForDate(day);
               const isToday =
                 new Date().toDateString() ===
@@ -499,20 +483,34 @@ export default function TransportCalendar({
                   key={index}
                   className={`relative p-2 text-center text-sm rounded-lg cursor-pointer transition-colors ${
                     isAllocatedDay
-                      ? "bg-red-100 text-red-800 border-2 border-red-300 font-semibold"
-                      : isToday
-                        ? "bg-blue-100 text-blue-800 font-semibold"
-                        : "hover:bg-gray-100"
+                      ? "bg-emerald-100 text-emerald-800 border-2 border-emerald-300 font-semibold"
+                      : locked
+                        ? "bg-gray-100 text-gray-700 border-2 border-gray-300 font-semibold"
+                        : isToday
+                          ? "bg-emerald-50 text-emerald-800 font-semibold"
+                          : "hover:bg-emerald-50"
                   }`}
                   title={
                     isAllocatedDay && allocationForDate
                       ? `Transport: ${allocationForDate.task.title} - ${allocationForDate.task.project_name}`
-                      : undefined
+                      : locked
+                        ? "Tanggal sudah dialokasikan pada proyek lain"
+                        : undefined
                   }
+                  onClick={() => {
+                    if (isAllocatedDay && allocationForDate) {
+                      setSelectedAllocation(allocationForDate);
+                      setSelectedDate(allocationForDate.allocation_date!);
+                      setIsEditMode(true);
+                    }
+                  }}
                 >
                   {day}
                   {isAllocatedDay && (
-                    <div className="w-2 h-2 bg-red-500 rounded-full mx-auto mt-1"></div>
+                    <div className="w-2 h-2 bg-emerald-600 rounded-full mx-auto mt-1"></div>
+                  )}
+                  {locked && !isAllocatedDay && (
+                    <div className="w-2 h-2 bg-gray-400 rounded-full mx-auto mt-1"></div>
                   )}
                 </div>
               );
@@ -527,7 +525,9 @@ export default function TransportCalendar({
           <Card className="w-full max-w-md mx-4">
             <CardHeader>
               <CardTitle>
-                {isEditMode ? "Edit Transport Date" : "Select Transport Date"}
+                {isEditMode
+                  ? "Edit Alokasi Transport"
+                  : "Pilih Tanggal Transport"}
               </CardTitle>
               <p className="text-sm text-gray-600 mt-1">
                 {(() => {
@@ -539,7 +539,7 @@ export default function TransportCalendar({
                   const currentIndex = taskAllocations.findIndex(
                     (a) => a.id === selectedAllocation.id,
                   );
-                  return `Allocating day ${currentIndex + 1} of ${taskAllocations.length} transport days`;
+                  return `Transport ke ${currentIndex + 1} dari ${taskAllocations.length}`;
                 })()}
               </p>
             </CardHeader>
@@ -551,14 +551,37 @@ export default function TransportCalendar({
                 <p className="text-sm text-gray-600">
                   {selectedAllocation.task.project_name}
                 </p>
-                <p className="text-sm font-medium text-orange-600">
-                  Amount: Rp {selectedAllocation.amount.toLocaleString()}
+                <div className="mt-2 grid grid-cols-1 gap-1 text-sm">
+                  <span className="text-emerald-800">
+                    {(() => {
+                      const taskAllocations = allocations.filter(
+                        (a) =>
+                          a.task_id === selectedAllocation.task_id &&
+                          !a.canceled_at,
+                      );
+                      const currentIndex = taskAllocations.findIndex(
+                        (a) => a.id === selectedAllocation.id,
+                      );
+                      return `Transport ke ${currentIndex + 1} dari ${taskAllocations.length}`;
+                    })()}
+                  </span>
+                  {selectedAllocation.allocation_date && (
+                    <span className="text-gray-700">
+                      Tanggal Alokasi:{" "}
+                      {new Date(
+                        selectedAllocation.allocation_date,
+                      ).toLocaleDateString("id-ID")}
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm font-medium text-emerald-700">
+                  Nominal: Rp {selectedAllocation.amount.toLocaleString()}
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">
-                  Select Date
+                <label className="block text-sm font-medium mb-2 text-emerald-800">
+                  Pilih Tanggal
                 </label>
                 <input
                   type="date"
@@ -566,10 +589,10 @@ export default function TransportCalendar({
                   onChange={(e) => setSelectedDate(e.target.value)}
                   min={selectedAllocation.task.start_date}
                   max={selectedAllocation.task.end_date}
-                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full p-2 border border-green-200 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Only dates between{" "}
+                  Hanya tanggal antara{" "}
                   {new Date(
                     selectedAllocation.task.start_date,
                   ).toLocaleDateString("id-ID")}{" "}
@@ -577,7 +600,7 @@ export default function TransportCalendar({
                   {new Date(
                     selectedAllocation.task.end_date,
                   ).toLocaleDateString("id-ID")}{" "}
-                  are allowed
+                  yang diizinkan
                 </p>
               </div>
 
@@ -589,7 +612,7 @@ export default function TransportCalendar({
                     setSelectedDate("");
                     setIsEditMode(false);
                   }}
-                  className="flex-1"
+                  className="flex-1 border-green-200 hover:bg-emerald-50"
                 >
                   Cancel
                 </Button>
@@ -598,7 +621,7 @@ export default function TransportCalendar({
                     isEditMode ? handleUpdateTransport : handleAllocateTransport
                   }
                   disabled={!selectedDate}
-                  className={`flex-1 ${isEditMode ? "bg-green-600 hover:bg-green-700" : "bg-blue-600 hover:bg-blue-700"}`}
+                  className={`flex-1 ${isEditMode ? "bg-emerald-600 hover:bg-emerald-700" : "bg-emerald-600 hover:bg-emerald-700"}`}
                 >
                   {isEditMode ? "Update Transport" : "Allocate Transport"}
                 </Button>

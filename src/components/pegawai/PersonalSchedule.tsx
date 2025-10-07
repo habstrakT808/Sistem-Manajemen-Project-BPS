@@ -75,6 +75,9 @@ interface ScheduleTask {
   id: string;
   deskripsi_tugas: string;
   tanggal_tugas: string;
+  start_date?: string;
+  end_date?: string;
+  effective_end_date?: string;
   status: "pending" | "in_progress" | "completed";
   project_name: string;
   project_status: string;
@@ -86,6 +89,7 @@ interface WorkloadIndicator {
   workload_level: "low" | "medium" | "high";
   event_count: number;
   task_count: number;
+  task_span_count?: number;
 }
 
 interface ProjectSpanDay {
@@ -362,34 +366,19 @@ export default function PersonalSchedule() {
     return scheduleData.workload_indicators.find((w) => w.date === dateString);
   };
 
-  const hasProjectSpanOnDate = (date: Date) => {
-    if (!scheduleData || !scheduleData.project_spans) return false;
-    const dateString = format(date, "yyyy-MM-dd");
-    return (
-      (scheduleData.project_spans.find((d) => d.date === dateString)
-        ?.project_count || 0) > 0
-    );
-  };
+  // Disable project span indicators on calendar (only tasks should show)
+  const hasProjectSpanOnDate = (_date: Date) => false;
 
-  const getProjectSpanCount = (date: Date) => {
-    if (!scheduleData || !scheduleData.project_spans) return 0;
-    const dateString = format(date, "yyyy-MM-dd");
-    return (
-      scheduleData.project_spans.find((d) => d.date === dateString)
-        ?.project_count || 0
-    );
-  };
+  const getProjectSpanCount = (_date: Date) => 0;
 
   const getEffectiveWorkloadLevel = (date: Date) => {
-    const w = getWorkloadForDate(date);
-    const projectCount = getProjectSpanCount(date);
-    if (!w && projectCount === 0) return null;
-    const eventCount = w?.event_count ?? 0;
-    const taskCount = w?.task_count ?? 0;
-    const total = eventCount + taskCount + projectCount;
-    if (total <= 2) return "low" as const;
-    if (total <= 4) return "medium" as const;
-    return "high" as const;
+    // Use task span concurrency for coloring per requirement
+    const w = getWorkloadForDate(date) as WorkloadIndicator | null;
+    const spanCount = w?.task_span_count ?? 0;
+    if (spanCount <= 0) return null;
+    if (spanCount <= 2) return "low" as const; // green
+    if (spanCount <= 4) return "medium" as const; // yellow for 3-4 spans
+    return "high" as const; // red for 5+
   };
 
   const isInCurrentMonth = (date: Date) => {
@@ -549,7 +538,7 @@ export default function PersonalSchedule() {
                 Tambah Acara
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
+            <DialogContent className="w-full sm:max-w-md md:max-w-lg lg:max-w-xl">
               <DialogHeader>
                 <DialogTitle>
                   {editingEvent ? "Ubah Acara" : "Buat Acara Baru"}
@@ -897,49 +886,53 @@ export default function PersonalSchedule() {
                       }}
                       modifiers={{
                         hasEvents: (date) => {
-                          // Only mark days that truly have an intersecting event (e.g., project span)
-                          const { events, tasks } = getEventsForDate(date);
+                          const w = getWorkloadForDate(
+                            date,
+                          ) as WorkloadIndicator | null;
+                          const spanCount = w?.task_span_count ?? 0;
+                          return spanCount > 0;
+                        },
+                        // Do not use deadline marker; replaced by completion/check logic
+                        deadline: (_date) => false,
+                        // New: mark a day as fully completed when all tasks that day are completed
+                        allCompletedDay: (date) => {
+                          const { tasks } = getEventsForDate(date);
                           return (
-                            events.length > 0 ||
-                            tasks.length > 0 ||
-                            hasProjectSpanOnDate(date)
+                            tasks.length > 0 &&
+                            tasks.every((t) => t.status === "completed")
                           );
                         },
-                        deadline: (date) => {
-                          const { tasks } = getEventsForDate(date);
-                          return tasks.length > 0;
-                        },
-                        projectSpanDay: (date) => hasProjectSpanOnDate(date),
+                        projectSpanDay: (_date) => false,
                         // Show workload indicators when there is at least one event/task
                         // OR the day falls within a project span. Project spans contribute to level.
                         lowWorkload: (date) => {
                           const wLevel = getEffectiveWorkloadLevel(date);
                           if (!wLevel) return false;
-                          const { events, tasks } = getEventsForDate(date);
-                          const hasSpan = hasProjectSpanOnDate(date);
+                          const w = getWorkloadForDate(
+                            date,
+                          ) as WorkloadIndicator | null;
                           return (
-                            wLevel === "low" &&
-                            (events.length > 0 || tasks.length > 0 || hasSpan)
+                            wLevel === "low" && (w?.task_span_count ?? 0) > 0
                           );
                         },
                         mediumWorkload: (date) => {
                           const wLevel = getEffectiveWorkloadLevel(date);
                           if (!wLevel) return false;
-                          const { events, tasks } = getEventsForDate(date);
-                          const hasSpan = hasProjectSpanOnDate(date);
+                          const w = getWorkloadForDate(
+                            date,
+                          ) as WorkloadIndicator | null;
                           return (
-                            wLevel === "medium" &&
-                            (events.length > 0 || tasks.length > 0 || hasSpan)
+                            wLevel === "medium" && (w?.task_span_count ?? 0) > 0
                           );
                         },
                         highWorkload: (date) => {
                           const wLevel = getEffectiveWorkloadLevel(date);
                           if (!wLevel) return false;
-                          const { events, tasks } = getEventsForDate(date);
-                          const hasSpan = hasProjectSpanOnDate(date);
+                          const w = getWorkloadForDate(
+                            date,
+                          ) as WorkloadIndicator | null;
                           return (
-                            wLevel === "high" &&
-                            (events.length > 0 || tasks.length > 0 || hasSpan)
+                            wLevel === "high" && (w?.task_span_count ?? 0) > 0
                           );
                         },
                       }}
@@ -977,12 +970,14 @@ export default function PersonalSchedule() {
                                       .toUpperCase()}
                                   </span>
                                 </Badge>
-                                <span className="text-sm text-gray-500">
-                                  {format(
-                                    parseISO(task.tanggal_tugas),
-                                    "dd MMM yyyy",
-                                    { locale: localeId },
-                                  )}
+                                <span className="text-xs text-gray-500">
+                                  {task.start_date && task.end_date
+                                    ? `${format(parseISO(task.start_date), "dd MMM yyyy", { locale: localeId })} - ${format(parseISO(task.end_date), "dd MMM yyyy", { locale: localeId })}`
+                                    : format(
+                                        parseISO(task.tanggal_tugas),
+                                        "dd MMM yyyy",
+                                        { locale: localeId },
+                                      )}
                                 </span>
                               </div>
                               <h4 className="font-semibold text-gray-900 mb-1">
@@ -1229,7 +1224,25 @@ export default function PersonalSchedule() {
                 const { events, tasks } = getEventsForDate(selectedDate);
                 const workload = getWorkloadForDate(selectedDate);
 
-                if (events.length === 0 && tasks.length === 0) {
+                // Build running tasks list (spans) for selected date
+                const runningTasks = (scheduleData?.tasks || []).filter((t) => {
+                  const s = t.start_date
+                    ? parseISO(t.start_date)
+                    : parseISO(t.tanggal_tugas);
+                  const e = t.effective_end_date
+                    ? parseISO(t.effective_end_date)
+                    : t.end_date
+                      ? parseISO(t.end_date)
+                      : parseISO(t.tanggal_tugas);
+                  const day = startOfDay(selectedDate);
+                  return day >= startOfDay(s) && day <= endOfDay(e);
+                });
+
+                if (
+                  events.length === 0 &&
+                  tasks.length === 0 &&
+                  runningTasks.length === 0
+                ) {
                   return (
                     <div className="text-center py-8">
                       <CalendarDays className="w-12 h-12 text-gray-300 mx-auto mb-4" />
@@ -1265,36 +1278,56 @@ export default function PersonalSchedule() {
                           </Badge>
                         </div>
                         <p className="text-xs text-gray-500 mt-1">
-                          {workload.event_count} acara, {workload.task_count}{" "}
-                          tugas
+                          {
+                            (scheduleData?.events || []).filter((e) => {
+                              const s = parseISO(e.start_date);
+                              const en = parseISO(e.end_date);
+                              const day = startOfDay(selectedDate);
+                              return (
+                                day >= startOfDay(s) && day <= endOfDay(en)
+                              );
+                            }).length
+                          }{" "}
+                          acara, {runningTasks.length} tugas berjalan
                         </p>
                       </div>
                     )}
 
-                    {tasks.map((task) => {
-                      const TaskStatusIcon = getTaskStatusIcon(task.status);
-                      return (
-                        <div
-                          key={task.id}
-                          className="p-3 border border-gray-200 rounded-lg"
-                        >
-                          <div className="flex items-center space-x-2 mb-2">
-                            <Badge
-                              className={`${getTaskStatusColor(task.status)} text-xs`}
-                            >
-                              <TaskStatusIcon className="w-3 h-3 mr-1" />
-                              {task.status.replace("_", " ").toUpperCase()}
-                            </Badge>
+                    {(runningTasks.length > 0 ? runningTasks : tasks).map(
+                      (task) => {
+                        const TaskStatusIcon = getTaskStatusIcon(task.status);
+                        return (
+                          <div
+                            key={task.id}
+                            className="p-3 border border-gray-200 rounded-lg"
+                          >
+                            <div className="flex items-center space-x-2 mb-2">
+                              <Badge
+                                className={`${getTaskStatusColor(task.status)} text-xs`}
+                              >
+                                <TaskStatusIcon className="w-3 h-3 mr-1" />
+                                {task.status.replace("_", " ").toUpperCase()}
+                              </Badge>
+                              <span className="text-[11px] text-gray-500">
+                                {task.start_date && task.end_date
+                                  ? `${format(parseISO(task.start_date), "dd MMM yyyy", { locale: localeId })} - ${format(parseISO(task.end_date), "dd MMM yyyy", { locale: localeId })}`
+                                  : format(
+                                      parseISO(task.tanggal_tugas),
+                                      "dd MMM yyyy",
+                                      { locale: localeId },
+                                    )}
+                              </span>
+                            </div>
+                            <h4 className="font-semibold text-gray-900 text-sm mb-1">
+                              {task.deskripsi_tugas}
+                            </h4>
+                            <p className="text-xs text-gray-600">
+                              {task.project_name}
+                            </p>
                           </div>
-                          <h4 className="font-semibold text-gray-900 text-sm mb-1">
-                            {task.deskripsi_tugas}
-                          </h4>
-                          <p className="text-xs text-gray-600">
-                            {task.project_name}
-                          </p>
-                        </div>
-                      );
-                    })}
+                        );
+                      },
+                    )}
 
                     {events.map((event) => (
                       <div
