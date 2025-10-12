@@ -25,9 +25,8 @@ function PegawaiLayoutContent({ children }: { children: React.ReactNode }) {
   const isProjectSelectionPage =
     pathname === "/pegawai/projects" && searchParams.get("team_id");
 
-  // 3. Settings page without active team
-  const isStandaloneSettings =
-    pathname === "/pegawai/settings" && !activeTeam?.id;
+  // 3. Settings page - always standalone
+  const isStandaloneSettings = pathname === "/pegawai/settings";
 
   // Show standalone layout (no sidebar) for these pages
   if (isTeamSelectionPage || isProjectSelectionPage || isStandaloneSettings) {
