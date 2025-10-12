@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import type { Database } from "@/../database/types/database.types";
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     const supabase = await createClient();
 
@@ -66,23 +66,42 @@ export async function POST(request: NextRequest) {
       throw earningsError;
     }
 
+    // Type the allocations and earnings properly
+    type Allocation = {
+      id: string;
+      task_id: string;
+      amount: number;
+      allocation_date: string | null;
+      canceled_at: string | null;
+    };
+
+    type Earning = {
+      id: string;
+      type: string;
+      amount: number;
+      occurred_on: string;
+      posted_at: string;
+      source_id: string;
+      source_table: string;
+    };
+
     // Find allocations that have allocation_date (should have earnings)
-    const allocatedAllocations = (allocations || []).filter(
-      (alloc) => alloc.allocation_date,
+    const allocatedAllocations = ((allocations as Allocation[]) || []).filter(
+      (alloc) => alloc.allocation_date !== null,
     );
     const allocatedAllocationIds = new Set(
       allocatedAllocations.map((alloc) => alloc.id),
     );
 
     // Find earnings that should exist (for allocated allocations)
-    const validEarnings = (earnings || []).filter(
+    const validEarnings = ((earnings as Earning[]) || []).filter(
       (earning) =>
         earning.source_table === "task_transport_allocations" &&
         allocatedAllocationIds.has(earning.source_id),
     );
 
     // Find earnings that should NOT exist (for non-allocated allocations)
-    const invalidEarnings = (earnings || []).filter(
+    const invalidEarnings = ((earnings as Earning[]) || []).filter(
       (earning) =>
         earning.source_table === "task_transport_allocations" &&
         !allocatedAllocationIds.has(earning.source_id),
@@ -117,7 +136,8 @@ export async function POST(request: NextRequest) {
       throw updatedError;
     }
 
-    const totalEarnings = (updatedEarnings || []).reduce(
+    type UpdatedEarning = { amount: number };
+    const totalEarnings = ((updatedEarnings as UpdatedEarning[]) || []).reduce(
       (sum, earning) => sum + earning.amount,
       0,
     );

@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import type { Database } from "@/../database/types/database.types";
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     const supabase = await createClient();
 
@@ -47,11 +47,22 @@ export async function POST(request: NextRequest) {
       throw earningsError;
     }
 
-    // Group by source_id to find duplicates
-    const earningsBySource = new Map();
-    const duplicatesToRemove = [];
+    // Type the earnings properly
+    type Earning = {
+      id: string;
+      type: string;
+      amount: number;
+      occurred_on: string;
+      posted_at: string;
+      source_id: string;
+      source_table: string;
+    };
 
-    (earnings || []).forEach((earning) => {
+    // Group by source_id to find duplicates
+    const earningsBySource = new Map<string, Earning>();
+    const duplicatesToRemove: string[] = [];
+
+    ((earnings as Earning[]) || []).forEach((earning) => {
       const key = `${earning.source_table}-${earning.source_id}`;
       if (earningsBySource.has(key)) {
         // Keep the latest (first in our sorted list) and mark others for removal
@@ -87,7 +98,8 @@ export async function POST(request: NextRequest) {
       throw updatedError;
     }
 
-    const totalEarnings = (updatedEarnings || []).reduce(
+    type UpdatedEarning = { amount: number };
+    const totalEarnings = ((updatedEarnings as UpdatedEarning[]) || []).reduce(
       (sum, earning) => sum + earning.amount,
       0,
     );

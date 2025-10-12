@@ -76,6 +76,24 @@ export function ProtectedRoute({
         return;
       }
 
+      // Special handling for /pegawai/projects with team_id - check this FIRST before requireProjectRole
+      const currentPath =
+        typeof window !== "undefined" ? window.location.pathname : "";
+      const hasTeamId =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("team_id")
+          : null;
+
+      if (currentPath === "/pegawai/projects" && hasTeamId) {
+        // Allow access to projects page with team_id regardless of activeProject/activeTeam
+        // The ProjectListView component will handle the team_id and show appropriate projects
+        console.log(
+          "[ProtectedRoute] Allowing access to /pegawai/projects with team_id:",
+          hasTeamId,
+        );
+        return;
+      }
+
       if (requireProjectRole) {
         // For ketua-tim pages, check if user has leader role in active project/team
         if (requireProjectRole === "leader") {
@@ -84,8 +102,7 @@ export function ProtectedRoute({
             userProfile: userProfile?.role,
             activeProject: activeProject?.role,
             activeTeam: activeTeam?.role,
-            currentPath:
-              typeof window !== "undefined" ? window.location.pathname : "",
+            currentPath,
           });
 
           // Wait for userProfile to load
@@ -147,8 +164,6 @@ export function ProtectedRoute({
               activeTeam?.role,
             );
             // Only redirect if we're actually trying to access ketua-tim pages
-            const currentPath =
-              typeof window !== "undefined" ? window.location.pathname : "";
             if (currentPath.startsWith("/ketua-tim")) {
               router.prefetch("/pegawai");
               router.push("/pegawai");
@@ -156,14 +171,6 @@ export function ProtectedRoute({
             }
           }
         }
-
-        // Special handling for /pegawai/projects with team_id - check this FIRST
-        const currentPath =
-          typeof window !== "undefined" ? window.location.pathname : "";
-        const hasTeamId =
-          typeof window !== "undefined"
-            ? new URLSearchParams(window.location.search).get("team_id")
-            : null;
 
         console.log("[ProtectedRoute] Debug:", {
           currentPath,
@@ -173,16 +180,6 @@ export function ProtectedRoute({
           storedRole: getStoredRole(),
           requireProjectRole,
         });
-
-        if (currentPath === "/pegawai/projects" && hasTeamId) {
-          // Allow access to projects page with team_id regardless of activeProject/activeTeam
-          // The ProjectListView component will handle the team_id and show appropriate projects
-          console.log(
-            "[ProtectedRoute] Allowing access to /pegawai/projects with team_id:",
-            hasTeamId,
-          );
-          return;
-        }
 
         // Allow access if either an active project OR an active team matches the role.
         // This lets team leaders access `/ketua-tim` after picking a team, even

@@ -598,7 +598,16 @@ export default function ProjectListView() {
                     : "Halaman ini menampilkan proyek di mana Anda ditugaskan sebagai anggota. Jika Anda adalah ketua tim, silakan klik tombol di bawah untuk mengakses dashboard ketua tim."}
                 </p>
                 <Button
-                  onClick={() => router.push("/ketua-tim")}
+                  onClick={() => {
+                    // Set activeTeam before redirecting to ketua-tim
+                    if (selectedTeam) {
+                      setActiveTeam({
+                        id: selectedTeam.id,
+                        role: "leader",
+                      });
+                    }
+                    router.push("/ketua-tim");
+                  }}
                   className="bg-white text-purple-600 hover:bg-white/90 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-105 font-semibold px-8 py-6 text-lg rounded-2xl"
                 >
                   <Users className="w-5 h-5 mr-3" />
@@ -617,7 +626,14 @@ export default function ProjectListView() {
             roleFilter === "all" && (
               <div
                 className={`group rounded-xl border border-gray-200 bg-white p-6 shadow-sm hover:shadow-lg transition hover:-translate-y-0.5 cursor-pointer`}
-                onClick={() => router.push("/ketua-tim")}
+                onClick={() => {
+                  // Set activeTeam before redirecting to ketua-tim
+                  setActiveTeam({
+                    id: selectedTeam.id,
+                    role: "leader",
+                  });
+                  router.push("/ketua-tim");
+                }}
               >
                 <div className="flex items-center justify-between mb-3">
                   <Badge className="bg-purple-100 text-purple-800 border font-medium">

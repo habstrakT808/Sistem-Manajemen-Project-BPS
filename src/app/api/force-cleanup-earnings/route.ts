@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import type { Database } from "@/../database/types/database.types";
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     const supabase = await createClient();
 
@@ -55,10 +55,30 @@ export async function POST(request: NextRequest) {
       throw allocError;
     }
 
+    // Type the allocations properly
+    type Allocation = {
+      id: string;
+      amount: number;
+      allocation_date: string;
+      user_id: string;
+    };
+
     // Step 3: Recreate earnings entries for allocated allocations only
     let recreatedCount = 0;
     if (allocations && allocations.length > 0) {
-      const earningsToInsert = allocations.map((alloc) => ({
+      type EarningsToInsert = {
+        user_id: string;
+        type: string;
+        amount: number;
+        occurred_on: string;
+        posted_at: string;
+        source_id: string;
+        source_table: string;
+      };
+
+      const earningsToInsert: EarningsToInsert[] = (
+        (allocations as Allocation[]) || []
+      ).map((alloc) => ({
         user_id: user.id,
         type: "transport",
         amount: alloc.amount,
@@ -70,7 +90,7 @@ export async function POST(request: NextRequest) {
 
       const { error: insertError } = await svc
         .from("earnings_ledger")
-        .insert(earningsToInsert);
+        .insert(earningsToInsert as any);
 
       if (insertError) {
         throw insertError;
@@ -90,11 +110,12 @@ export async function POST(request: NextRequest) {
       throw finalError;
     }
 
-    const totalEarnings = (finalEarnings || []).reduce(
+    type FinalEarning = { amount: number };
+    const totalEarnings = ((finalEarnings as FinalEarning[]) || []).reduce(
       (sum, earning) => sum + earning.amount,
       0,
     );
-    const totalAllocations = (allocations || []).reduce(
+    const totalAllocations = ((allocations as Allocation[]) || []).reduce(
       (sum, alloc) => sum + alloc.amount,
       0,
     );

@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import type { Database } from "@/../database/types/database.types";
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const supabase = await createClient();
 
@@ -51,15 +51,30 @@ export async function GET(request: NextRequest) {
       throw allocError;
     }
 
+    // Type the allocations properly
+    type AllocationWithTask = {
+      id: string;
+      task_id: string;
+      amount: number;
+      allocation_date: string | null;
+      allocated_at: string | null;
+      canceled_at: string | null;
+      tasks: {
+        id: string;
+        title: string;
+        project_id: string;
+      } | null;
+    };
+
     // Get project details separately
     const projectIds = [
       ...new Set(
-        (allocations || [])
+        ((allocations as AllocationWithTask[]) || [])
           .map((alloc) => alloc.tasks?.project_id)
           .filter(Boolean),
       ),
     ];
-    let projectDetails = {};
+    let projectDetails: Record<string, any> = {};
 
     if (projectIds.length > 0) {
       const { data: projects, error: projectsError } = await svc
@@ -68,7 +83,11 @@ export async function GET(request: NextRequest) {
         .in("id", projectIds);
 
       if (!projectsError && projects) {
-        projectDetails = projects.reduce(
+        type Project = {
+          id: string;
+          nama_project: string;
+        };
+        projectDetails = (projects as Project[]).reduce(
           (acc, project) => {
             acc[project.id] = project;
             return acc;
@@ -100,45 +119,65 @@ export async function GET(request: NextRequest) {
       throw earningsError;
     }
 
-    // Check for duplicates
-    const earningsBySource = new Map();
-    const duplicates = [];
+    // Type the earnings properly
+    type Earning = {
+      id: string;
+      type: string;
+      amount: number;
+      occurred_on: string;
+      posted_at: string;
+      source_id: string;
+      source_table: string;
+    };
 
-    (earnings || []).forEach((earning) => {
+    // Check for duplicates
+    const earningsBySource = new Map<string, Earning>();
+    const duplicates: Array<{
+      source: string;
+      entries: Earning[];
+    }> = [];
+
+    ((earnings as Earning[]) || []).forEach((earning) => {
       const key = `${earning.source_table}-${earning.source_id}`;
       if (earningsBySource.has(key)) {
-        duplicates.push({
-          source: key,
-          entries: [earningsBySource.get(key), earning],
-        });
+        const existingEarning = earningsBySource.get(key);
+        if (existingEarning) {
+          duplicates.push({
+            source: key,
+            entries: [existingEarning, earning],
+          });
+        }
       } else {
         earningsBySource.set(key, earning);
       }
     });
 
     // Calculate totals
-    const totalAllocations = (allocations || []).reduce(
-      (sum, alloc) => sum + alloc.amount,
-      0,
-    );
-    const totalEarnings = (earnings || []).reduce(
+    const totalAllocations = (
+      (allocations as AllocationWithTask[]) || []
+    ).reduce((sum, alloc) => sum + alloc.amount, 0);
+    const totalEarnings = ((earnings as Earning[]) || []).reduce(
       (sum, earning) => sum + earning.amount,
       0,
     );
-    const allocatedCount = (allocations || []).filter(
+    const allocatedCount = ((allocations as AllocationWithTask[]) || []).filter(
       (alloc) => alloc.allocation_date,
     ).length;
-    const pendingCount = (allocations || []).filter(
+    const pendingCount = ((allocations as AllocationWithTask[]) || []).filter(
       (alloc) => !alloc.allocation_date,
     ).length;
 
     // Enrich allocations with project details
-    const enrichedAllocations = (allocations || []).map((alloc) => ({
+    const enrichedAllocations = (
+      (allocations as AllocationWithTask[]) || []
+    ).map((alloc) => ({
       ...alloc,
       tasks: {
         ...alloc.tasks,
-        projects: projectDetails[alloc.tasks?.project_id] || {
-          id: alloc.tasks?.project_id,
+        projects: (alloc.tasks?.project_id
+          ? projectDetails[alloc.tasks.project_id]
+          : null) || {
+          id: alloc.tasks?.project_id || "unknown",
           nama_project: "Unknown Project",
         },
       },

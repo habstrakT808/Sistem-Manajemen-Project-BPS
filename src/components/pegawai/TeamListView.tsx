@@ -277,12 +277,18 @@ export default function TeamListView() {
                   key={team.id}
                   className="group relative bg-white/90 backdrop-blur-sm rounded-2xl border border-white/50 shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-3 hover:scale-105 cursor-pointer overflow-hidden"
                   onClick={async () => {
-                    // Don't set activeTeam with role yet - user hasn't chosen their role
-                    // Just store the team ID for navigation
+                    // Set activeTeam with the correct role based on team.role
                     console.log("Team click:", {
                       teamRole: team.role,
                       userRole: userProfile?.role,
                     });
+
+                    // Set activeTeam with the role from the team data
+                    setActiveTeam({
+                      id: team.id,
+                      role: team.role, // This should be "leader" or "member"
+                    });
+
                     router.push(
                       `/pegawai/projects?team_id=${encodeURIComponent(team.id)}`,
                     );
