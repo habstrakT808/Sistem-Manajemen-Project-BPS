@@ -176,23 +176,16 @@ export function LoginForm() {
             return;
           }
 
-          // Always use database role to prevent URL parameter conflicts
-          let redirectPath = "/pegawai"; // default fallback
-
-          if (typedUserProfile?.role) {
-            redirectPath =
-              typedUserProfile.role === "admin"
-                ? "/admin"
-                : typedUserProfile.role === "ketua_tim"
-                  ? "/ketua-tim"
-                  : "/pegawai";
-          }
+          // Always redirect to /pegawai for role selection
+          // Users with ketua_tim role should choose their team first
+          let redirectPath = "/pegawai"; // default for all users
 
           console.log(
             "LoginForm - Auto-redirecting to:",
             redirectPath,
-            "based on database role:",
+            "for role selection (database role:",
             typedUserProfile?.role,
+            ")",
             "Session:",
             currentSessionKey,
           );

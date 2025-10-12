@@ -9,7 +9,10 @@ import {
 } from "@/components/ui/select";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams, useRouter } from "next/navigation";
-import React from "react";
+import React, { Suspense } from "react";
+import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+
+export const dynamic = "force-dynamic";
 
 async function fetchMyProjects() {
   const res = await fetch("/api/pegawai/tasks");
@@ -27,7 +30,7 @@ async function fetchMyProjects() {
   return Array.from(map.values());
 }
 
-export default function TransportPage() {
+function TransportPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const selectedProjectId = searchParams.get("project_id");
@@ -82,5 +85,13 @@ export default function TransportPage() {
         <TransportCalendar projectId={selectedProjectId} />
       </div>
     </div>
+  );
+}
+
+export default function TransportPage() {
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <TransportPageContent />
+    </Suspense>
   );
 }

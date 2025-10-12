@@ -121,7 +121,7 @@ interface MemberDetailProps {
 export default function MemberDetail({ memberId }: MemberDetailProps) {
   const router = useRouter();
   const [selectedCalendarMonth, setSelectedCalendarMonth] = React.useState(
-    new Date()
+    new Date(),
   );
 
   const fetchMemberDetailRequest = async (): Promise<MemberDetailData> => {
@@ -202,7 +202,7 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
     for (let i = 0; i < 42; i++) {
       const dateStr = currentDate.toISOString().split("T")[0];
       const calendarEntry = memberData?.calendar_data.find(
-        (entry) => entry.date === dateStr
+        (entry) => entry.date === dateStr,
       );
 
       days.push({
@@ -263,7 +263,7 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
             className="border-2 border-gray-200 text-gray-600 hover:bg-gray-50"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back
+            Kembali
           </Button>
         </div>
 
@@ -274,8 +274,8 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
             />
             <h2 className="text-2xl font-bold text-gray-900">
               {isNotFound
-                ? "Member Tidak Ditemukan"
-                : "Failed to Load Member Data"}
+                ? "Anggota Tidak Ditemukan"
+                : "Gagal Memuat Data Anggota"}
             </h2>
             <p className="text-gray-600 max-w-md">
               {isNotFound
@@ -288,7 +288,7 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
                 className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
-                Try Again
+                Coba Lagi
               </Button>
             )}
           </div>
@@ -314,9 +314,9 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
         month: "short",
         day: "numeric",
       }),
-      Completed: trend.completed,
-      Pending: trend.pending,
-    })
+      Selesai: trend.completed,
+      Menunggu: trend.pending,
+    }),
   );
 
   const projectParticipationData =
@@ -334,21 +334,25 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
       month: month.month,
       tasks: month.tasks_completed,
       earnings: month.earnings / 1000000, // Convert to millions for chart readability
-    })
+    }),
   );
 
   const taskDistributionData = [
     {
-      name: "Completed",
+      name: "Selesai",
       value: task_statistics.completed_tasks,
       color: "#10B981",
     },
     {
-      name: "In Progress",
+      name: "Sedang Berjalan",
       value: task_statistics.in_progress_tasks,
       color: "#3B82F6",
     },
-    { name: "Pending", value: task_statistics.pending_tasks, color: "#F59E0B" },
+    {
+      name: "Menunggu",
+      value: task_statistics.pending_tasks,
+      color: "#F59E0B",
+    },
   ];
 
   const earningsHistoryData = monthly_earnings.historical.map((history) => ({
@@ -367,7 +371,7 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
             className="border-2 border-gray-200 text-gray-600 hover:bg-gray-50"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Team
+            Kembali ke Tim
           </Button>
 
           <div className="flex items-center space-x-4">
@@ -381,7 +385,7 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
                 {personal_info.nama_lengkap}
               </h1>
               <p className="text-gray-600 text-lg">
-                Team Member Profile & Analytics
+                Profil & Analitik Anggota Tim
               </p>
             </div>
           </div>
@@ -397,12 +401,12 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
             <RefreshCw
               className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`}
             />
-            Refresh
+            Muat Ulang
           </Button>
 
           <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300">
             <Download className="w-4 h-4 mr-2" />
-            Export Report
+            Ekspor Laporan
           </Button>
         </div>
       </div>
@@ -412,10 +416,10 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
         <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-6">
           <div className="flex items-center text-white text-xl font-semibold">
             <User className="w-6 h-6 mr-3" />
-            Personal Information
+            Informasi Pribadi
           </div>
           <div className="text-indigo-100 mt-2 text-sm">
-            Contact details and account information
+            Detail kontak dan informasi akun
           </div>
         </div>
         <div className="p-6">
@@ -437,9 +441,9 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
                 <Phone className="w-5 h-5 text-white" />
               </div>
               <div>
-                <div className="text-sm font-medium text-gray-600">Phone</div>
+                <div className="text-sm font-medium text-gray-600">Telepon</div>
                 <div className="font-semibold text-gray-900">
-                  {personal_info.no_telepon || "Not provided"}
+                  {personal_info.no_telepon || "Tidak disediakan"}
                 </div>
               </div>
             </div>
@@ -449,9 +453,9 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
                 <MapPin className="w-5 h-5 text-white" />
               </div>
               <div>
-                <div className="text-sm font-medium text-gray-600">Address</div>
+                <div className="text-sm font-medium text-gray-600">Alamat</div>
                 <div className="font-semibold text-gray-900">
-                  {personal_info.alamat || "Not provided"}
+                  {personal_info.alamat || "Tidak disediakan"}
                 </div>
               </div>
             </div>
@@ -461,7 +465,7 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm font-medium text-gray-600">
-                  Member Since
+                  Anggota Sejak
                 </div>
                 <div className="font-semibold text-gray-900">
                   {new Date(personal_info.created_at).toLocaleDateString(
@@ -470,7 +474,7 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
                       year: "numeric",
                       month: "long",
                       day: "numeric",
-                    }
+                    },
                   )}
                 </div>
               </div>
@@ -481,7 +485,7 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
                     : "bg-red-100 text-red-800"
                 }
               >
-                {personal_info.is_active ? "Active" : "Inactive"}
+                {personal_info.is_active ? "Aktif" : "Tidak Aktif"}
               </Badge>
             </div>
           </div>
@@ -496,12 +500,12 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
             <div className="flex items-center justify-between mb-4">
               <div className="flex-1">
                 <p className="text-sm font-semibold text-gray-600 mb-2">
-                  Active Projects
+                  Proyek Aktif
                 </p>
                 <p className="text-3xl font-bold text-gray-900 mb-1">
                   {current_projects.length}
                 </p>
-                <p className="text-sm text-gray-500">Currently assigned</p>
+                <p className="text-sm text-gray-500">Sedang ditugaskan</p>
               </div>
               <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
                 <FolderOpen className="w-8 h-8 text-white" />
@@ -516,12 +520,14 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
             <div className="flex items-center justify-between mb-4">
               <div className="flex-1">
                 <p className="text-sm font-semibold text-gray-600 mb-2">
-                  Completion Rate
+                  Tingkat Penyelesaian
                 </p>
                 <p className="text-3xl font-bold text-gray-900 mb-1">
                   {task_statistics.completion_rate}%
                 </p>
-                <p className="text-sm text-gray-500">Task success rate</p>
+                <p className="text-sm text-gray-500">
+                  Tingkat keberhasilan tugas
+                </p>
               </div>
               <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg">
                 <Target className="w-8 h-8 text-white" />
@@ -536,12 +542,12 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
             <div className="flex items-center justify-between mb-4">
               <div className="flex-1">
                 <p className="text-sm font-semibold text-gray-600 mb-2">
-                  Total Tasks
+                  Total Tugas
                 </p>
                 <p className="text-3xl font-bold text-gray-900 mb-1">
                   {task_statistics.total_tasks}
                 </p>
-                <p className="text-sm text-gray-500">All time tasks</p>
+                <p className="text-sm text-gray-500">Tugas sepanjang waktu</p>
               </div>
               <div className="w-16 h-16 bg-gradient-to-r from-orange-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg">
                 <ClipboardList className="w-8 h-8 text-white" />
@@ -556,12 +562,12 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
             <div className="flex items-center justify-between mb-4">
               <div className="flex-1">
                 <p className="text-sm font-semibold text-gray-600 mb-2">
-                  Monthly Earnings
+                  Pendapatan Bulanan
                 </p>
                 <p className="text-3xl font-bold text-gray-900 mb-1">
                   {formatCurrency(monthly_earnings.current_month.total)}
                 </p>
-                <p className="text-sm text-gray-500">This month</p>
+                <p className="text-sm text-gray-500">Bulan ini</p>
               </div>
               <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
                 <DollarSign className="w-8 h-8 text-white" />
@@ -574,11 +580,11 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
       {/* Main Content Tabs */}
       <Tabs defaultValue="overview" className="space-y-6">
         <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="projects">Projects</TabsTrigger>
-          <TabsTrigger value="calendar">Calendar</TabsTrigger>
-          <TabsTrigger value="earnings">Earnings</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="overview">Ringkasan</TabsTrigger>
+          <TabsTrigger value="projects">Proyek</TabsTrigger>
+          <TabsTrigger value="calendar">Kalender</TabsTrigger>
+          <TabsTrigger value="earnings">Pendapatan</TabsTrigger>
+          <TabsTrigger value="analytics">Analitik</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
@@ -589,10 +595,10 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
               <div className="bg-gradient-to-r from-green-600 to-teal-600 p-6">
                 <div className="flex items-center text-white text-xl font-semibold">
                   <BarChart3 className="w-6 h-6 mr-3" />
-                  Task Distribution
+                  Distribusi Tugas
                 </div>
                 <div className="text-green-100 mt-2 text-sm">
-                  Current task status breakdown
+                  Rincian status tugas saat ini
                 </div>
               </div>
               <div className="p-6">
@@ -609,19 +615,19 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
                     <div className="text-xl font-bold text-green-600">
                       {task_statistics.completed_tasks}
                     </div>
-                    <div className="text-sm text-green-700">Completed</div>
+                    <div className="text-sm text-green-700">Selesai</div>
                   </div>
                   <div className="text-center p-3 bg-blue-50 rounded-lg">
                     <div className="text-xl font-bold text-blue-600">
                       {task_statistics.in_progress_tasks}
                     </div>
-                    <div className="text-sm text-blue-700">In Progress</div>
+                    <div className="text-sm text-blue-700">Sedang Berjalan</div>
                   </div>
                   <div className="text-center p-3 bg-yellow-50 rounded-lg">
                     <div className="text-xl font-bold text-yellow-600">
                       {task_statistics.pending_tasks}
                     </div>
-                    <div className="text-sm text-yellow-700">Pending</div>
+                    <div className="text-sm text-yellow-700">Menunggu</div>
                   </div>
                 </div>
               </div>
@@ -632,10 +638,10 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
               <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-6">
                 <div className="flex items-center text-white text-xl font-semibold">
                   <Award className="w-6 h-6 mr-3" />
-                  Performance Metrics
+                  Metrik Performa
                 </div>
                 <div className="text-purple-100 mt-2 text-sm">
-                  Key performance indicators
+                  Indikator kinerja utama
                 </div>
               </div>
               <div className="p-6 space-y-6">
@@ -644,20 +650,22 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
                     <div className="text-2xl font-bold text-blue-600 mb-1">
                       {task_statistics.completion_rate}%
                     </div>
-                    <div className="text-sm text-blue-700">Success Rate</div>
+                    <div className="text-sm text-blue-700">
+                      Tingkat Keberhasilan
+                    </div>
                   </div>
                   <div className="text-center p-4 bg-gradient-to-br from-green-50 to-teal-50 rounded-xl border border-green-100">
                     <div className="text-2xl font-bold text-green-600 mb-1">
                       {task_statistics.average_completion_time}
                     </div>
-                    <div className="text-sm text-green-700">Avg Days</div>
+                    <div className="text-sm text-green-700">Rata-rata Hari</div>
                   </div>
                 </div>
 
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">
-                      Overall Performance
+                      Performa Keseluruhan
                     </span>
                     <span className="text-sm font-semibold text-gray-900">
                       {task_statistics.completion_rate}%
@@ -673,14 +681,14 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
 
                 <div className="pt-4 border-t border-gray-100">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Active Since</span>
+                    <span className="text-gray-600">Aktif Sejak</span>
                     <span className="font-semibold text-gray-900">
                       {new Date(personal_info.created_at).toLocaleDateString(
                         "id-ID",
                         {
                           year: "numeric",
                           month: "long",
-                        }
+                        },
                       )}
                     </span>
                   </div>
@@ -697,14 +705,14 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
               <div className="flex items-center justify-between">
                 <div className="flex items-center text-white text-xl font-semibold">
                   <FolderOpen className="w-6 h-6 mr-3" />
-                  Current Projects
+                  Proyek Saat Ini
                 </div>
                 <Badge className="bg-white/20 text-white">
-                  {current_projects.length} Active
+                  {current_projects.length} Aktif
                 </Badge>
               </div>
               <div className="text-blue-100 mt-2 text-sm">
-                Projects currently assigned to this member
+                Proyek yang sedang ditugaskan kepada anggota ini
               </div>
             </div>
             <div className="p-6">
@@ -712,10 +720,10 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
                 <div className="text-center py-12">
                   <FolderOpen className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                    No Active Projects
+                    Tidak Ada Proyek Aktif
                   </h3>
                   <p className="text-gray-500">
-                    This member is not currently assigned to any projects.
+                    Anggota ini saat ini tidak ditugaskan ke proyek manapun.
                   </p>
                 </div>
               ) : (
@@ -725,7 +733,7 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
                     const daysUntilDeadline = Math.ceil(
                       (new Date(project.deadline).getTime() -
                         new Date().getTime()) /
-                        (1000 * 60 * 60 * 24)
+                        (1000 * 60 * 60 * 24),
                     );
 
                     return (
@@ -748,25 +756,25 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
                         <div className="space-y-4">
                           <div className="grid grid-cols-2 gap-4 text-sm">
                             <div>
-                              <div className="text-gray-500">Start Date</div>
+                              <div className="text-gray-500">Tanggal Mulai</div>
                               <div className="font-semibold">
                                 {new Date(
-                                  project.tanggal_mulai
+                                  project.tanggal_mulai,
                                 ).toLocaleDateString("id-ID")}
                               </div>
                             </div>
                             <div>
-                              <div className="text-gray-500">Deadline</div>
+                              <div className="text-gray-500">Jatuh Tempo</div>
                               <div
                                 className={`font-semibold ${daysUntilDeadline < 7 ? "text-red-600" : "text-gray-900"}`}
                               >
                                 {new Date(project.deadline).toLocaleDateString(
-                                  "id-ID"
+                                  "id-ID",
                                 )}
                               </div>
                             </div>
                             <div>
-                              <div className="text-gray-500">My Tasks</div>
+                              <div className="text-gray-500">Tugas Saya</div>
                               <div className="font-semibold">
                                 {project.completed_tasks}/{project.task_count}
                               </div>
@@ -781,7 +789,9 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
 
                           <div>
                             <div className="flex justify-between text-sm mb-2">
-                              <span className="text-gray-600">My Progress</span>
+                              <span className="text-gray-600">
+                                Progres Saya
+                              </span>
                               <span className="font-semibold text-gray-900">
                                 {project.progress}%
                               </span>
@@ -797,7 +807,9 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
                           {daysUntilDeadline < 7 && daysUntilDeadline > 0 && (
                             <div className="flex items-center text-red-600 text-sm">
                               <AlertTriangle className="w-4 h-4 mr-1" />
-                              <span>Deadline in {daysUntilDeadline} days</span>
+                              <span>
+                                Jatuh tempo dalam {daysUntilDeadline} hari
+                              </span>
                             </div>
                           )}
                         </div>
@@ -817,7 +829,7 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
               <div className="flex items-center justify-between">
                 <div className="flex items-center text-white text-xl font-semibold">
                   <Calendar className="w-6 h-6 mr-3" />
-                  Work Schedule
+                  Jadwal Kerja
                 </div>
                 <div className="flex items-center space-x-2">
                   <Button
@@ -867,7 +879,7 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
                     >
                       {day}
                     </div>
-                  )
+                  ),
                 )}
               </div>
 
@@ -996,7 +1008,7 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
                             </div>
                             <div className="text-sm text-gray-500">
                               {new Date(earning.date).toLocaleDateString(
-                                "id-ID"
+                                "id-ID",
                               )}
                             </div>
                           </div>
@@ -1004,7 +1016,7 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
                             {formatCurrency(earning.amount)}
                           </div>
                         </div>
-                      )
+                      ),
                     )}
                   </div>
                 )}
@@ -1016,10 +1028,10 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
               <div className="bg-gradient-to-r from-purple-600 to-violet-600 p-6">
                 <div className="flex items-center text-white text-xl font-semibold">
                   <TrendingUp className="w-6 h-6 mr-3" />
-                  Earnings History
+                  Riwayat Pendapatan
                 </div>
                 <div className="text-purple-100 mt-2 text-sm">
-                  6-month earnings trend
+                  Tren pendapatan 6 bulan
                 </div>
               </div>
               <div className="p-6">
@@ -1031,7 +1043,7 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
                     {
                       dataKey: "earnings",
                       stroke: "#8B5CF6",
-                      name: "Earnings (Rp)",
+                      name: "Pendapatan (Rp)",
                     },
                   ]}
                 />
@@ -1048,10 +1060,10 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
               <div className="bg-gradient-to-r from-blue-600 to-cyan-600 p-6">
                 <div className="flex items-center text-white text-xl font-semibold">
                   <TrendingUp className="w-6 h-6 mr-3" />
-                  Task Completion Trend
+                  Tren Penyelesaian Tugas
                 </div>
                 <div className="text-blue-100 mt-2 text-sm">
-                  Daily task completion over the last 30 days
+                  Penyelesaian tugas harian selama 30 hari terakhir
                 </div>
               </div>
               <div className="p-6">
@@ -1063,12 +1075,12 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
                     {
                       dataKey: "Completed",
                       stroke: "#10B981",
-                      name: "Completed Tasks",
+                      name: "Tugas Selesai",
                     },
                     {
                       dataKey: "Pending",
                       stroke: "#F59E0B",
-                      name: "Pending Tasks",
+                      name: "Tugas Menunggu",
                     },
                   ]}
                 />
@@ -1081,10 +1093,10 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
                 <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-6">
                   <div className="flex items-center text-white text-xl font-semibold">
                     <BarChart3 className="w-6 h-6 mr-3" />
-                    Project Participation
+                    Partisipasi Proyek
                   </div>
                   <div className="text-indigo-100 mt-2 text-sm">
-                    Completion rate by project
+                    Tingkat penyelesaian per proyek
                   </div>
                 </div>
                 <div className="p-6">
@@ -1096,7 +1108,7 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
                       {
                         dataKey: "completion",
                         fill: "#8B5CF6",
-                        name: "Completion %",
+                        name: "Penyelesaian %",
                       },
                     ]}
                   />
@@ -1133,63 +1145,6 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
           </div>
         </TabsContent>
       </Tabs>
-
-      {/* Performance Summary */}
-      <div className="border-0 shadow-xl bg-gradient-to-r from-slate-800 to-slate-900 text-white overflow-hidden rounded-xl">
-        <div className="p-8">
-          <h3 className="text-2xl font-bold mb-6 text-center">
-            Performance Summary
-          </h3>
-          <div className="grid md:grid-cols-4 gap-8 text-center relative">
-            <div className="space-y-2">
-              <div className="flex items-center justify-center mb-3">
-                <Target className="w-8 h-8" />
-              </div>
-              <div className="text-3xl font-bold">
-                {task_statistics.completion_rate}%
-              </div>
-              <div className="text-slate-300 text-sm">Task Success Rate</div>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-center mb-3">
-                <Clock className="w-8 h-8" />
-              </div>
-              <div className="text-3xl font-bold">
-                {task_statistics.average_completion_time}
-              </div>
-              <div className="text-slate-300 text-sm">Avg Completion Days</div>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-center mb-3">
-                <FolderOpen className="w-8 h-8" />
-              </div>
-              <div className="text-3xl font-bold">
-                {current_projects.length}
-              </div>
-              <div className="text-slate-300 text-sm">Active Projects</div>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-center mb-3">
-                <Award className="w-8 h-8" />
-              </div>
-              <div className="text-3xl font-bold">
-                {current_projects.length > 0
-                  ? Math.round(
-                      current_projects.reduce((sum, p) => sum + p.progress, 0) /
-                        current_projects.length
-                    )
-                  : 0}
-                %
-              </div>
-              <div className="text-slate-300 text-sm">Avg Project Progress</div>
-            </div>
-
-            {/* Background decorations */}
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white bg-opacity-5 rounded-full -translate-y-16 translate-x-16"></div>
-            <div className="absolute bottom-0 left-0 w-24 h-24 bg-white bg-opacity-5 rounded-full translate-y-12 -translate-x-12"></div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

@@ -1,6 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
+import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+
+export const dynamic = "force-dynamic";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,9 +46,14 @@ import {
   Globe,
   Clock,
   Calendar,
+  LogOut,
+  ArrowLeft,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/hooks/useAuth";
+import { useActiveTeam } from "@/components/providers";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 interface ProfileData {
   id: string;
@@ -83,11 +91,21 @@ interface PreferenceSettings {
   time_format: "12h" | "24h";
 }
 
-export default function SettingsPage() {
-  const { user } = useAuth();
+function SettingsPageContent() {
+  const { user, signOut } = useAuth();
+  const { activeTeam } = useActiveTeam();
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error("Error during logout:", error);
+    }
+  };
 
   // Profile Data
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
@@ -415,6 +433,30 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       <div className="container mx-auto px-4 py-8 max-w-6xl">
+        {/* Top Navigation - Only show when no active team (standalone mode) */}
+        {!activeTeam && (
+          <div className="mb-6 flex items-center justify-between">
+            <Button
+              variant="outline"
+              asChild
+              className="border-gray-200 hover:bg-gray-50"
+            >
+              <Link href="/pegawai">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Kembali
+              </Link>
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleSignOut}
+              className="border-red-200 text-red-600 hover:bg-red-50"
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              Logout
+            </Button>
+          </div>
+        )}
+
         {/* Profile Overview Card - Enhanced */}
         <Card className="mb-8 border-0 shadow-2xl bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 rounded-3xl overflow-hidden">
           <div className="relative p-8">
@@ -1227,5 +1269,13 @@ export default function SettingsPage() {
         </Dialog>
       </div>
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <SettingsPageContent />
+    </Suspense>
   );
 }

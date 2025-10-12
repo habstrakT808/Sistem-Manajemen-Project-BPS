@@ -16,7 +16,6 @@ import {
   Bell,
   LogOut,
   Home,
-  Calendar,
   DollarSign,
   ClipboardList,
   ChevronDown,

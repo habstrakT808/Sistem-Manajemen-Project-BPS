@@ -2,8 +2,11 @@
 
 "use client";
 
-import React, { useMemo, useState, useCallback } from "react";
+import React, { useMemo, useState, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+
+export const dynamic = "force-dynamic";
 import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -54,7 +57,7 @@ async function fetchTasksRequest(projectId?: string | null): Promise<Task[]> {
   return result.data || [];
 }
 
-export default function TasksPage() {
+function TasksPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { activeProject } = useActiveProject();
@@ -240,5 +243,13 @@ export default function TasksPage() {
         ))}
       </Tabs>
     </div>
+  );
+}
+
+export default function TasksPage() {
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <TasksPageContent />
+    </Suspense>
   );
 }

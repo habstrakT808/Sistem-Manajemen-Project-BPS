@@ -17,10 +17,11 @@ import {
   Sparkles,
   Building2,
   User,
-  Calendar,
   Star,
   Zap,
   Shield,
+  LogOut,
+  Settings,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -44,7 +45,18 @@ export default function TeamListView() {
   const router = useRouter();
   const { setActiveTeam } = useActiveTeam();
   const { setActiveProject } = useActiveProject();
-  const { user, userProfile } = useAuthContext();
+  const { user, userProfile, signOut } = useAuthContext();
+
+  // Note: Removed automatic clearing of activeProject/activeTeam
+  // This was causing issues with ProtectedRoute redirects
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error("Error during logout:", error);
+    }
+  };
 
   // Force re-render when user changes
   const teamKey = user?.id || "no-user";
@@ -101,6 +113,28 @@ export default function TeamListView() {
         </div>
 
         <div className="relative px-4 sm:px-6 lg:px-8 py-16">
+          {/* Logout & Settings Buttons - Top Right */}
+          <div className="absolute top-6 right-6 flex space-x-3 z-20">
+            <Button
+              variant="outline"
+              size="sm"
+              asChild
+              className="bg-white/20 backdrop-blur-sm border-white/30 text-white hover:bg-white/30"
+            >
+              <Link href="/pegawai/settings">
+                <Settings className="w-4 h-4" />
+              </Link>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSignOut}
+              className="bg-white/20 backdrop-blur-sm border-white/30 text-white hover:bg-white/30"
+            >
+              <LogOut className="w-4 h-4" />
+            </Button>
+          </div>
+
           <div className="max-w-7xl mx-auto text-center">
             <div className="space-y-6">
               <div className="flex items-center justify-center space-x-4">
@@ -243,7 +277,8 @@ export default function TeamListView() {
                   key={team.id}
                   className="group relative bg-white/90 backdrop-blur-sm rounded-2xl border border-white/50 shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-3 hover:scale-105 cursor-pointer overflow-hidden"
                   onClick={async () => {
-                    setActiveTeam({ id: team.id, role: team.role });
+                    // Don't set activeTeam with role yet - user hasn't chosen their role
+                    // Just store the team ID for navigation
                     console.log("Team click:", {
                       teamRole: team.role,
                       userRole: userProfile?.role,

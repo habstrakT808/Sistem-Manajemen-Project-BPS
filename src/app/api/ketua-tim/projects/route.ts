@@ -102,6 +102,16 @@ export async function POST(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
+    // Get team_id where current user is the leader
+    const { data: userTeam } = await (svc as any)
+      .from("teams")
+      .select("id")
+      .eq("leader_user_id", user.id)
+      .limit(1)
+      .single();
+
+    const teamId = userTeam?.id || null;
+
     for (const mitraAssignment of formData.mitra_assignments) {
       const { data: currentTotal } = await (svc as any).rpc(
         "get_mitra_monthly_total",
@@ -137,6 +147,8 @@ export async function POST(request: NextRequest) {
         // Set both fields for backward compatibility with legacy code
         leader_user_id: user.id,
         ketua_tim_id: user.id,
+        // Automatically assign to the team where user is leader
+        team_id: teamId,
         status:
           new Date(formData.tanggal_mulai) <= new Date()
             ? "active"

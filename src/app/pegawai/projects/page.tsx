@@ -3,9 +3,20 @@
 
 "use client";
 
-import React from "react";
+import React, { Suspense } from "react";
 import ProjectListView from "@/components/pegawai/ProjectListView";
+import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+
+export const dynamic = "force-dynamic";
+
+function ProjectsPageContent() {
+  return <ProjectListView />;
+}
 
 export default function ProjectsPage() {
-  return <ProjectListView />;
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <ProjectsPageContent />
+    </Suspense>
+  );
 }

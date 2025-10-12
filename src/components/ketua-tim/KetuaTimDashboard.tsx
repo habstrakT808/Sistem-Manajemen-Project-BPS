@@ -19,13 +19,10 @@ import {
   Users,
   ClipboardList,
   DollarSign,
-  TrendingUp,
   CheckCircle,
   Clock,
   Plus,
   ArrowRight,
-  Target,
-  Zap,
   RefreshCw,
   AlertCircle,
 } from "lucide-react";
@@ -258,31 +255,24 @@ export default function KetuaTimDashboard() {
           </Button>
 
           <Button
-            asChild
-            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
-          >
-            <Link
-              href="/ketua-tim/projects/new"
-              prefetch
-              onMouseEnter={() => router.prefetch("/ketua-tim/projects/new")}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Proyek Baru
-            </Link>
-          </Button>
-
-          <Button
             variant="outline"
             asChild
-            className="border-2 border-green-200 text-green-600 hover:bg-green-50 font-semibold px-6 py-3 rounded-xl transition-all duration-300 hover:border-green-300"
+            className="border-2 border-purple-200 text-purple-600 hover:bg-purple-50 font-semibold px-6 py-3 rounded-xl transition-all duration-300 hover:border-purple-300"
+            onClick={() => {
+              // Clear any cached data before navigating
+              if (typeof window !== "undefined") {
+                // Clear localStorage/sessionStorage if needed
+                localStorage.removeItem("activeTeam");
+                sessionStorage.clear();
+                // Also clear any project-related cache
+                localStorage.removeItem("ACTIVE_PROJECT");
+                localStorage.removeItem("ACTIVE_TEAM");
+              }
+            }}
           >
-            <Link
-              href="/ketua-tim/team"
-              prefetch
-              onMouseEnter={() => router.prefetch("/ketua-tim/team")}
-            >
+            <Link href="/pegawai">
               <Users className="w-4 h-4 mr-2" />
-              Kelola Tim
+              Ganti Tim
             </Link>
           </Button>
         </div>
@@ -546,78 +536,6 @@ export default function KetuaTimDashboard() {
                 </p>
               </div>
             )}
-          </div>
-        </div>
-      </div>
-
-      {/* Performance Overview (unchanged) */}
-      <div className="border-0 shadow-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white overflow-hidden rounded-xl">
-        <div className="p-8">
-          <div className="grid md:grid-cols-4 gap-8 text-center relative">
-            <div className="space-y-2">
-              <div className="flex items-center justify-center mb-3">
-                <Target className="w-8 h-8" />
-              </div>
-              <div className="text-3xl font-bold">
-                {recent_projects.length > 0
-                  ? Math.round(
-                      recent_projects.reduce((acc, p) => acc + p.progress, 0) /
-                        recent_projects.length,
-                    )
-                  : 0}
-                %
-              </div>
-              <div className="text-purple-100 text-sm">
-                Rata-rata progres proyek
-              </div>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-center mb-3">
-                <TrendingUp className="w-8 h-8" />
-              </div>
-              <div className="text-3xl font-bold">
-                {stats.team_members > 0
-                  ? Math.round(
-                      (stats.team_members / Math.max(stats.my_projects, 1)) *
-                        100,
-                    )
-                  : 0}
-                %
-              </div>
-              <div className="text-purple-100 text-sm">
-                Tingkat pemanfaatan tim
-              </div>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-center mb-3">
-                <CheckCircle className="w-8 h-8" />
-              </div>
-              <div className="text-3xl font-bold">{stats.active_projects}</div>
-              <div className="text-purple-100 text-sm">
-                Proyek aktif bulan ini
-              </div>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-center mb-3">
-                <Zap className="w-8 h-8" />
-              </div>
-              <div className="text-3xl font-bold">
-                {pending_tasks.length === 0
-                  ? "5.0"
-                  : pending_tasks.length <= 3
-                    ? "4.8"
-                    : pending_tasks.length <= 7
-                      ? "4.5"
-                      : "4.0"}
-              </div>
-              <div className="text-purple-100 text-sm">
-                Skor manajemen proyek
-              </div>
-            </div>
-
-            {/* Background decorations */}
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white bg-opacity-10 rounded-full -translate-y-16 translate-x-16"></div>
-            <div className="absolute bottom-0 left-0 w-24 h-24 bg-white bg-opacity-10 rounded-full translate-y-12 -translate-x-12"></div>
           </div>
         </div>
       </div>

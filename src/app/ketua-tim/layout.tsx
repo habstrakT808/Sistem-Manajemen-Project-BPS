@@ -2,6 +2,7 @@
 
 import { KetuaTimLayout } from "@/components/layout/KetuaTimLayout";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 
 export default function KetuaTimLayoutPage({
   children,
@@ -9,8 +10,10 @@ export default function KetuaTimLayoutPage({
   children: React.ReactNode;
 }) {
   return (
-    <ProtectedRoute requireProjectRole="leader">
-      <KetuaTimLayout>{children}</KetuaTimLayout>
-    </ProtectedRoute>
+    <ErrorBoundary>
+      <ProtectedRoute requireProjectRole="leader">
+        <KetuaTimLayout>{children}</KetuaTimLayout>
+      </ProtectedRoute>
+    </ErrorBoundary>
   );
 }

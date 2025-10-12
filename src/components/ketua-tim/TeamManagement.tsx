@@ -294,7 +294,7 @@ export default function TeamManagement() {
       <div className="space-y-8">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
-          <p>Loading team data...</p>
+          <p>Memuat data tim...</p>
         </div>
       </div>
     );
@@ -306,11 +306,11 @@ export default function TeamManagement() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-            Team Management
+            Manajemen Tim
           </h1>
           <p className="text-gray-600 text-lg mt-2">
-            Monitor team workload, performance, and manage assignments
-            effectively.
+            Pantau beban kerja tim, performa, dan kelola penugasan dengan
+            efektif.
           </p>
         </div>
 
@@ -321,7 +321,7 @@ export default function TeamManagement() {
             className="border-2 border-blue-200 text-blue-600 hover:bg-blue-50"
           >
             <Users className="w-4 h-4 mr-2" />
-            Refresh Data
+            Muat Ulang Data
           </Button>
         </div>
       </div>
@@ -335,7 +335,7 @@ export default function TeamManagement() {
                 <Users className="w-6 h-6 mr-3" />
                 {analytics.overview.total_team_members}
               </div>
-              <div className="text-blue-100 mt-2 text-sm">Team Members</div>
+              <div className="text-blue-100 mt-2 text-sm">Anggota Tim</div>
             </div>
           </div>
 
@@ -345,7 +345,7 @@ export default function TeamManagement() {
                 <ClipboardList className="w-6 h-6 mr-3" />
                 {analytics.overview.total_tasks}
               </div>
-              <div className="text-green-100 mt-2 text-sm">Total Tasks</div>
+              <div className="text-green-100 mt-2 text-sm">Total Tugas</div>
             </div>
           </div>
 
@@ -355,9 +355,7 @@ export default function TeamManagement() {
                 <CheckCircle className="w-6 h-6 mr-3" />
                 {analytics.overview.completed_tasks}
               </div>
-              <div className="text-orange-100 mt-2 text-sm">
-                Completed Tasks
-              </div>
+              <div className="text-orange-100 mt-2 text-sm">Tugas Selesai</div>
             </div>
           </div>
 
@@ -368,7 +366,7 @@ export default function TeamManagement() {
                 {analytics.overview.completion_rate}%
               </div>
               <div className="text-purple-100 mt-2 text-sm">
-                Completion Rate
+                Tingkat Penyelesaian
               </div>
             </div>
           </div>
@@ -377,9 +375,9 @@ export default function TeamManagement() {
 
       <Tabs defaultValue="team" className="space-y-6">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="team">Team Overview</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics & Performance</TabsTrigger>
-          <TabsTrigger value="mitra-reviews">Mitra Reviews</TabsTrigger>
+          <TabsTrigger value="team">Ringkasan Tim</TabsTrigger>
+          <TabsTrigger value="analytics">Analitik & Performa</TabsTrigger>
+          <TabsTrigger value="mitra-reviews">Ulasan Mitra</TabsTrigger>
         </TabsList>
 
         <TabsContent value="team" className="space-y-6">
@@ -388,7 +386,7 @@ export default function TeamManagement() {
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <Input
-                placeholder="Search team members..."
+                placeholder="Cari anggota tim..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -397,10 +395,10 @@ export default function TeamManagement() {
 
             <Select value={workloadFilter} onValueChange={setWorkloadFilter}>
               <SelectTrigger className="w-48">
-                <SelectValue placeholder="All Workloads" />
+                <SelectValue placeholder="Semua Beban Kerja" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Workloads</SelectItem>
+                <SelectItem value="all">Semua Beban Kerja</SelectItem>
                 <SelectItem value="low">
                   Ringan ({workloadCounts.low})
                 </SelectItem>
@@ -418,7 +416,7 @@ export default function TeamManagement() {
               className="border-2 border-gray-200 text-gray-600 hover:bg-gray-50"
             >
               <Filter className="w-4 h-4 mr-2" />
-              More Filters
+              Filter Lainnya
             </Button>
           </div>
 
@@ -428,10 +426,10 @@ export default function TeamManagement() {
               <div className="col-span-full text-center py-12">
                 <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  No team members found
+                  Tidak ada anggota tim ditemukan
                 </h3>
                 <p className="text-gray-500">
-                  Try adjusting your search or filter criteria.
+                  Coba sesuaikan kriteria pencarian atau filter Anda.
                 </p>
               </div>
             ) : (
@@ -489,7 +487,7 @@ export default function TeamManagement() {
                                 </span>
                               </Badge>
                               <Badge className="bg-blue-100 text-blue-800 shadow-sm">
-                                {member.workload.project_count} Projects
+                                {member.workload.project_count} Proyek
                               </Badge>
                             </div>
                           </div>
@@ -510,7 +508,7 @@ export default function TeamManagement() {
                             }}
                           >
                             <Eye className="w-4 h-4 mr-1" />
-                            View Details
+                            Lihat Detail
                           </Link>
                         </Button>
                       </div>
@@ -522,7 +520,7 @@ export default function TeamManagement() {
                             {completionRate}%
                           </div>
                           <div className="text-sm text-emerald-700">
-                            Task Completion
+                            Penyelesaian Tugas
                           </div>
                         </div>
                         <div className="text-center p-3 bg-indigo-50 rounded-lg">
@@ -530,7 +528,7 @@ export default function TeamManagement() {
                             {member.task_stats.total}
                           </div>
                           <div className="text-sm text-indigo-700">
-                            Total Tasks
+                            Total Tugas
                           </div>
                         </div>
                       </div>
@@ -538,7 +536,7 @@ export default function TeamManagement() {
                       {/* Task Breakdown */}
                       <div className="space-y-2 mb-4">
                         <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Task Progress</span>
+                          <span className="text-gray-600">Progres Tugas</span>
                           <span className="font-semibold text-gray-900">
                             {member.task_stats.completed}/
                             {member.task_stats.total}
@@ -553,22 +551,22 @@ export default function TeamManagement() {
                           </div>
                         </div>
                         <div className="flex justify-between text-xs text-gray-500">
-                          <span>Pending: {member.task_stats.pending}</span>
+                          <span>Menunggu: {member.task_stats.pending}</span>
                           <span>
-                            In Progress: {member.task_stats.in_progress}
+                            Sedang Berjalan: {member.task_stats.in_progress}
                           </span>
-                          <span>Completed: {member.task_stats.completed}</span>
+                          <span>Selesai: {member.task_stats.completed}</span>
                         </div>
                       </div>
 
                       {/* Current Projects */}
                       <div className="space-y-2 mb-4">
                         <h4 className="font-semibold text-gray-900">
-                          Current Projects
+                          Proyek Saat Ini
                         </h4>
                         {member.current_projects.length === 0 ? (
                           <p className="text-sm text-gray-500">
-                            No active projects
+                            Tidak ada proyek aktif
                           </p>
                         ) : (
                           <div className="space-y-1">
@@ -580,7 +578,7 @@ export default function TeamManagement() {
                                     {project.nama_project}
                                   </span>
                                   <span className="text-gray-500 ml-2">
-                                    • Due:{" "}
+                                    • Jatuh Tempo:{" "}
                                     {new Date(
                                       project.deadline,
                                     ).toLocaleDateString("id-ID")}
@@ -589,8 +587,8 @@ export default function TeamManagement() {
                               ))}
                             {member.current_projects.length > 2 && (
                               <p className="text-sm text-gray-500">
-                                +{member.current_projects.length - 2} more
-                                projects
+                                +{member.current_projects.length - 2} proyek
+                                lainnya
                               </p>
                             )}
                           </div>
@@ -602,7 +600,7 @@ export default function TeamManagement() {
                         <div className="flex items-center space-x-2">
                           <DollarSign className="w-4 h-4 text-emerald-600" />
                           <span className="text-sm text-gray-600">
-                            Monthly Earnings
+                            Pendapatan Bulanan
                           </span>
                         </div>
                         <span className="font-semibold text-emerald-600">
@@ -621,7 +619,7 @@ export default function TeamManagement() {
           {/* Analytics Controls */}
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold text-gray-900">
-              Team Analytics
+              Analitik Tim
             </h2>
             <div className="flex items-center space-x-4">
               <Select
@@ -629,12 +627,12 @@ export default function TeamManagement() {
                 onValueChange={setAnalyticsPeriod}
               >
                 <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Select Period" />
+                  <SelectValue placeholder="Pilih Periode" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="7">Last 7 days</SelectItem>
-                  <SelectItem value="30">Last 30 days</SelectItem>
-                  <SelectItem value="90">Last 90 days</SelectItem>
+                  <SelectItem value="7">7 hari terakhir</SelectItem>
+                  <SelectItem value="30">30 hari terakhir</SelectItem>
+                  <SelectItem value="90">90 hari terakhir</SelectItem>
                 </SelectContent>
               </Select>
               <Button
@@ -648,7 +646,7 @@ export default function TeamManagement() {
                 ) : (
                   <BarChart3 className="w-4 h-4 mr-2" />
                 )}
-                Refresh
+                Muat Ulang
               </Button>
             </div>
           </div>
@@ -656,7 +654,7 @@ export default function TeamManagement() {
           {analyticsLoading ? (
             <div className="text-center py-12">
               <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
-              <p>Loading analytics...</p>
+              <p>Memuat analitik...</p>
             </div>
           ) : analytics ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -665,10 +663,10 @@ export default function TeamManagement() {
                 <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-6">
                   <div className="flex items-center text-white text-xl font-semibold">
                     <Users className="w-6 h-6 mr-3" />
-                    Workload Distribution
+                    Distribusi Beban Kerja
                   </div>
                   <div className="text-purple-100 mt-2 text-sm">
-                    Team workload breakdown
+                    Rincian beban kerja tim
                   </div>
                 </div>
                 <div className="p-6">
@@ -687,10 +685,10 @@ export default function TeamManagement() {
                 <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6">
                   <div className="flex items-center text-white text-xl font-semibold">
                     <TrendingUp className="w-6 h-6 mr-3" />
-                    Task Completion Trends
+                    Tren Penyelesaian Tugas
                   </div>
                   <div className="text-blue-100 mt-2 text-sm">
-                    Daily task completion over time
+                    Penyelesaian tugas harian dari waktu ke waktu
                   </div>
                 </div>
                 <div className="p-6">
@@ -702,17 +700,17 @@ export default function TeamManagement() {
                       {
                         dataKey: "Completed",
                         stroke: "#10B981",
-                        name: "Completed",
+                        name: "Selesai",
                       },
                       {
                         dataKey: "In Progress",
                         stroke: "#3B82F6",
-                        name: "In Progress",
+                        name: "Sedang Berjalan",
                       },
                       {
                         dataKey: "Pending",
                         stroke: "#F59E0B",
-                        name: "Pending",
+                        name: "Menunggu",
                       },
                     ]}
                   />
@@ -724,10 +722,10 @@ export default function TeamManagement() {
                 <div className="bg-gradient-to-r from-green-600 to-teal-600 p-6">
                   <div className="flex items-center text-white text-xl font-semibold">
                     <BarChart3 className="w-6 h-6 mr-3" />
-                    Member Performance Comparison
+                    Perbandingan Performa Anggota
                   </div>
                   <div className="text-green-100 mt-2 text-sm">
-                    Task completion rates by team member
+                    Tingkat penyelesaian tugas per anggota tim
                   </div>
                 </div>
                 <div className="p-6">
@@ -750,10 +748,10 @@ export default function TeamManagement() {
             <div className="text-center py-12">
               <BarChart3 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                No analytics data
+                Tidak ada data analitik
               </h3>
               <p className="text-gray-500">
-                Analytics data will appear here once you have team activities.
+                Data analitik akan muncul di sini setelah ada aktivitas tim.
               </p>
             </div>
           )}

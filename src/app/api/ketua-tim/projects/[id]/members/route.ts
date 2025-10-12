@@ -64,7 +64,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // Get project members (excluding leader)
+    // Get project members (including leader)
     const { data: members, error: membersError } = await (svc as any)
       .from("project_members")
       .select(
@@ -80,8 +80,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       `,
       )
       .eq("project_id", projectId)
-      .eq("users.is_active", true)
-      .neq("role", "leader"); // Exclude leader from assignable members
+      .eq("users.is_active", true);
 
     if (membersError) {
       console.error("Members fetch error:", membersError);
@@ -109,7 +108,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       const ketuaId = (project as { ketua_tim_id?: string }).ketua_tim_id;
       const userIds = (assigns as Array<{ assignee_id: string }>)
         .map((a) => a.assignee_id)
-        .filter((uid) => !!uid && uid !== leaderId && uid !== ketuaId);
+        .filter((uid) => !!uid); // Include all assigned users, including leader
 
       if (userIds.length > 0) {
         const { data: userRows } = await (svc as any)

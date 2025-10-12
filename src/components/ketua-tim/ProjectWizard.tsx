@@ -73,6 +73,8 @@ const initialFormData: ProjectFormData = {
 };
 
 export default function ProjectWizard() {
+  console.log("ProjectWizard: Component mounting");
+
   const router = useRouter();
   const queryClient = useQueryClient();
   const [currentStep, setCurrentStep] = useState(1);
@@ -80,6 +82,7 @@ export default function ProjectWizard() {
   const [pegawaiData, setPegawaiData] = useState<PegawaiData[]>([]);
   const [mitraData, setMitraData] = useState<MitraData[]>([]);
   const [loading, setLoading] = useState(true);
+  console.log("ProjectWizard: State initialized successfully");
   const [submitting, setSubmitting] = useState(false);
   const [selectedPegawai, setSelectedPegawai] = useState<string[]>([]);
   const [selectedMitra, setSelectedMitra] = useState<string[]>([]);

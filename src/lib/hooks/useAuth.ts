@@ -35,8 +35,15 @@ export function useAuth(): UseAuthReturn {
   const fetchUserProfile = useCallback(
     async (
       userId: string,
+      retryCount: number = 0,
     ): Promise<Database["public"]["Tables"]["users"]["Row"] | null> => {
       try {
+        console.log(
+          "=== fetchUserProfile: Fetching profile for user:",
+          userId,
+          "Retry:",
+          retryCount,
+        );
         const { data, error } = await supabase
           .from("users")
           .select("*")
@@ -44,11 +51,40 @@ export function useAuth(): UseAuthReturn {
           .single<Database["public"]["Tables"]["users"]["Row"]>();
 
         if (error) {
+          console.error("=== fetchUserProfile: Error fetching profile:", error);
+          console.error("=== fetchUserProfile: Error details:", {
+            code: error.code,
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+          });
+
+          // Retry up to 3 times with exponential backoff
+          if (retryCount < 3) {
+            const delay = Math.pow(2, retryCount) * 500; // 500ms, 1s, 2s
+            console.log(`=== fetchUserProfile: Retrying in ${delay}ms...`);
+            await new Promise((resolve) => setTimeout(resolve, delay));
+            return fetchUserProfile(userId, retryCount + 1);
+          }
+
           return null;
         }
 
+        console.log("=== fetchUserProfile: Profile loaded successfully:", data);
         return data;
-      } catch {
+      } catch (err) {
+        console.error("=== fetchUserProfile: Exception fetching profile:", err);
+
+        // Retry up to 3 times with exponential backoff
+        if (retryCount < 3) {
+          const delay = Math.pow(2, retryCount) * 500;
+          console.log(
+            `=== fetchUserProfile: Retrying in ${delay}ms due to exception...`,
+          );
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          return fetchUserProfile(userId, retryCount + 1);
+        }
+
         return null;
       }
     },

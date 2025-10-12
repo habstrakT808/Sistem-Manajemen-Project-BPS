@@ -79,10 +79,33 @@ export function ProtectedRoute({
       if (requireProjectRole) {
         // For ketua-tim pages, check if user has leader role in active project/team
         if (requireProjectRole === "leader") {
+          console.log("ProtectedRoute: Checking ketua-tim access", {
+            loading,
+            userProfile: userProfile?.role,
+            activeProject: activeProject?.role,
+            activeTeam: activeTeam?.role,
+            currentPath:
+              typeof window !== "undefined" ? window.location.pathname : "",
+          });
+
           // Wait for userProfile to load
           if (loading) {
             console.log("Still loading userProfile, waiting...");
             return; // Still loading, wait
+          }
+
+          // If userProfile is still undefined after loading, wait a bit more
+          if (!userProfile && !loading) {
+            console.log("UserProfile is undefined, waiting for it to load...");
+            // Wait maximum 3 seconds for userProfile to load
+            setTimeout(() => {
+              if (!userProfile) {
+                console.log(
+                  "UserProfile still undefined after timeout, proceeding with access check",
+                );
+              }
+            }, 3000);
+            // Don't return here, continue with access check
           }
 
           console.log("Checking ketua-tim access:", {
@@ -97,6 +120,23 @@ export function ProtectedRoute({
           const isLeaderInTeam = activeTeam?.role === "leader";
           const isDatabaseKetuaTim = userProfile?.role === "ketua_tim";
 
+          // If userProfile is undefined but we have activeProject or activeTeam with leader role, allow access
+          if (!userProfile && (isLeaderInProject || isLeaderInTeam)) {
+            console.log(
+              "Allowing access based on activeProject/activeTeam role despite undefined userProfile",
+            );
+            return;
+          }
+
+          // Special case: If userProfile is undefined and no activeProject/activeTeam,
+          // but we're accessing ketua-tim pages, allow access temporarily
+          if (!userProfile && !activeProject && !activeTeam) {
+            console.log(
+              "Allowing temporary access to ketua-tim pages despite undefined userProfile and no activeProject/activeTeam",
+            );
+            return;
+          }
+
           if (!isLeaderInProject && !isLeaderInTeam && !isDatabaseKetuaTim) {
             console.log(
               "User not authorized for ketua-tim access:",
@@ -106,23 +146,59 @@ export function ProtectedRoute({
               "Team role:",
               activeTeam?.role,
             );
-            router.prefetch("/pegawai");
-            router.push("/pegawai");
-            return;
+            // Only redirect if we're actually trying to access ketua-tim pages
+            const currentPath =
+              typeof window !== "undefined" ? window.location.pathname : "";
+            if (currentPath.startsWith("/ketua-tim")) {
+              router.prefetch("/pegawai");
+              router.push("/pegawai");
+              return;
+            }
           }
+        }
+
+        // Special handling for /pegawai/projects with team_id - check this FIRST
+        const currentPath =
+          typeof window !== "undefined" ? window.location.pathname : "";
+        const hasTeamId =
+          typeof window !== "undefined"
+            ? new URLSearchParams(window.location.search).get("team_id")
+            : null;
+
+        console.log("[ProtectedRoute] Debug:", {
+          currentPath,
+          hasTeamId,
+          activeProject: activeProject?.id,
+          activeTeam: activeTeam?.id,
+          storedRole: getStoredRole(),
+          requireProjectRole,
+        });
+
+        if (currentPath === "/pegawai/projects" && hasTeamId) {
+          // Allow access to projects page with team_id regardless of activeProject/activeTeam
+          // The ProjectListView component will handle the team_id and show appropriate projects
+          console.log(
+            "[ProtectedRoute] Allowing access to /pegawai/projects with team_id:",
+            hasTeamId,
+          );
+          return;
         }
 
         // Allow access if either an active project OR an active team matches the role.
         // This lets team leaders access `/ketua-tim` after picking a team, even
         // when no specific project has been selected yet.
         if (!activeProject && !activeTeam && !getStoredRole()) {
-          router.prefetch("/pegawai/projects");
-          router.push("/pegawai/projects");
-          return;
+          // Don't redirect if user is already on /pegawai/projects with team_id
+          if (currentPath !== "/pegawai/projects" || !hasTeamId) {
+            router.prefetch("/pegawai/projects");
+            router.push("/pegawai/projects");
+            return;
+          }
         }
 
         const resolvedRole =
           activeProject?.role ?? activeTeam?.role ?? getStoredRole();
+
         if (resolvedRole && resolvedRole !== requireProjectRole) {
           const dest = resolvedRole === "leader" ? "/ketua-tim" : "/pegawai";
           router.prefetch(dest);
@@ -164,7 +240,33 @@ export function ProtectedRoute({
   if (requireProjectRole) {
     const resolvedRole =
       activeProject?.role ?? activeTeam?.role ?? getStoredRole();
-    if (!resolvedRole) return null;
+
+    // Special handling for /pegawai/projects with team_id
+    const currentPath =
+      typeof window !== "undefined" ? window.location.pathname : "";
+    const hasTeamId =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("team_id")
+        : null;
+
+    if (currentPath === "/pegawai/projects" && hasTeamId) {
+      // Allow access to projects page with team_id regardless of activeProject/activeTeam
+      return <>{children}</>;
+    }
+
+    // Special case: If userProfile is undefined and we're on ketua-tim pages, allow temporary access
+    // This prevents white screen while userProfile is loading
+    if (!userProfile && currentPath.startsWith("/ketua-tim")) {
+      console.log(
+        "Rendering ketua-tim page despite undefined userProfile (temporary access)",
+      );
+      return <>{children}</>;
+    }
+
+    if (!resolvedRole) {
+      console.log("No resolved role found, showing loading spinner");
+      return <LoadingSpinner />;
+    }
     if (resolvedRole !== requireProjectRole) return null;
   }
 

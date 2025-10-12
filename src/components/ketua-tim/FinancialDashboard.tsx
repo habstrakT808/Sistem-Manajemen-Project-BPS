@@ -736,7 +736,9 @@ export default function FinancialDashboard() {
                     </div>
                   </div>
                 ))}
-                {(!dailyDetails || dailyDetails.details.length === 0) && (
+                {(!dailyDetails ||
+                  !dailyDetails.details ||
+                  dailyDetails.details.length === 0) && (
                   <div className="text-sm text-gray-500 py-6">
                     Tidak ada pengeluaran untuk tanggal ini.
                   </div>
@@ -772,7 +774,7 @@ export default function FinancialDashboard() {
                   // Reuse built-in styling used by Spending tab
                   hasEvents: (date) => {
                     const y = format(date, "yyyy-MM-dd");
-                    const rec = transportDaily?.days.find((d) => d.date === y);
+                    const rec = transportDaily?.days?.find((d) => d.date === y);
                     return !!rec && rec.count > 0;
                   },
                 }}
@@ -821,6 +823,7 @@ export default function FinancialDashboard() {
                   </div>
                 ))}
                 {(!transportDetails ||
+                  !transportDetails.details ||
                   transportDetails.details.length === 0) && (
                   <div className="text-sm text-gray-500 py-6">
                     Tidak ada alokasi transport pada tanggal ini.

@@ -2,7 +2,10 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, Suspense } from "react";
+import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+
+export const dynamic = "force-dynamic";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -88,7 +91,15 @@ interface SkillData {
   category: string;
 }
 
-export default function ProfilePage() {
+function ProfilePageContent() {
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <ProfilePageInner />
+    </Suspense>
+  );
+}
+
+function ProfilePageInner() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
@@ -1247,5 +1258,13 @@ export default function ProfilePage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <ProfilePageContent />
+    </Suspense>
   );
 }

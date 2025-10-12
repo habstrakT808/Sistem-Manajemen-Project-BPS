@@ -310,7 +310,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     // Check if project exists and belongs to user (using service client to bypass RLS but enforce ownership ourselves)
     const { data: existingProject, error: projectError } = await (svc as any)
       .from("projects")
-      .select("id, ketua_tim_id, leader_user_id")
+      .select("id, ketua_tim_id, leader_user_id, team_id")
       .eq("id", projectId)
       .single();
 
@@ -323,6 +323,18 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
+    // Get team_id where current user is the leader (if not already set)
+    let teamId = (existingProject as any).team_id;
+    if (!teamId) {
+      const { data: userTeam } = await (svc as any)
+        .from("teams")
+        .select("id")
+        .eq("leader_user_id", user.id)
+        .limit(1)
+        .single();
+      teamId = userTeam?.id || null;
+    }
+
     // Update project
     const { data: updatedProject, error: updateError } = await (svc as any)
       .from("projects")
@@ -332,6 +344,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         tanggal_mulai: body.tanggal_mulai,
         deadline: body.deadline,
         status: body.status,
+        team_id: teamId,
         updated_at: new Date().toISOString(),
       })
       .eq("id", projectId)

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -26,7 +27,7 @@ import {
   AlertTriangle,
   CheckCircle,
   Clock,
-  X,
+  Search,
 } from "lucide-react";
 
 import { toast } from "sonner";
@@ -98,6 +99,8 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
     Record<string, number>
   >({});
   const [mitraHonor, setMitraHonor] = useState<Record<string, number>>({});
+  const [pegawaiSearchTerm, setPegawaiSearchTerm] = useState("");
+  const [mitraSearchTerm, setMitraSearchTerm] = useState("");
 
   const fetchProject = useCallback(async () => {
     setLoading(true);
@@ -292,33 +295,85 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
     }
   };
 
-  const addPegawai = (userId: string) => {
-    if (!selectedPegawai.includes(userId)) {
+  const handlePegawaiSelection = (userId: string, checked: boolean) => {
+    if (checked) {
       setSelectedPegawai([...selectedPegawai, userId]);
       setPegawaiTransport({ ...pegawaiTransport, [userId]: 0 });
+    } else {
+      setSelectedPegawai(selectedPegawai.filter((id) => id !== userId));
+      const newTransport = { ...pegawaiTransport };
+      delete newTransport[userId];
+      setPegawaiTransport(newTransport);
     }
   };
 
-  const removePegawai = (userId: string) => {
-    setSelectedPegawai(selectedPegawai.filter((id) => id !== userId));
-    const newTransport = { ...pegawaiTransport };
-    delete newTransport[userId];
-    setPegawaiTransport(newTransport);
-  };
-
-  const addMitra = (mitraId: string) => {
-    if (!selectedMitra.includes(mitraId)) {
+  const handleMitraSelection = (mitraId: string, checked: boolean) => {
+    if (checked) {
       setSelectedMitra([...selectedMitra, mitraId]);
       setMitraHonor({ ...mitraHonor, [mitraId]: 0 });
+    } else {
+      setSelectedMitra(selectedMitra.filter((id) => id !== mitraId));
+      const newHonor = { ...mitraHonor };
+      delete newHonor[mitraId];
+      setMitraHonor(newHonor);
     }
   };
 
-  const removeMitra = (mitraId: string) => {
-    setSelectedMitra(selectedMitra.filter((id) => id !== mitraId));
-    const newHonor = { ...mitraHonor };
-    delete newHonor[mitraId];
-    setMitraHonor(newHonor);
-  };
+  // Filter and sort users - selected first, then alphabetically
+  const filteredUsers = React.useMemo(() => {
+    let filtered = users;
+
+    // Apply search filter
+    if (pegawaiSearchTerm.trim()) {
+      const searchLower = pegawaiSearchTerm.toLowerCase();
+      filtered = users.filter(
+        (user) =>
+          user.nama_lengkap.toLowerCase().includes(searchLower) ||
+          user.email.toLowerCase().includes(searchLower),
+      );
+    }
+
+    // Sort: selected first, then alphabetically by name
+    return filtered.sort((a, b) => {
+      const aSelected = selectedPegawai.includes(a.id);
+      const bSelected = selectedPegawai.includes(b.id);
+
+      // Selected items first
+      if (aSelected && !bSelected) return -1;
+      if (!aSelected && bSelected) return 1;
+
+      // Alphabetically by name
+      return a.nama_lengkap.localeCompare(b.nama_lengkap, "id");
+    });
+  }, [users, pegawaiSearchTerm, selectedPegawai]);
+
+  // Filter and sort mitra - selected first, then alphabetically
+  const filteredMitra = React.useMemo(() => {
+    let filtered = mitra;
+
+    // Apply search filter
+    if (mitraSearchTerm.trim()) {
+      const searchLower = mitraSearchTerm.toLowerCase();
+      filtered = mitra.filter(
+        (m) =>
+          m.nama_mitra.toLowerCase().includes(searchLower) ||
+          m.jenis.toLowerCase().includes(searchLower),
+      );
+    }
+
+    // Sort: selected first, then alphabetically by name
+    return filtered.sort((a, b) => {
+      const aSelected = selectedMitra.includes(a.id);
+      const bSelected = selectedMitra.includes(b.id);
+
+      // Selected items first
+      if (aSelected && !bSelected) return -1;
+      if (!aSelected && bSelected) return 1;
+
+      // Alphabetically by name
+      return a.nama_mitra.localeCompare(b.nama_mitra, "id");
+    });
+  }, [mitra, mitraSearchTerm, selectedMitra]);
 
   if (loading) {
     return (
@@ -563,60 +618,74 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
                 </div>
               </div>
               <div className="p-6 space-y-4">
+                {/* Search Input for Pegawai */}
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">
-                    Tambah Anggota Tim
-                  </Label>
-                  <Select onValueChange={addPegawai}>
-                    <SelectTrigger className="border-2 border-gray-200 focus:border-green-500">
-                      <SelectValue placeholder="Pilih anggota tim" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {users
-                        .filter((user) => !selectedPegawai.includes(user.id))
-                        .map((user) => (
-                          <SelectItem key={user.id} value={user.id}>
-                            {user.nama_lengkap} ({user.email})
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">
+                      Anggota Tim (Pegawai)
+                    </Label>
+                    <div className="text-sm text-gray-500">
+                      {selectedPegawai.length} dipilih
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <Input
+                      placeholder="Cari anggota tim berdasarkan nama atau email..."
+                      value={pegawaiSearchTerm}
+                      onChange={(e) => setPegawaiSearchTerm(e.target.value)}
+                      className="pl-10 border-2 border-gray-200 focus:border-green-500"
+                    />
+                  </div>
                 </div>
 
-                <div className="space-y-3">
-                  {selectedPegawai.map((userId) => {
-                    const user = users.find((u) => u.id === userId);
-                    return (
+                {/* Live Search Results */}
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {filteredUsers.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <Users className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                      <p>
+                        {pegawaiSearchTerm.trim()
+                          ? "Tidak ada anggota tim yang sesuai dengan pencarian"
+                          : "Tidak ada anggota tim"}
+                      </p>
+                    </div>
+                  ) : (
+                    filteredUsers.map((user) => (
                       <div
-                        key={userId}
-                        className="flex items-center justify-between p-3 border border-gray-200 rounded-lg"
+                        key={user.id}
+                        className={`flex items-center p-3 border rounded-lg transition-all duration-200 ${
+                          selectedPegawai.includes(user.id)
+                            ? "border-green-300 bg-green-50"
+                            : "border-gray-200 hover:border-green-300 hover:bg-green-50"
+                        }`}
                       >
-                        <div className="flex items-center space-x-3">
+                        <Checkbox
+                          id={`pegawai-${user.id}`}
+                          checked={selectedPegawai.includes(user.id)}
+                          onCheckedChange={(checked) =>
+                            handlePegawaiSelection(user.id, checked as boolean)
+                          }
+                          className="mr-3"
+                        />
+                        <div className="flex items-center space-x-3 flex-1">
                           <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-teal-500 rounded-full flex items-center justify-center">
                             <span className="text-white font-bold text-sm">
-                              {user?.nama_lengkap?.charAt(0).toUpperCase()}
+                              {user.nama_lengkap.charAt(0).toUpperCase()}
                             </span>
                           </div>
-                          <div>
+                          <div className="flex-1">
                             <div className="font-medium text-gray-900">
-                              {user?.nama_lengkap}
+                              {user.nama_lengkap}
                             </div>
                             <div className="text-sm text-gray-500">
-                              {user?.email}
+                              {user.email}
                             </div>
                           </div>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removePegawai(userId)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
                       </div>
-                    );
-                  })}
+                    ))
+                  )}
                 </div>
               </div>
             </div>
@@ -630,59 +699,72 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
                 </div>
               </div>
               <div className="p-6 space-y-4">
+                {/* Search Input for Mitra */}
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">Tambah Mitra</Label>
-                  <Select onValueChange={addMitra}>
-                    <SelectTrigger className="border-2 border-gray-200 focus:border-purple-500">
-                      <SelectValue placeholder="Pilih mitra" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {mitra
-                        .filter((m) => !selectedMitra.includes(m.id))
-                        .map((m) => (
-                          <SelectItem key={m.id} value={m.id}>
-                            {m.nama_mitra} ({m.jenis}) - ⭐{" "}
-                            {m.rating_average.toFixed(1)}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">Mitra</Label>
+                    <div className="text-sm text-gray-500">
+                      {selectedMitra.length} dipilih
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <Input
+                      placeholder="Cari mitra berdasarkan nama atau jenis..."
+                      value={mitraSearchTerm}
+                      onChange={(e) => setMitraSearchTerm(e.target.value)}
+                      className="pl-10 border-2 border-gray-200 focus:border-purple-500"
+                    />
+                  </div>
                 </div>
 
-                <div className="space-y-3">
-                  {selectedMitra.map((mitraId) => {
-                    const m = mitra.find((mit) => mit.id === mitraId);
-                    return (
+                {/* Live Search Results */}
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {filteredMitra.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <Users className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                      <p>
+                        {mitraSearchTerm.trim()
+                          ? "Tidak ada mitra yang sesuai dengan pencarian"
+                          : "Tidak ada mitra"}
+                      </p>
+                    </div>
+                  ) : (
+                    filteredMitra.map((m) => (
                       <div
-                        key={mitraId}
-                        className="flex items-center justify-between p-3 border border-gray-200 rounded-lg"
+                        key={m.id}
+                        className={`flex items-center p-3 border rounded-lg transition-all duration-200 ${
+                          selectedMitra.includes(m.id)
+                            ? "border-purple-300 bg-purple-50"
+                            : "border-gray-200 hover:border-purple-300 hover:bg-purple-50"
+                        }`}
                       >
-                        <div className="flex items-center space-x-3">
+                        <Checkbox
+                          id={`mitra-${m.id}`}
+                          checked={selectedMitra.includes(m.id)}
+                          onCheckedChange={(checked) =>
+                            handleMitraSelection(m.id, checked as boolean)
+                          }
+                          className="mr-3"
+                        />
+                        <div className="flex items-center space-x-3 flex-1">
                           <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
                             <span className="text-white font-bold text-sm">
-                              {m?.nama_mitra?.charAt(0).toUpperCase()}
+                              {m.nama_mitra.charAt(0).toUpperCase()}
                             </span>
                           </div>
-                          <div>
+                          <div className="flex-1">
                             <div className="font-medium text-gray-900">
-                              {m?.nama_mitra}
+                              {m.nama_mitra}
                             </div>
                             <div className="text-sm text-gray-500">
-                              {m?.jenis} • ⭐ {m?.rating_average.toFixed(1)}
+                              {m.jenis} • ⭐ {m.rating_average.toFixed(1)}
                             </div>
                           </div>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeMitra(mitraId)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
                       </div>
-                    );
-                  })}
+                    ))
+                  )}
                 </div>
               </div>
             </div>

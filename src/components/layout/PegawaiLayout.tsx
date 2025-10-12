@@ -22,7 +22,6 @@ import {
   CheckSquare,
   Play,
   Leaf,
-  Users,
 } from "lucide-react";
 import { useAuthContext } from "@/components/auth/AuthProvider";
 import { useActiveProject } from "@/components/providers";
@@ -49,14 +48,6 @@ async function fetchNotifications(): Promise<NotificationData> {
 }
 
 const navigation = [
-  {
-    name: "Tim",
-    href: "/pegawai",
-    icon: Users,
-    description: "Daftar tim saya",
-    color: "from-blue-500 to-blue-600",
-    isDefault: true,
-  },
   {
     name: "Dasbor",
     href: "/pegawai/dashboard",

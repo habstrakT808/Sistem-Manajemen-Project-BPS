@@ -3,5 +3,6 @@
 import { ProjectWizard } from "@/components/ketua-tim";
 
 export default function NewProjectPage() {
+  console.log("NewProjectPage: Rendering ProjectWizard");
   return <ProjectWizard />;
 }

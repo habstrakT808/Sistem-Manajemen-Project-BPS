@@ -31,6 +31,7 @@ export async function GET(request: Request) {
     const supabase = await createClient();
     const { searchParams } = new URL(request.url);
     const teamId = searchParams.get("team_id");
+    console.log("[API] /api/pegawai/projects - teamId:", teamId);
     const svc = createServiceClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -71,13 +72,15 @@ export async function GET(request: Request) {
         )
         .eq("team_id", teamId);
 
-      // 2) Membership rows for current user within these projects
+      // 2) Membership rows for current user within these projects (only as member, not leader)
       const projectIds = (teamProjects || []).map((p: any) => p.id);
       const { data: memberRows } = await (svc as any)
         .from("project_members")
         .select("project_id, role")
         .eq("user_id", user.id)
+        .eq("role", "member")
         .in("project_id", projectIds.length > 0 ? projectIds : ["__none__"]);
+
       const memberSet = new Set(
         (memberRows || []).map((r: any) => r.project_id),
       );
@@ -89,32 +92,15 @@ export async function GET(request: Request) {
           .select("project_id")
           .in("project_id", projectIds)
           .or(`assignee_user_id.eq.${user.id},pegawai_id.eq.${user.id}`);
+
         (taskProjects || []).forEach((r: any) => {
           if (r?.project_id) memberSet.add(r.project_id);
         });
       }
 
-      // 4) If current user is the leader of this team, include user's leader projects even when team_id is null
-      const { data: teamRow } = await (svc as any)
-        .from("teams")
-        .select("leader_user_id")
-        .eq("id", teamId)
-        .single();
-
-      let extraLeaderProjects: any[] = [];
+      // 4) No longer include leader projects automatically
+      // Projects are only shown if user is explicitly assigned as a member
       let extraMemberProjects: any[] = [];
-
-      if (teamRow) {
-        const leaderId = (teamRow as any).leader_user_id as string;
-        const { data: leaderProjectsNoTeam } = await (svc as any)
-          .from("projects")
-          .select(
-            "id, nama_project, deskripsi, status, tanggal_mulai, deadline, leader_user_id, team_id, ketua_tim_id",
-          )
-          .is("team_id", null)
-          .or(`leader_user_id.eq.${leaderId},ketua_tim_id.eq.${leaderId}`);
-        extraLeaderProjects = leaderProjectsNoTeam || [];
-      }
 
       // 5) Also include projects where current user is a member but project.team_id is null
       const { data: memberProjectsNoTeam } = await (svc as any)
@@ -124,11 +110,12 @@ export async function GET(request: Request) {
         )
         .is("team_id", null)
         .in("id", projectIds.length > 0 ? projectIds : ["__none__"]);
-      // Note: above would be empty; instead fetch by membership table directly
+      // Note: above would be empty; instead fetch by membership table directly (only as member, not leader)
       const { data: memberDirect } = await (svc as any)
         .from("project_members")
         .select("project_id")
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .eq("role", "member");
       const memberProjectIdsNoTeam = (memberDirect || []).map(
         (r: any) => r.project_id,
       );
@@ -174,62 +161,86 @@ export async function GET(request: Request) {
         }
       }
 
-      // Merge: team projects + leader no-team projects + member no-team projects
+      // Merge: team projects + member no-team projects (no leader projects)
       const mergedProjectsMap: Record<string, any> = {};
-      [
-        ...(teamProjects || []),
-        ...extraLeaderProjects,
-        ...extraMemberProjects,
-      ].forEach((p: any) => {
+      [...(teamProjects || []), ...extraMemberProjects].forEach((p: any) => {
         mergedProjectsMap[p.id] = p;
       });
       const mergedProjects = Object.values(mergedProjectsMap);
 
-      let baseProjects: Array<ProjectData> = (mergedProjects as any[]).map(
-        (p: any) => ({
-          project_id: p.id,
-          project_name: p.nama_project,
-          project_description: p.deskripsi,
-          project_status: p.status,
-          status: p.status,
-          start_date: p.tanggal_mulai,
-          end_date: p.deadline,
-          deadline: p.deadline,
-          leader_name: "-",
-          // Treat explicit membership as "member" even if user is also leader,
-          // so the project appears on the Pegawai list view.
-          user_role: memberSet.has(p.id)
-            ? ("member" as const)
-            : p.leader_user_id === user.id || p.ketua_tim_id === user.id
-              ? ("leader" as const)
-              : ("member" as const),
-          team_size: undefined,
-          my_tasks_count: undefined,
-          my_pending_tasks: undefined,
-        }),
+      // Filter to only show projects where user is actually assigned as a member
+      // User is assigned if:
+      // 1. Has project_members entry (memberSet)
+      // 2. Has tasks assigned
+      // Note: Being a project leader does NOT automatically make you a member in pegawai view
+      // AND project belongs to the selected team
+      const filteredProjects = (mergedProjects as any[]).filter((p: any) => {
+        // Check if user is assigned to this project (only as member, not as leader)
+        const isInMemberSet = memberSet.has(p.id);
+
+        // Check if project belongs to the selected team
+        const belongsToTeam = p.team_id === teamId;
+
+        console.log(
+          `[API] Project ${p.id} (${p.nama_project}): isInMemberSet=${isInMemberSet}, belongsToTeam=${belongsToTeam}, team_id=${p.team_id}, expected_team_id=${teamId}`,
+        );
+
+        return isInMemberSet && belongsToTeam;
+      });
+
+      console.log(
+        `[API] Total merged projects: ${mergedProjects.length}, filtered projects: ${filteredProjects.length}`,
       );
 
-      // Do not filter by relation; show all projects under the team (default as member)
+      let baseProjects: Array<ProjectData> = filteredProjects.map((p: any) => ({
+        project_id: p.id,
+        project_name: p.nama_project,
+        project_description: p.deskripsi,
+        project_status: p.status,
+        status: p.status,
+        start_date: p.tanggal_mulai,
+        end_date: p.deadline,
+        deadline: p.deadline,
+        leader_name: "-",
+        // In pegawai view, user is always a member (since we filter by memberSet)
+        user_role: "member" as const,
+        team_size: undefined,
+        my_tasks_count: undefined,
+        my_pending_tasks: undefined,
+      }));
+
+      // Only show projects where user is actually assigned
 
       // Enrich and return
       const enrichedProjects = await Promise.all(
         (baseProjects || []).map(async (project) => {
-          type TaskIdRow = { id: string };
-          const { data: taskIdRows } = await supabase
+          // Get all tasks assigned to user (including pegawai_id for backward compatibility)
+          type TaskRow = { id: string; status: string };
+          const { data: userTasks } = await (svc as any)
             .from("tasks")
-            .select("id")
+            .select("id, status")
             .eq("project_id", project.project_id)
-            .eq("assignee_user_id", user.id);
+            .or(`assignee_user_id.eq.${user.id},pegawai_id.eq.${user.id}`);
 
-          const taskIds = ((taskIdRows as TaskIdRow[]) || []).map((r) => r.id);
-          const { data: earnings } = await supabase
-            .from("earnings_ledger")
+          const tasks = (userTasks as TaskRow[]) || [];
+          const totalTasks = tasks.length;
+          const completedTasks = tasks.filter(
+            (t) => t.status === "completed",
+          ).length;
+          const pendingTasks = tasks.filter(
+            (t) => t.status === "pending",
+          ).length;
+
+          // Get transport earnings from task_transport_allocations
+          const taskIds = tasks.map((t) => t.id);
+          const { data: transportData } = await (svc as any)
+            .from("task_transport_allocations")
             .select("amount")
             .eq("user_id", user.id)
-            .eq("type", "transport")
-            .in("source_id", taskIds.length > 0 ? taskIds : ["__none__"]);
-          const totalTransport = (earnings || []).reduce(
-            (sum: number, e: any) => sum + e.amount,
+            .in("task_id", taskIds.length > 0 ? taskIds : ["__none__"]);
+
+          const totalTransport = (transportData || []).reduce(
+            (sum: number, t: any) => sum + (Number(t.amount) || 0),
             0,
           );
 
@@ -244,10 +255,9 @@ export async function GET(request: Request) {
             ketua_tim: { nama_lengkap: project.leader_name },
             team_size: project.team_size,
             my_tasks: {
-              total: project.my_tasks_count || 0,
-              pending: project.my_pending_tasks || 0,
-              completed:
-                (project.my_tasks_count || 0) - (project.my_pending_tasks || 0),
+              total: totalTasks,
+              pending: pendingTasks,
+              completed: completedTasks,
             },
             my_transport_earnings: totalTransport,
           };
@@ -344,6 +354,7 @@ export async function GET(request: Request) {
     const enrichedProjects = await Promise.all(
       (baseProjects || []).map(async (project) => {
         // Get my transport earnings for this project
+        // First get task IDs for this project where user is assigned
         type TaskIdRow = { id: string };
         const { data: taskIdRows } = await supabase
           .from("tasks")
@@ -353,12 +364,33 @@ export async function GET(request: Request) {
 
         const taskIds = ((taskIdRows as TaskIdRow[]) || []).map((r) => r.id);
 
+        // Get transport allocations for these tasks that have been allocated
+        let allocationIds: string[] = [];
+        if (taskIds.length > 0) {
+          const { data: allocationRows } = await supabase
+            .from("task_transport_allocations")
+            .select("id")
+            .eq("user_id", user.id)
+            .in("task_id", taskIds)
+            .not("allocation_date", "is", null)
+            .is("canceled_at", null);
+
+          allocationIds = ((allocationRows as { id: string }[]) || []).map(
+            (r) => r.id,
+          );
+        }
+
+        // Get earnings only for allocated transport allocations
         const { data: earnings } = await supabase
           .from("earnings_ledger")
           .select("amount")
           .eq("user_id", user.id)
           .eq("type", "transport")
-          .in("source_id", taskIds.length > 0 ? taskIds : ["__none__"]);
+          .eq("source_table", "task_transport_allocations")
+          .in(
+            "source_id",
+            allocationIds.length > 0 ? allocationIds : ["__none__"],
+          );
 
         const totalTransport = (earnings || []).reduce(
           (sum: number, e: EarningsRecord) => sum + e.amount,

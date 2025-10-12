@@ -19,7 +19,6 @@ import {
   ArrowRight,
   Target,
   TrendingUp,
-  Award,
   RefreshCw,
   AlertCircle,
   Play,
@@ -28,6 +27,7 @@ import {
   Leaf,
   MapPin,
   Clock,
+  Users,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
@@ -336,6 +336,27 @@ export default function PegawaiDashboard() {
                     className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`}
                   />
                   Muat Ulang
+                </Button>
+
+                <Button
+                  asChild
+                  className="bg-white/20 backdrop-blur-sm text-white border-white/30 hover:bg-white/30 transition-all duration-300"
+                  onClick={() => {
+                    // Clear any cached data before navigating
+                    if (typeof window !== "undefined") {
+                      // Clear localStorage/sessionStorage if needed
+                      localStorage.removeItem("activeTeam");
+                      sessionStorage.clear();
+                      // Also clear any project-related cache
+                      localStorage.removeItem("ACTIVE_PROJECT");
+                      localStorage.removeItem("ACTIVE_TEAM");
+                    }
+                  }}
+                >
+                  <Link href="/pegawai">
+                    <Users className="w-4 h-4 mr-2" />
+                    Ganti Tim
+                  </Link>
                 </Button>
 
                 <Button
