@@ -1660,57 +1660,143 @@ export default function TaskManagement() {
               </Select>
             </div>
 
-            {/* Assignee Type Selection */}
+            {/* Assignee Type Display (Read-only) */}
             <div className="space-y-2">
-              <Label>Tipe Penugasan *</Label>
-              <div className="grid grid-cols-2 gap-3">
-                <Button
-                  type="button"
-                  variant={
-                    formData.assignee_type === "member" ? "default" : "outline"
-                  }
-                  onClick={() => {
-                    setFormData((prev) => ({
-                      ...prev,
-                      assignee_type: "member",
-                      assignee_mitra_id: "",
-                      honor_amount: 0,
-                    }));
-                  }}
-                  className={`flex items-center justify-center space-x-2 h-12 ${
-                    formData.assignee_type === "member"
-                      ? "bg-blue-600 hover:bg-blue-700 text-white"
-                      : "border-2 border-gray-200 hover:border-blue-300"
-                  }`}
-                >
-                  <User className="w-4 h-4" />
-                  <span>Anggota Tim</span>
-                </Button>
-                <Button
-                  type="button"
-                  variant={
-                    formData.assignee_type === "mitra" ? "default" : "outline"
-                  }
-                  onClick={() => {
-                    setFormData((prev) => ({
-                      ...prev,
-                      assignee_type: "mitra",
-                      assignee_user_id: "",
-                      transport_days: 0,
-                      has_transport: false,
-                    }));
-                  }}
-                  className={`flex items-center justify-center space-x-2 h-12 ${
-                    formData.assignee_type === "mitra"
-                      ? "bg-green-600 hover:bg-green-700 text-white"
-                      : "border-2 border-gray-200 hover:border-green-300"
-                  }`}
-                >
-                  <Building2 className="w-4 h-4" />
-                  <span>Mitra</span>
-                </Button>
+              <Label>Tipe Penugasan</Label>
+              <div className="flex items-center space-x-3 p-4 border rounded-xl bg-gray-50">
+                {formData.assignee_type === "member" ? (
+                  <>
+                    <User className="w-5 h-5 text-blue-600" />
+                    <div className="flex-1">
+                      <div className="font-semibold text-gray-900">
+                        Anggota Tim
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        Tugas untuk anggota tim internal
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <Building2 className="w-5 h-5 text-green-600" />
+                    <div className="flex-1">
+                      <div className="font-semibold text-gray-900">Mitra</div>
+                      <div className="text-sm text-gray-500">
+                        Tugas untuk mitra eksternal
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
+
+            {/* Assignee Selection */}
+            {formData.assignee_type === "member" && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-assignee">Anggota Tim *</Label>
+                <Select
+                  value={formData.assignee_user_id}
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      assignee_user_id: value,
+                    }))
+                  }
+                  disabled={!formData.project_id || loadingMembers}
+                >
+                  <SelectTrigger>
+                    <SelectValue
+                      placeholder={
+                        loadingMembers
+                          ? "Memuat anggota tim..."
+                          : !formData.project_id
+                            ? "Pilih proyek terlebih dahulu"
+                            : (projectMembers?.length || 0) === 0
+                              ? "Tidak ada anggota tim"
+                              : "Pilih anggota tim"
+                      }
+                    >
+                      {formData.assignee_user_id
+                        ? projectMembers?.find(
+                            (m) => m.id === formData.assignee_user_id,
+                          )?.nama_lengkap || "Unknown"
+                        : "Pilih anggota tim"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(projectMembers || []).map((member) => (
+                      <SelectItem key={member.id} value={member.id}>
+                        <div className="flex items-center justify-between w-full">
+                          <span>{member.nama_lengkap}</span>
+                          <span className="text-xs text-gray-500 ml-2">
+                            {member.email}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {formData.assignee_type === "mitra" && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-mitra">Mitra *</Label>
+                <Select
+                  value={formData.assignee_mitra_id}
+                  onValueChange={(value) => {
+                    const selectedMitra = mitraOptions?.find(
+                      (m) => m.id === value,
+                    );
+                    setFormData((prev) => ({
+                      ...prev,
+                      assignee_mitra_id: value,
+                      honor_amount: selectedMitra ? 500000 : 0,
+                    }));
+                  }}
+                  disabled={!formData.project_id || loadingMitra}
+                >
+                  <SelectTrigger>
+                    <SelectValue
+                      placeholder={
+                        loadingMitra ? "Loading mitra..." : "Pilih mitra"
+                      }
+                    >
+                      {formData.assignee_mitra_id
+                        ? mitraOptions?.find(
+                            (m) => m.id === formData.assignee_mitra_id,
+                          )?.nama_mitra || "Unknown"
+                        : "Pilih mitra"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(mitraOptions || []).map((mitra) => (
+                      <SelectItem key={mitra.id} value={mitra.id}>
+                        <div className="flex items-center space-x-2">
+                          <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                            <span className="text-xs font-medium text-green-600">
+                              {mitra.nama_mitra
+                                ?.split(" ")
+                                .map((n) => n[0])
+                                .join("")
+                                .toUpperCase() || "?"}
+                            </span>
+                          </div>
+                          <div>
+                            <div className="font-medium">
+                              {mitra.nama_mitra}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {mitra.kontak}
+                            </div>
+                          </div>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="edit-title">Judul Tugas *</Label>
