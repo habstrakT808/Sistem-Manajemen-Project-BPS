@@ -496,7 +496,51 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // Delete dependent rows first (assignments, tasks)
+    // Get all task IDs for this project first
+    const { data: taskRows } = await (svc as any)
+      .from("tasks")
+      .select("id")
+      .eq("project_id", projectId);
+
+    const taskIds = (taskRows || []).map((t: { id: string }) => t.id);
+
+    // Delete transport allocations and earnings for these tasks
+    if (taskIds.length > 0) {
+      // Get allocation IDs before deleting allocations
+      const { data: allocRows } = await (svc as any)
+        .from("task_transport_allocations")
+        .select("id")
+        .in("task_id", taskIds);
+
+      const allocIds = (allocRows || []).map((a: { id: string }) => a.id);
+
+      // Delete earnings linked to these allocations
+      if (allocIds.length > 0) {
+        const { error: deleteEarningsError } = await (svc as any)
+          .from("earnings_ledger")
+          .delete()
+          .in("source_id", allocIds);
+
+        if (deleteEarningsError) {
+          console.error("Failed to delete earnings:", deleteEarningsError);
+        }
+      }
+
+      // Delete transport allocations
+      const { error: deleteAllocationsError } = await (svc as any)
+        .from("task_transport_allocations")
+        .delete()
+        .in("task_id", taskIds);
+
+      if (deleteAllocationsError) {
+        console.error(
+          "Failed to delete transport allocations:",
+          deleteAllocationsError,
+        );
+      }
+    }
+
+    // Delete dependent rows (assignments, tasks)
     const { error: deleteAssignmentsError } = await (svc as any)
       .from("project_assignments")
       .delete()

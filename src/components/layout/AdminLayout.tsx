@@ -59,7 +59,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   const [openAnalytics, setOpenAnalytics] = React.useState(false);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50">
+    <div className="min-h-screen bg-white">
       {/* Sidebar */}
       <div className="fixed inset-y-0 left-0 z-50 w-72 bg-white shadow-2xl border-r border-gray-200 flex flex-col">
         {/* Header */}
