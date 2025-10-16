@@ -52,10 +52,10 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient();
     const { searchParams } = new URL(request.url);
     const month = parseInt(
-      searchParams.get("month") || String(new Date().getMonth() + 1)
+      searchParams.get("month") || String(new Date().getMonth() + 1),
     );
     const year = parseInt(
-      searchParams.get("year") || String(new Date().getFullYear())
+      searchParams.get("year") || String(new Date().getFullYear()),
     );
 
     // Auth check
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
     // Service client to avoid RLS issues
     const svc = createServiceClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
     // First get transport allocations that have been allocated (have allocation_date)
@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
 
     // Get earnings only for allocated transport
     const allocationIds = (allocatedTransport || []).map(
-      (t: TransportAllocationRecord) => t.id
+      (t: TransportAllocationRecord) => t.id,
     );
 
     const { data: currentEarnings, error: currentError } = await svc
@@ -100,14 +100,14 @@ export async function GET(request: NextRequest) {
         occurred_on,
         posted_at,
         source_id
-      `
+      `,
       )
       .eq("user_id", user.id)
       .in("source_id", allocationIds)
       .gte("occurred_on", `${year}-${month.toString().padStart(2, "0")}-01`)
       .lt(
         "occurred_on",
-        `${year}-${(month + 1).toString().padStart(2, "0")}-01`
+        `${year}-${(month + 1).toString().padStart(2, "0")}-01`,
       )
       .order("occurred_on", { ascending: false });
 
@@ -121,8 +121,8 @@ export async function GET(request: NextRequest) {
       new Set(
         ((currentEarnings as EarningsRecord[]) || [])
           .map((e) => e.source_id)
-          .filter(Boolean)
-      )
+          .filter(Boolean),
+      ),
     );
 
     const taskDetails: Record<string, { title: string; project_id: string }> =
@@ -138,10 +138,6 @@ export async function GET(request: NextRequest) {
       allocations = (allocationsData as AllocationLookupRecord[]) || [];
       const taskIds = allocations.map((a) => a.task_id).filter(Boolean);
 
-      console.log(
-        `Found ${allocations.length} allocations, ${taskIds.length} task IDs`
-      );
-
       if (taskIds.length > 0) {
         // Then get tasks using the task_ids
         const { data: tasks } = await svc
@@ -155,11 +151,6 @@ export async function GET(request: NextRequest) {
             project_id: t.project_id,
           };
         });
-
-        console.log(
-          `Found ${((tasks as TaskRecord[]) || []).length} tasks, taskDetails:`,
-          taskDetails
-        );
       }
     }
 
@@ -168,8 +159,8 @@ export async function GET(request: NextRequest) {
       new Set(
         Object.values(taskDetails)
           .map((t) => t.project_id)
-          .filter(Boolean)
-      )
+          .filter(Boolean),
+      ),
     );
 
     const projectDetails: Record<
@@ -210,7 +201,7 @@ export async function GET(request: NextRequest) {
       const monthKey = `${recordDate.getFullYear()}-${(recordDate.getMonth() + 1).toString().padStart(2, "0")}`;
       monthlyData.set(
         monthKey,
-        (monthlyData.get(monthKey) || 0) + record.amount
+        (monthlyData.get(monthKey) || 0) + record.amount,
       );
     });
 
@@ -221,7 +212,7 @@ export async function GET(request: NextRequest) {
         year: parseInt(year),
         month_name: new Date(
           parseInt(year),
-          parseInt(month) - 1
+          parseInt(month) - 1,
         ).toLocaleDateString("id-ID", {
           month: "short",
           year: "numeric",
@@ -273,7 +264,7 @@ export async function GET(request: NextRequest) {
     console.error("Earnings API Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

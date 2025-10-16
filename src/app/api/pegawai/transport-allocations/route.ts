@@ -56,13 +56,19 @@ export async function GET(request: Request) {
         project_id: string;
         start_date: string;
         end_date: string;
+        satuan_id: string | null;
+        rate_per_satuan: number | null;
+        volume: number | null;
+        total_amount: number | null;
       }
     > = {};
 
     if (taskIds.length > 0) {
       const { data: tasks, error: tasksError } = await serviceClient
         .from("tasks")
-        .select("id, title, project_id, start_date, end_date")
+        .select(
+          "id, title, project_id, start_date, end_date, satuan_id, rate_per_satuan, volume, total_amount",
+        )
         .in("id", taskIds);
 
       if (tasksError) {
@@ -84,6 +90,10 @@ export async function GET(request: Request) {
           project_id: task.project_id,
           start_date: task.start_date,
           end_date: task.end_date,
+          satuan_id: task.satuan_id,
+          rate_per_satuan: task.rate_per_satuan,
+          volume: task.volume,
+          total_amount: task.total_amount,
         };
       });
     }
@@ -121,7 +131,10 @@ export async function GET(request: Request) {
       allocations
         ?.filter((allocation: any) => {
           const task = taskDetails[allocation.task_id];
-          if (!task) return false;
+
+          if (!task) {
+            return false;
+          }
           if (projectIdFilter && String(task.project_id) !== projectIdFilter) {
             return false;
           }
@@ -133,7 +146,9 @@ export async function GET(request: Request) {
           const isDummyProject = String(project?.nama_project || "")
             .toLowerCase()
             .includes("test project for transport");
-          if (isDummyTitle || isDummyProject) return false;
+          if (isDummyTitle || isDummyProject) {
+            return false;
+          }
           return true;
         })
         .map((allocation: any) => {
@@ -152,6 +167,10 @@ export async function GET(request: Request) {
               project_name: project?.nama_project || "",
               start_date: task.start_date || "",
               end_date: task.end_date || "",
+              satuan_id: task.satuan_id,
+              rate_per_satuan: task.rate_per_satuan,
+              volume: task.volume,
+              total_amount: task.total_amount,
             },
           };
         }) || [];

@@ -10,7 +10,6 @@ interface RouteParams {
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const supabase = (await createClient()) as any;
     const { id: projectId } = await params;
 
@@ -34,30 +33,29 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       console.error("Profile error:", profileError);
       return NextResponse.json(
         { error: "User profile not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     const userRole = (userProfile as { role: string }).role;
-    console.log("User role:", userRole, "User ID:", user.id);
 
     // Allow both ketua_tim role and pegawai users (they will be checked for project leadership later)
     if (userRole !== "ketua_tim" && userRole !== "pegawai") {
       console.error(
         "User role not allowed:",
         userRole,
-        "Expected: ketua_tim or pegawai"
+        "Expected: ketua_tim or pegawai",
       );
       return NextResponse.json(
         { error: "Forbidden - Invalid role" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
     // Use service client to bypass RLS for project query
     const serviceClient = createServiceClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
     // Ensure the project belongs to this ketua tim and is not already completed
@@ -70,33 +68,27 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     if (projectError || !project) {
       console.error("Project error:", projectError);
-      console.log("Project ID:", projectId, "User ID:", user.id);
       return NextResponse.json(
         { error: "Project not found or access denied" },
-        { status: 404 }
+        { status: 404 },
       );
     }
-
-    console.log("Project found:", project);
 
     // Check if user is the leader of this project
     const isLeader =
       project.leader_user_id === user.id || project.ketua_tim_id === user.id;
     if (!isLeader) {
       console.error("User is not the leader of this project");
-      console.log("Project leader_user_id:", project.leader_user_id);
-      console.log("Project ketua_tim_id:", project.ketua_tim_id);
-      console.log("Current user ID:", user.id);
       return NextResponse.json(
         { error: "You are not the leader of this project" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
     if (project.status === "completed") {
       return NextResponse.json(
         { message: "Project is already completed" },
-        { status: 200 }
+        { status: 200 },
       );
     }
 
@@ -141,7 +133,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     console.error("Finish project error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -78,6 +78,11 @@ interface TaskData {
   response_pegawai: string | null;
   created_at: string;
   updated_at: string;
+  // New fields for satuan system
+  satuan_id: string | null;
+  rate_per_satuan: number | null;
+  volume: number | null;
+  total_amount: number | null;
   projects: {
     id: string;
     nama_project: string;
@@ -121,6 +126,12 @@ interface MitraOption {
   kontak?: string;
 }
 
+interface SatuanData {
+  id: string;
+  nama_satuan: string;
+  deskripsi: string | null;
+}
+
 interface ProjectDetail {
   id: string;
   nama_project: string;
@@ -140,6 +151,10 @@ interface TaskFormData {
   transport_days: number;
   has_transport: boolean;
   honor_amount: number;
+  // New fields for satuan system
+  satuan_id: string;
+  rate_per_satuan: number;
+  volume: number;
 }
 
 const initialFormData: TaskFormData = {
@@ -154,6 +169,10 @@ const initialFormData: TaskFormData = {
   transport_days: 0,
   has_transport: false,
   honor_amount: 0,
+  // New fields for satuan system
+  satuan_id: "",
+  rate_per_satuan: 0,
+  volume: 1,
 };
 
 async function fetchTasksRequest(
@@ -175,26 +194,16 @@ async function fetchTasksRequest(
   const result = await response.json();
   if (!response.ok) throw new Error(result.error || "Failed to fetch tasks");
 
-  // Debug: Log the actual API response
-  console.log("API Response Debug:", {
-    totalTasks: result.data?.length,
-    firstTask: result.data?.[0],
-    transportFields: result.data?.map((task: any) => ({
-      id: task.id,
-      title: task.title,
-      has_transport: task.has_transport,
-      transport_days: task.transport_days,
-      assignee_user_id: task.assignee_user_id,
-      pegawai_id: task.pegawai_id,
-    })),
-  });
-
   return result.data as TaskData[];
 }
 
 async function fetchProjectsRequest(): Promise<ProjectOption[]> {
   const response = await fetch("/api/ketua-tim/projects?limit=100", {
     cache: "no-store",
+    headers: {
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+    },
   });
   const result = await response.json();
   if (!response.ok) throw new Error(result.error || "Failed to fetch projects");
@@ -245,6 +254,15 @@ async function fetchProjectDetail(projectId: string): Promise<ProjectDetail> {
   return result.data as ProjectDetail;
 }
 
+async function fetchSatuanRequest(): Promise<SatuanData[]> {
+  const response = await fetch("/api/ketua-tim/satuan", {
+    cache: "no-store",
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || "Failed to fetch satuan");
+  return result.data as SatuanData[];
+}
+
 export default function TaskManagement() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -276,18 +294,14 @@ export default function TaskManagement() {
     return diffDays === 0 ? 1 : diffDays; // Minimum 1 day if same date
   };
 
-  // Calculate total transport amount for a task
-  const calculateTransportAmount = (task: TaskData): number => {
-    console.log("Calculate Transport Amount Debug:", {
-      taskId: task.id,
-      title: task.title,
-      has_transport: task.has_transport,
-      transport_days: task.transport_days,
-      typeof_transport_days: typeof task.transport_days,
-      transportDays: task.transport_days || 0,
-      finalAmount: 150000 * (task.transport_days || 0),
-    });
+  // Calculate total amount using new satuan system
+  const calculateTotalAmount = (task: TaskData): number => {
+    // Use new satuan system if available
+    if (task.rate_per_satuan && task.volume) {
+      return task.rate_per_satuan * task.volume;
+    }
 
+    // Fallback to old system for backward compatibility
     if (!task.has_transport) {
       return 0;
     }
@@ -305,6 +319,11 @@ export default function TaskManagement() {
     return 150000 * transportDays;
   };
 
+  // Calculate total transport amount for a task (legacy function)
+  const calculateTransportAmount = (task: TaskData): number => {
+    return calculateTotalAmount(task);
+  };
+
   // Fetch data with React Query
   const {
     data: tasks,
@@ -317,9 +336,11 @@ export default function TaskManagement() {
     staleTime: 0, // Always consider data stale to ensure fresh data
   });
 
-  const { data: projects } = useQuery({
-    queryKey: ["projects"],
+  const { data: projects, refetch: refetchProjects } = useQuery({
+    queryKey: ["ketua", "projects", "forTasks"],
     queryFn: fetchProjectsRequest,
+    staleTime: 0, // Always consider data stale to ensure fresh data
+    refetchOnWindowFocus: true, // Refetch when window regains focus
   });
 
   const { data: projectMembers, isLoading: loadingMembers } = useQuery({
@@ -343,10 +364,31 @@ export default function TaskManagement() {
     enabled: !!formData.project_id,
   });
 
+  const {
+    data: satuanOptions,
+    isLoading: loadingSatuan,
+    error: satuanError,
+  } = useQuery({
+    queryKey: ["satuan"],
+    queryFn: fetchSatuanRequest,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+
   useEffect(() => {
     router.prefetch("/ketua-tim/tasks");
     router.prefetch("/ketua-tim/projects");
   }, [router]);
+
+  // Refresh projects when component mounts or when coming back from project creation
+  useEffect(() => {
+    const handleFocus = () => {
+      // Refetch projects when window regains focus (user comes back from project creation)
+      refetchProjects();
+    };
+
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [refetchProjects]);
 
   const handleCreateTask = async () => {
     // Validate common fields
@@ -397,6 +439,22 @@ export default function TaskManagement() {
     // Validate transport days
     if (formData.transport_days < 0) {
       toast.error("Hari transport tidak boleh negatif");
+      return;
+    }
+
+    // Validate satuan system
+    if (!formData.satuan_id) {
+      toast.error("Pilih satuan untuk tugas ini");
+      return;
+    }
+
+    if (formData.rate_per_satuan < 0) {
+      toast.error("Rate per satuan tidak boleh negatif");
+      return;
+    }
+
+    if (formData.volume < 1) {
+      toast.error("Volume harus minimal 1");
       return;
     }
 
@@ -463,6 +521,10 @@ export default function TaskManagement() {
       transport_days: task.transport_days || 0,
       has_transport: task.has_transport || false,
       honor_amount: task.honor_amount || 0,
+      // New fields for satuan system
+      satuan_id: task.satuan_id || "",
+      rate_per_satuan: task.rate_per_satuan || 0,
+      volume: task.volume || 1,
     });
     setIsEditDialogOpen(true);
   };
@@ -649,7 +711,7 @@ export default function TaskManagement() {
                 Buat Tugas
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-lg">
+            <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Buat Tugas Baru</DialogTitle>
                 <DialogDescription>
@@ -809,7 +871,7 @@ export default function TaskManagement() {
                         setFormData((prev) => ({
                           ...prev,
                           assignee_mitra_id: value,
-                          honor_amount: selectedMitra ? 500000 : 0, // Default honor amount
+                          honor_amount: 0, // Will be calculated from satuan system
                         }));
                       }}
                       disabled={!formData.project_id || loadingMitra}
@@ -935,79 +997,151 @@ export default function TaskManagement() {
                   </div>
                 </div>
 
-                {/* Transport Allowance for Team Members */}
-                {formData.assignee_type === "member" && (
+                {/* Satuan System for All Assignee Types */}
+                <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="transport_days">Hari Transport</Label>
-                    <div className="flex items-center space-x-3 p-4 border border-gray-200 rounded-xl">
-                      <MapPin className="w-5 h-5 text-blue-500" />
-                      <div className="flex-1">
-                        <div className="font-semibold text-gray-900">
-                          Uang Transport
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {formatCurrency(150000)} per hari ×{" "}
-                          {formData.transport_days} hari ={" "}
-                          {formatCurrency(150000 * formData.transport_days)}
-                        </div>
-                      </div>
-                      <div className="w-24">
-                        <Input
-                          id="transport_days"
-                          type="number"
-                          min="0"
-                          value={formData.transport_days}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              transport_days: parseInt(e.target.value) || 0,
-                            }))
+                    <Label htmlFor="satuan_id">Satuan *</Label>
+                    <Select
+                      value={formData.satuan_id}
+                      onValueChange={(value) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          satuan_id: value,
+                        }))
+                      }
+                      disabled={loadingSatuan}
+                    >
+                      <SelectTrigger>
+                        <SelectValue
+                          placeholder={
+                            loadingSatuan
+                              ? "Memuat satuan..."
+                              : satuanError
+                                ? "Error memuat satuan"
+                                : "Pilih satuan..."
                           }
-                          placeholder="0"
-                          className="text-center"
                         />
-                      </div>
-                    </div>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {loadingSatuan ? (
+                          <div className="px-2 py-1.5 text-sm text-gray-500">
+                            Memuat satuan...
+                          </div>
+                        ) : satuanError ? (
+                          <div className="px-2 py-1.5 text-sm text-red-500">
+                            Error: {satuanError.message}
+                          </div>
+                        ) : (satuanOptions || []).length === 0 ? (
+                          <div className="px-2 py-1.5 text-sm text-gray-500">
+                            Tidak ada satuan tersedia
+                          </div>
+                        ) : (
+                          (satuanOptions || []).map((satuan) => (
+                            <SelectItem key={satuan.id} value={satuan.id}>
+                              {satuan.nama_satuan}
+                              {satuan.deskripsi && (
+                                <span className="text-gray-500 ml-2">
+                                  - {satuan.deskripsi}
+                                </span>
+                              )}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
                   </div>
-                )}
 
-                {/* Honor for Mitra */}
-                {formData.assignee_type === "mitra" && (
-                  <div className="space-y-2">
-                    <Label htmlFor="honor_amount">Honor</Label>
-                    <div className="flex items-center space-x-3 p-4 border border-green-200 rounded-xl bg-green-50">
-                      <DollarSign className="w-5 h-5 text-green-600" />
-                      <div className="flex-1">
-                        <div className="font-semibold text-gray-900">
-                          Honor untuk Mitra
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="rate_per_satuan">Rate Per Satuan *</Label>
+                      <div className="flex items-center space-x-3 p-4 border border-blue-200 rounded-xl bg-blue-50">
+                        <DollarSign className="w-5 h-5 text-blue-600" />
+                        <div className="flex-1">
+                          <div className="font-semibold text-gray-900">
+                            Rate Per Satuan
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            Harga per satuan
+                          </div>
                         </div>
-                        <div className="text-sm text-gray-500">
-                          Total honor yang akan diberikan kepada mitra
+                        <div className="w-32">
+                          <Input
+                            id="rate_per_satuan"
+                            type="number"
+                            min="0"
+                            step="1000"
+                            value={formData.rate_per_satuan}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                rate_per_satuan:
+                                  parseFloat(e.target.value) || 0,
+                              }))
+                            }
+                            placeholder="150000"
+                            className="text-center"
+                          />
                         </div>
-                      </div>
-                      <div className="w-32">
-                        <Input
-                          id="honor_amount"
-                          type="number"
-                          min="0"
-                          step="50000"
-                          value={formData.honor_amount}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              honor_amount: parseInt(e.target.value) || 0,
-                            }))
-                          }
-                          placeholder="500000"
-                          className="text-center"
-                        />
                       </div>
                     </div>
-                    <div className="text-xs text-gray-500 px-1">
-                      Total: {formatCurrency(formData.honor_amount)}
+
+                    <div className="space-y-2">
+                      <Label htmlFor="volume">Volume *</Label>
+                      <div className="flex items-center space-x-3 p-4 border border-green-200 rounded-xl bg-green-50">
+                        <MapPin className="w-5 h-5 text-green-600" />
+                        <div className="flex-1">
+                          <div className="font-semibold text-gray-900">
+                            Volume
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            Jumlah satuan
+                          </div>
+                        </div>
+                        <div className="w-24">
+                          <Input
+                            id="volume"
+                            type="number"
+                            min="1"
+                            value={formData.volume}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                volume: parseInt(e.target.value) || 1,
+                              }))
+                            }
+                            placeholder="1"
+                            className="text-center"
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
-                )}
+
+                  {/* Total Amount Preview */}
+                  <div className="space-y-2">
+                    <Label>Total Nilai</Label>
+                    <div className="flex items-center space-x-3 p-4 border border-purple-200 rounded-xl bg-purple-50">
+                      <DollarSign className="w-5 h-5 text-purple-600" />
+                      <div className="flex-1">
+                        <div className="font-semibold text-gray-900">
+                          Total Nilai
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {formatCurrency(formData.rate_per_satuan)} ×{" "}
+                          {formData.volume} ={" "}
+                          {formatCurrency(
+                            formData.rate_per_satuan * formData.volume,
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-lg font-bold text-purple-600">
+                        {formatCurrency(
+                          formData.rate_per_satuan * formData.volume,
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <DialogFooter>
@@ -1208,8 +1342,14 @@ export default function TaskManagement() {
                 const transportAllocation =
                   task.task_transport_allocations?.[0];
                 const hasActiveTransport =
-                  task.has_transport &&
-                  (!transportAllocation || !transportAllocation.canceled_at);
+                  (task.has_transport &&
+                    (!transportAllocation ||
+                      !transportAllocation.canceled_at)) ||
+                  (task.assignee_type === "member" &&
+                    task.rate_per_satuan &&
+                    task.volume &&
+                    task.rate_per_satuan > 0 &&
+                    task.volume > 0);
 
                 return (
                   <div
@@ -1252,11 +1392,16 @@ export default function TaskManagement() {
                             )}
 
                             {task.assignee_type === "mitra" &&
-                              task.honor_amount && (
+                              (task.honor_amount || task.total_amount) && (
                                 <Badge className="bg-purple-100 text-purple-800 border-purple-200 flex items-center space-x-1">
                                   <Building2 className="w-3 h-3" />
                                   <span>
-                                    Honor: {formatCurrency(task.honor_amount)}
+                                    Honor:{" "}
+                                    {formatCurrency(
+                                      task.total_amount ||
+                                        task.honor_amount ||
+                                        0,
+                                    )}
                                   </span>
                                 </Badge>
                               )}
@@ -1320,20 +1465,24 @@ export default function TaskManagement() {
 
                           {/* Honor Amount for Mitra Tasks */}
                           {task.assignee_type === "mitra" &&
-                            task.honor_amount && (
-                              <div className="mb-4 p-3 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-purple-200">
+                            (task.honor_amount || task.total_amount) && (
+                              <div className="mb-4 p-3 rounded-lg border border-gray-200">
                                 <div className="flex items-center justify-between">
                                   <div>
-                                    <div className="text-sm font-medium text-purple-900 flex items-center">
+                                    <div className="text-sm font-medium text-gray-900 flex items-center">
                                       <DollarSign className="w-4 h-4 mr-2" />
                                       Honor
                                     </div>
-                                    <div className="text-sm text-purple-700 mt-1">
+                                    <div className="text-sm text-gray-700 mt-1">
                                       Pembayaran untuk layanan Mitra
                                     </div>
                                   </div>
-                                  <div className="text-lg font-semibold text-purple-600">
-                                    {formatCurrency(task.honor_amount)}
+                                  <div className="text-lg font-semibold text-gray-800">
+                                    {formatCurrency(
+                                      task.total_amount ||
+                                        task.honor_amount ||
+                                        0,
+                                    )}
                                   </div>
                                 </div>
                               </div>
@@ -1341,21 +1490,21 @@ export default function TaskManagement() {
 
                           {/* Transport Status */}
                           {hasActiveTransport && (
-                            <div className="mt-4 p-3 bg-gradient-to-r from-green-500 to-teal-50 rounded-lg border border-green-200">
+                            <div className="mt-4 p-3 rounded-lg border border-gray-200">
                               <div className="flex items-center justify-between">
                                 <div>
-                                  <div className="text-sm font-medium text-green-900 flex items-center">
+                                  <div className="text-sm font-medium text-gray-900 flex items-center">
                                     <MapPin className="w-4 h-4 mr-2" />
                                     Alokasi Transport
                                   </div>
-                                  <div className="text-sm text-green-700 mt-1">
+                                  <div className="text-sm text-gray-700 mt-1">
                                     {transportAllocation?.allocation_date
                                       ? `Dialokasikan untuk: ${new Date(transportAllocation.allocation_date).toLocaleDateString("id-ID")}`
                                       : "Menunggu pemilihan tanggal"}
                                   </div>
                                 </div>
                                 <div className="flex items-center space-x-2">
-                                  <div className="text-sm font-semibold text-green-600">
+                                  <div className="text-sm font-semibold text-gray-800">
                                     {formatCurrency(
                                       calculateTransportAmount(task),
                                     )}
@@ -1551,32 +1700,49 @@ export default function TaskManagement() {
                   </div>
 
                   {/* Transport Information */}
-                  {selectedTask.has_transport && (
+                  {(selectedTask.has_transport ||
+                    (selectedTask.assignee_type === "member" &&
+                      selectedTask.rate_per_satuan &&
+                      selectedTask.volume &&
+                      selectedTask.rate_per_satuan > 0 &&
+                      selectedTask.volume > 0)) && (
                     <div>
                       <Label className="text-sm font-medium text-gray-500">
-                        Transport Allocation
+                        Alokasi Transport
                       </Label>
                       <div className="mt-1 p-3 bg-green-50 rounded-lg border border-green-200">
                         <div className="flex items-center justify-between">
                           <div>
                             <div className="text-sm font-medium text-green-900">
-                              Amount:{" "}
+                              Jumlah:{" "}
                               {formatCurrency(
                                 calculateTransportAmount(selectedTask),
                               )}
                             </div>
+                            {selectedTask.rate_per_satuan &&
+                              selectedTask.volume && (
+                                <div className="text-sm text-green-700">
+                                  Perhitungan:{" "}
+                                  {formatCurrency(selectedTask.rate_per_satuan)}{" "}
+                                  × {selectedTask.volume} ={" "}
+                                  {formatCurrency(
+                                    selectedTask.rate_per_satuan *
+                                      selectedTask.volume,
+                                  )}
+                                </div>
+                              )}
                             <div className="text-sm text-green-700">
                               {selectedTask.task_transport_allocations?.[0]
                                 ?.allocation_date
-                                ? `Date: ${new Date(selectedTask.task_transport_allocations[0].allocation_date).toLocaleDateString("id-ID")}`
-                                : "Awaiting date selection"}
+                                ? `Tanggal: ${new Date(selectedTask.task_transport_allocations[0].allocation_date).toLocaleDateString("id-ID")}`
+                                : "Menunggu pemilihan tanggal"}
                             </div>
                           </div>
                           <Badge className="bg-green-100 text-green-800">
                             {selectedTask.task_transport_allocations?.[0]
                               ?.canceled_at
-                              ? "Canceled"
-                              : "Active"}
+                              ? "Dibatalkan"
+                              : "Aktif"}
                           </Badge>
                         </div>
                       </div>
@@ -1613,7 +1779,7 @@ export default function TaskManagement() {
 
       {/* Edit Task Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Tugas</DialogTitle>
             <DialogDescription>
@@ -1789,111 +1955,146 @@ export default function TaskManagement() {
               </div>
             </div>
 
-            {/* Mitra Selection */}
-            {formData.assignee_type === "mitra" && (
-              <>
-                {/* Honor Amount */}
+            {/* Satuan System for All Assignee Types */}
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-satuan_id">Satuan *</Label>
+                <Select
+                  value={formData.satuan_id}
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      satuan_id: value,
+                    }))
+                  }
+                  disabled={loadingSatuan}
+                >
+                  <SelectTrigger>
+                    <SelectValue
+                      placeholder={
+                        loadingSatuan
+                          ? "Memuat satuan..."
+                          : satuanError
+                            ? "Error memuat satuan"
+                            : "Pilih satuan..."
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {loadingSatuan ? (
+                      <div className="px-2 py-1.5 text-sm text-gray-500">
+                        Memuat satuan...
+                      </div>
+                    ) : satuanError ? (
+                      <div className="px-2 py-1.5 text-sm text-red-500">
+                        Error: {satuanError.message}
+                      </div>
+                    ) : (satuanOptions || []).length === 0 ? (
+                      <div className="px-2 py-1.5 text-sm text-gray-500">
+                        Tidak ada satuan tersedia
+                      </div>
+                    ) : (
+                      (satuanOptions || []).map((satuan) => (
+                        <SelectItem key={satuan.id} value={satuan.id}>
+                          {satuan.nama_satuan}
+                          {satuan.deskripsi && (
+                            <span className="text-gray-500 ml-2">
+                              - {satuan.deskripsi}
+                            </span>
+                          )}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="edit-honor_amount">Jumlah Honor *</Label>
-                  <div className="flex items-center space-x-3 p-4 border border-green-200 rounded-xl bg-green-50">
-                    <DollarSign className="w-5 h-5 text-green-600" />
+                  <Label htmlFor="edit-rate_per_satuan">
+                    Rate Per Satuan *
+                  </Label>
+                  <div className="flex items-center space-x-3 p-4 border border-blue-200 rounded-xl bg-blue-50">
+                    <DollarSign className="w-5 h-5 text-blue-600" />
                     <div className="flex-1">
                       <div className="font-semibold text-gray-900">
-                        Honor untuk Mitra
+                        Rate Per Satuan
                       </div>
                       <div className="text-sm text-gray-500">
-                        Total honor yang akan diberikan kepada mitra
+                        Harga per satuan
                       </div>
                     </div>
                     <div className="w-32">
                       <Input
-                        id="edit-honor_amount"
+                        id="edit-rate_per_satuan"
                         type="number"
                         min="0"
-                        step="50000"
-                        value={formData.honor_amount}
+                        step="1000"
+                        value={formData.rate_per_satuan}
                         onChange={(e) =>
                           setFormData((prev) => ({
                             ...prev,
-                            honor_amount: parseInt(e.target.value) || 0,
+                            rate_per_satuan: parseFloat(e.target.value) || 0,
                           }))
                         }
-                        placeholder="500000"
+                        placeholder="150000"
                         className="text-center"
                       />
                     </div>
                   </div>
-                  <div className="text-xs text-gray-500 px-1">
-                    Total: {formatCurrency(formData.honor_amount)}
-                  </div>
                 </div>
-              </>
-            )}
 
-            {/* Transport Section - Only for Team Members */}
-            {formData.assignee_type === "member" && (
-              <div className="space-y-2">
-                <Label htmlFor="edit-transport_days">Hari Transport</Label>
-                <div className="flex items-center space-x-3 p-4 border border-gray-200 rounded-xl">
-                  <MapPin className="w-5 h-5 text-blue-500" />
-                  <div className="flex-1">
-                    <div className="font-semibold text-gray-900">
-                      Hari Transport
+                <div className="space-y-2">
+                  <Label htmlFor="edit-volume">Volume *</Label>
+                  <div className="flex items-center space-x-3 p-4 border border-green-200 rounded-xl bg-green-50">
+                    <MapPin className="w-5 h-5 text-green-600" />
+                    <div className="flex-1">
+                      <div className="font-semibold text-gray-900">Volume</div>
+                      <div className="text-sm text-gray-500">Jumlah satuan</div>
                     </div>
-                    <div className="text-sm text-gray-500">
-                      {formatCurrency(150000)} per hari ×{" "}
-                      {formData.transport_days} hari ={" "}
-                      {formatCurrency(150000 * formData.transport_days)}
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        if (formData.start_date && formData.end_date) {
-                          const calculatedDays = calculateTransportDays(
-                            formData.start_date,
-                            formData.end_date,
-                          );
-                          setFormData((prev) => ({
-                            ...prev,
-                            transport_days: calculatedDays,
-                          }));
-                          toast.success(
-                            `Otomatis dihitung: ${calculatedDays} hari`,
-                          );
-                        } else {
-                          toast.error(
-                            "Silakan set tanggal mulai dan selesai terlebih dahulu",
-                          );
-                        }
-                      }}
-                      className="text-xs"
-                    >
-                      Otomatis
-                    </Button>
-                    <div className="w-20">
+                    <div className="w-24">
                       <Input
-                        id="edit-transport_days"
+                        id="edit-volume"
                         type="number"
-                        min="0"
-                        value={formData.transport_days}
+                        min="1"
+                        value={formData.volume}
                         onChange={(e) =>
                           setFormData((prev) => ({
                             ...prev,
-                            transport_days: parseInt(e.target.value) || 0,
+                            volume: parseInt(e.target.value) || 1,
                           }))
                         }
-                        placeholder="0"
+                        placeholder="1"
                         className="text-center"
                       />
                     </div>
                   </div>
                 </div>
               </div>
-            )}
+
+              {/* Total Amount Preview */}
+              <div className="space-y-2">
+                <Label>Total Nilai</Label>
+                <div className="flex items-center space-x-3 p-4 border border-purple-200 rounded-xl bg-purple-50">
+                  <DollarSign className="w-5 h-5 text-purple-600" />
+                  <div className="flex-1">
+                    <div className="font-semibold text-gray-900">
+                      Total Nilai
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {formatCurrency(formData.rate_per_satuan)} ×{" "}
+                      {formData.volume} ={" "}
+                      {formatCurrency(
+                        formData.rate_per_satuan * formData.volume,
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-lg font-bold text-purple-600">
+                    {formatCurrency(formData.rate_per_satuan * formData.volume)}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <DialogFooter>

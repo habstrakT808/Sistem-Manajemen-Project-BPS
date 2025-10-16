@@ -22,6 +22,11 @@ interface TaskData {
   response_pegawai: string;
   created_at: string;
   updated_at: string;
+  // New fields for satuan system
+  satuan_id: string | null;
+  rate_per_satuan: number | null;
+  volume: number | null;
+  total_amount: number | null;
   task_transport_allocations?: Array<{
     id: string;
     amount: number;
@@ -87,6 +92,10 @@ export async function GET(request: Request) {
         response_pegawai,
         created_at,
         updated_at,
+        satuan_id,
+        rate_per_satuan,
+        volume,
+        total_amount,
         task_transport_allocations (
           id,
           amount,
@@ -255,6 +264,11 @@ export async function GET(request: Request) {
       response_pegawai: task.response_pegawai,
       created_at: task.created_at,
       updated_at: task.updated_at,
+      // New fields for satuan system
+      satuan_id: task.satuan_id,
+      rate_per_satuan: task.rate_per_satuan,
+      volume: task.volume,
+      total_amount: task.total_amount,
       projects: projectDetails[task.project_id] || {
         id: task.project_id,
         nama_project: "Unknown Project",

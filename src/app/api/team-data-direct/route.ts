@@ -3,8 +3,6 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 
 export async function GET(_request: NextRequest) {
   try {
-    console.log("🔍 DEBUG: Team data direct API called!");
-
     const serviceClient = createServiceClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -12,7 +10,6 @@ export async function GET(_request: NextRequest) {
 
     // Test with specific user ID from database
     const testUserId = "87aa041a-80bb-4c94-9d83-472ae25eb451";
-    console.log("🔍 DEBUG: Testing with user ID:", testUserId);
 
     // Get team members directly
     const { data: memberRows, error: memberErr } = await serviceClient
@@ -22,10 +19,7 @@ export async function GET(_request: NextRequest) {
       )
       .eq("projects.ketua_tim_id", testUserId);
 
-    console.log("🔍 DEBUG: Member rows query result:", memberRows);
-
     if (memberErr) {
-      console.log("🔍 DEBUG: Member error:", memberErr);
       throw memberErr;
     }
 
@@ -37,8 +31,6 @@ export async function GET(_request: NextRequest) {
       }
     });
     const pegawai = Array.from(uniqueUsers.values());
-
-    console.log("🔍 DEBUG: Found pegawai:", pegawai.length, pegawai);
 
     // Enrich with detailed stats
     const enrichedTeamMembers = await Promise.all(
@@ -71,11 +63,6 @@ export async function GET(_request: NextRequest) {
               total: (allTasks || []).length,
             };
 
-            console.log(
-              `🔍 DEBUG: Task stats for member ${member.id}:`,
-              taskStats,
-            );
-
             // Get monthly earnings - simplified query
             const currentMonth = new Date().getMonth() + 1;
             const currentYear = new Date().getFullYear();
@@ -97,11 +84,6 @@ export async function GET(_request: NextRequest) {
             const monthlyEarnings = (earningsRecords || []).reduce(
               (sum: number, record: { amount: number }) => sum + record.amount,
               0,
-            );
-
-            console.log(
-              `🔍 DEBUG: Monthly earnings for member ${member.id}:`,
-              monthlyEarnings,
             );
 
             // Get actual project assignments for this member
@@ -174,7 +156,6 @@ export async function GET(_request: NextRequest) {
       ),
     );
 
-    console.log("🔍 DEBUG: Final enriched team members:", enrichedTeamMembers);
     return NextResponse.json({ data: enrichedTeamMembers });
   } catch (error) {
     console.error("🔍 DEBUG: Team data direct API error:", error);

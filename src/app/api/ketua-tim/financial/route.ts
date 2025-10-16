@@ -111,47 +111,44 @@ export async function GET(request: NextRequest) {
 
     const ownedTaskIds = (ownedTasks || []).map((t: any) => t.id);
 
-    // Then get transport allocations for those tasks
-    const { data: transportAllocations } =
+    // Get ALL tasks with their transport/honor amounts (not just allocated ones)
+    const { data: allTasksWithAmounts, error: tasksError } =
       ownedTaskIds.length > 0
         ? await (svc as any)
-            .from("task_transport_allocations")
-            .select("id")
-            .in("task_id", ownedTaskIds)
-        : { data: [] };
+            .from("tasks")
+            .select(
+              "id, title, pegawai_id, assignee_mitra_id, rate_per_satuan, volume, total_amount, honor_amount, transport_days",
+            )
+            .in("id", ownedTaskIds)
+        : { data: [], error: null };
 
-    const allocationIds = (transportAllocations || []).map((a: any) => a.id);
-
-    // Finally get earnings for those allocations
-    const { data: transportEarnings } =
-      allocationIds.length > 0
-        ? await (svc as any)
-            .from("earnings_ledger")
-            .select("amount, occurred_on")
-            .eq("type", "transport")
-            .gte("occurred_on", startDate.toISOString().split("T")[0])
-            .lte("occurred_on", endDate.toISOString().split("T")[0])
-            .in("source_id", allocationIds)
-        : { data: [] };
-
-    const transportSpending = (transportEarnings || []).reduce(
-      (sum: number, earning: { amount: number }) => sum + earning.amount,
+    // Calculate transport spending from tasks (both allocated and unallocated)
+    const transportSpending = (allTasksWithAmounts || []).reduce(
+      (sum: number, task: any) => {
+        // For pegawai tasks (has pegawai_id), use total_amount (new system) or transport_days * 150000 (old system)
+        if (task.pegawai_id) {
+          const amount = task.total_amount || task.transport_days * 150000 || 0;
+          return sum + amount;
+        }
+        return sum;
+      },
       0,
     );
 
-    // Calculate honor spending from financial_records (actual partner honor)
-    const { data: honorRecords } =
-      ownedIdArray.length > 0
-        ? await (svc as any)
-            .from("financial_records")
-            .select(
-              "amount, bulan, tahun, project_id, recipient_id, description",
-            )
-            .eq("recipient_type", "mitra")
-            .in("project_id", ownedIdArray)
-            .gte("tahun", startDate.getFullYear())
-            .lte("tahun", endDate.getFullYear())
-        : { data: [] };
+    // Calculate honor spending from tasks (both allocated and unallocated)
+    const honorSpending = (allTasksWithAmounts || []).reduce(
+      (sum: number, task: any) => {
+        // For mitra tasks (has assignee_mitra_id), use total_amount (new system) or honor_amount (old system)
+        if (task.assignee_mitra_id) {
+          const amount = task.total_amount || task.honor_amount || 0;
+          return sum + amount;
+        }
+        return sum;
+      },
+      0,
+    );
+
+    // Honor spending is now calculated from tasks above
 
     // Also get ALL financial records for debugging
     const { data: _allFinancialRecords } =
@@ -162,19 +159,7 @@ export async function GET(request: NextRequest) {
             .in("project_id", ownedIdArray)
         : { data: [] };
 
-    // Filter honor records by date range
-    const honorSpending = (honorRecords || [])
-      .filter((record: { bulan: number; tahun: number }) => {
-        const recordDate = new Date(record.tahun, record.bulan - 1, 1); // First day of the month
-        const recordEndDate = new Date(record.tahun, record.bulan, 0); // Last day of the month
-
-        // Check if the record month overlaps with the date range
-        return recordDate <= endDate && recordEndDate >= startDate;
-      })
-      .reduce(
-        (sum: number, record: { amount: number }) => sum + record.amount,
-        0,
-      );
+    // Honor spending is already calculated from tasks above
 
     // Calculate total spending from actual financial data
     const totalSpending = transportSpending + honorSpending;
@@ -229,11 +214,6 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    console.log(
-      "🔍 [DEBUG] Budget by Project:",
-      Object.fromEntries(budgetByProject),
-    );
-
     const projectBudgets: ProjectBudget[] = (projectRows || []).map(
       (p: {
         id: string;
@@ -276,19 +256,21 @@ export async function GET(request: NextRequest) {
       const monthStart = new Date(year, month - 1, 1);
       const monthEnd = new Date(year, month, 0);
 
-      const { data: monthlyTransportEarnings } =
-        allocationIds.length > 0
+      // Get monthly transport spending from task_transport_allocations
+      const { data: monthlyTransportAllocations } =
+        ownedTaskIds.length > 0
           ? await (svc as any)
-              .from("earnings_ledger")
-              .select("amount")
-              .eq("type", "transport")
-              .gte("occurred_on", monthStart.toISOString().split("T")[0])
-              .lte("occurred_on", monthEnd.toISOString().split("T")[0])
-              .in("source_id", allocationIds)
+              .from("task_transport_allocations")
+              .select("amount, allocation_date")
+              .in("task_id", ownedTaskIds)
+              .not("allocation_date", "is", null)
+              .gte("allocation_date", monthStart.toISOString().split("T")[0])
+              .lte("allocation_date", monthEnd.toISOString().split("T")[0])
           : { data: [] };
 
-      const monthlyTransport = (monthlyTransportEarnings || []).reduce(
-        (sum: number, earning: { amount: number }) => sum + earning.amount,
+      const monthlyTransport = (monthlyTransportAllocations || []).reduce(
+        (sum: number, allocation: { amount: number }) =>
+          sum + allocation.amount,
         0,
       );
 
@@ -320,21 +302,10 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Get top spenders from actual financial data
-    // Get transport spending by user from earnings_ledger
-    const { data: allTransportEarnings } =
-      allocationIds.length > 0
-        ? await (svc as any)
-            .from("earnings_ledger")
-            .select("user_id, amount")
-            .eq("type", "transport")
-            .gte("occurred_on", startDate.toISOString().split("T")[0])
-            .lte("occurred_on", endDate.toISOString().split("T")[0])
-            .in("source_id", allocationIds)
-        : { data: [] };
+    // Get top spenders from tasks data (using the same data we already fetched)
 
-    // Aggregate transport spending by user
-    const pegawaiTotals = (allTransportEarnings || []).reduce(
+    // Aggregate transport spending by user from tasks
+    const pegawaiTotals = (allTasksWithAmounts || []).reduce(
       (
         acc: {
           [key: string]: {
@@ -343,19 +314,59 @@ export async function GET(request: NextRequest) {
             projects: Set<string>;
           };
         },
-        earning: {
-          user_id: string;
-          amount: number;
-        },
+        task: any,
       ) => {
-        if (!acc[earning.user_id]) {
-          acc[earning.user_id] = {
-            name: earning.user_id, // temporary, will be replaced with fetched name below
+        // Only process tasks for pegawai (has pegawai_id)
+        if (!task.pegawai_id) {
+          return acc;
+        }
+
+        const userId = task.pegawai_id;
+        const amount = task.total_amount || task.transport_days * 150000 || 0;
+
+        if (!acc[userId]) {
+          acc[userId] = {
+            name: userId, // temporary, will be replaced with fetched name below
             amount: 0,
             projects: new Set(),
           };
         }
-        acc[earning.user_id].amount += earning.amount;
+        acc[userId].amount += amount;
+        acc[userId].projects.add(task.project_id);
+        return acc;
+      },
+      {},
+    );
+
+    // Aggregate honor spending by mitra from tasks
+    const mitraTotals = (allTasksWithAmounts || []).reduce(
+      (
+        acc: {
+          [key: string]: {
+            name: string;
+            amount: number;
+            projects: Set<string>;
+          };
+        },
+        task: any,
+      ) => {
+        // Only process tasks for mitra (has assignee_mitra_id)
+        if (!task.assignee_mitra_id) {
+          return acc;
+        }
+
+        const mitraId = task.assignee_mitra_id;
+        const amount = task.total_amount || task.honor_amount || 0;
+
+        if (!acc[mitraId]) {
+          acc[mitraId] = {
+            name: mitraId, // temporary, will be replaced with fetched name below
+            amount: 0,
+            projects: new Set(),
+          };
+        }
+        acc[mitraId].amount += amount;
+        acc[mitraId].projects.add(task.project_id);
         return acc;
       },
       {},
@@ -411,40 +422,7 @@ export async function GET(request: NextRequest) {
             .lte("tahun", endDate.getFullYear())
         : { data: [] };
 
-    // Filter by date range and aggregate by mitra
-    const mitraTotals = (allHonorRecords || [])
-      .filter((record: { bulan: number; tahun: number }) => {
-        const recordDate = new Date(record.tahun, record.bulan - 1);
-        return recordDate >= startDate && recordDate <= endDate;
-      })
-      .reduce(
-        (
-          acc: {
-            [key: string]: {
-              name: string;
-              amount: number;
-              projects: Set<string>;
-            };
-          },
-          record: {
-            recipient_id: string;
-            amount: number;
-            project_id: string;
-          },
-        ) => {
-          if (!acc[record.recipient_id]) {
-            acc[record.recipient_id] = {
-              name: record.recipient_id, // temporary, will be replaced with fetched name below
-              amount: 0,
-              projects: new Set(),
-            };
-          }
-          acc[record.recipient_id].amount += record.amount;
-          acc[record.recipient_id].projects.add(record.project_id);
-          return acc;
-        },
-        {},
-      );
+    // mitraTotals is already calculated from tasks above
 
     // Resolve mitra names in batch; mitra likely public/visible via RLS
     const mitraIds = Object.keys(mitraTotals);

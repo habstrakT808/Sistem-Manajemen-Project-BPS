@@ -15,6 +15,9 @@ export async function GET(request: NextRequest) {
     const day = searchParams.get("day");
     const monthParam = searchParams.get("month");
     const yearParam = searchParams.get("year");
+    const pegawaiId = searchParams.get("pegawai_id");
+    const projectId = searchParams.get("project_id");
+    const teamId = searchParams.get("team_id");
 
     const {
       data: { user },
@@ -24,41 +27,102 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Resolve owned projects
-    const { data: ownedProjects, error: ownedErr } = await (svc as any)
-      .from("projects")
-      .select("id")
-      .or(`ketua_tim_id.eq.${user.id},leader_user_id.eq.${user.id}`);
-    if (ownedErr) throw ownedErr;
-    const ownedIds: string[] = (ownedProjects || []).map((p: any) => p.id);
-    if (ownedIds.length === 0)
-      return NextResponse.json({
-        data: day
-          ? { date: day, details: [] }
-          : {
-              month: Number(monthParam) || 0,
-              year: Number(yearParam) || 0,
-              days: [],
-            },
-      });
+    // Check if user is admin
+    const { data: userProfile, error: profileError } = await supabase
+      .from("users")
+      .select("role")
+      .eq("id", user.id)
+      .single();
 
-    // All tasks in owned projects
-    const { data: taskRows, error: taskErr } = await (svc as any)
+    if (profileError || !userProfile) {
+      return NextResponse.json(
+        { error: "User profile not found" },
+        { status: 403 },
+      );
+    }
+
+    if (userProfile.role !== "admin") {
+      return NextResponse.json(
+        { error: "Forbidden - Admin access required" },
+        { status: 403 },
+      );
+    }
+
+    // Build filter conditions for tasks
+    let taskFilter: any = {};
+    if (pegawaiId) taskFilter.pegawai_id = pegawaiId;
+    if (projectId) taskFilter.project_id = projectId;
+
+    // Handle team filter - need to get project IDs for the team first
+    let projectIdsForTeam: string[] = [];
+    if (teamId) {
+      const { data: teamProjects } = await (svc as any)
+        .from("projects")
+        .select("id")
+        .eq("team_id", teamId);
+
+      if (teamProjects && teamProjects.length > 0) {
+        projectIdsForTeam = teamProjects.map((p: any) => p.id);
+      }
+    }
+
+    // Get all tasks (global access)
+    let tasksQuery = (svc as any)
       .from("tasks")
       .select(
-        "id, project_id, pegawai_id, assignee_user_id, deskripsi_tugas, title",
+        "id, project_id, pegawai_id, assignee_user_id, deskripsi_tugas, title, satuan_id, rate_per_satuan, volume, total_amount",
       )
-      .in("project_id", ownedIds);
+      .match(taskFilter);
+
+    // Apply team filter if specified
+    if (teamId && projectIdsForTeam.length > 0) {
+      tasksQuery = tasksQuery.in("project_id", projectIdsForTeam);
+    } else if (teamId && projectIdsForTeam.length === 0) {
+      // If team has no projects, return empty result
+      tasksQuery = tasksQuery.eq("id", "no-match");
+    }
+
+    const { data: taskRows, error: taskErr } = await tasksQuery;
+
     if (taskErr) throw taskErr;
     const taskIdSet = new Set<string>((taskRows || []).map((t: any) => t.id));
 
+    // Get satuan data for tasks that have satuan_id
+    const satuanIds = Array.from(
+      new Set((taskRows || []).map((t: any) => t.satuan_id).filter(Boolean)),
+    );
+    let satuanMap = new Map();
+    if (satuanIds.length > 0) {
+      const { data: satuanRows, error: satuanErr } = await (svc as any)
+        .from("satuan_master")
+        .select("id, nama_satuan")
+        .in("id", satuanIds);
+
+      if (satuanErr) throw satuanErr;
+      satuanMap = new Map((satuanRows || []).map((s: any) => [s.id, s]));
+    }
+
     if (day) {
       // Details for a specific day
-      const { data: allocations, error: allocErr } = await (svc as any)
+      let allocationsQuery = (svc as any)
         .from("task_transport_allocations")
         .select("id, task_id, allocation_date, allocated_at, canceled_at")
         .eq("allocation_date", day)
         .is("canceled_at", null);
+
+      // Apply team filter to allocations if specified
+      if (teamId && projectIdsForTeam.length > 0) {
+        // Filter allocations by tasks that belong to the team's projects
+        allocationsQuery = allocationsQuery.in(
+          "task_id",
+          Array.from(taskIdSet),
+        );
+      } else if (teamId && projectIdsForTeam.length === 0) {
+        allocationsQuery = allocationsQuery.eq("id", "no-match");
+      }
+
+      const { data: allocations, error: allocErr } = await allocationsQuery;
+
       if (allocErr) throw allocErr;
 
       const filtered = (allocations || []).filter((a: any) =>
@@ -115,6 +179,7 @@ export async function GET(request: NextRequest) {
         const userId = t.pegawai_id || t.assignee_user_id;
         const u = userId ? userMap.get(userId) : null;
         const p = t.project_id ? projectMap.get(t.project_id) : null;
+        const satuan = t.satuan_id ? satuanMap.get(t.satuan_id) : null;
         return {
           allocation_id: a.id,
           allocation_date: a.allocation_date,
@@ -122,6 +187,14 @@ export async function GET(request: NextRequest) {
           project_name: p?.nama_project || String(t.project_id || ""),
           task_title: t.title || "",
           task_description: t.deskripsi_tugas || "",
+          // New satuan system fields
+          satuan_id: t.satuan_id,
+          satuan_name: satuan?.nama_satuan || null,
+          rate_per_satuan: t.rate_per_satuan || null,
+          volume: t.volume || null,
+          total_amount: t.total_amount || null,
+          // Calculate which volume this allocation represents
+          volume_sequence: 1, // This will be calculated based on allocation order
         };
       });
 
@@ -149,6 +222,7 @@ export async function GET(request: NextRequest) {
       .gte("allocation_date", monthStartStr)
       .lt("allocation_date", monthEndStr)
       .is("canceled_at", null);
+
     if (allocErr) throw allocErr;
 
     const filtered = (allocations || []).filter((a: any) =>
@@ -170,7 +244,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ month, year, days });
   } catch (error) {
-    console.error("Transport daily API error:", error);
+    console.error("Admin transport daily API error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

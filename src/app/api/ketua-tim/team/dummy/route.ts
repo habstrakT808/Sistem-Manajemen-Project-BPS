@@ -14,8 +14,6 @@ export async function GET(_request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    console.log("🔍 DEBUG: Creating dummy data for user:", user.id);
-
     // Return realistic dummy data
     const dummyData = {
       data: [
@@ -85,7 +83,6 @@ export async function GET(_request: NextRequest) {
       message: "Dummy data for testing",
     };
 
-    console.log("🔍 DEBUG: Returning dummy data:", dummyData);
     return NextResponse.json(dummyData);
   } catch (error) {
     console.error("Dummy data error:", error);

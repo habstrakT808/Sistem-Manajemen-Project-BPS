@@ -24,6 +24,11 @@ interface TransportAllocation {
     project_name: string;
     start_date: string;
     end_date: string;
+    // New fields for satuan system
+    satuan_id?: string | null;
+    rate_per_satuan?: number | null;
+    volume?: number | null;
+    total_amount?: number | null;
   };
 }
 
@@ -90,15 +95,8 @@ export default function TransportCalendar({
         const globalJson = await globalRes.json();
         if (Array.isArray(globalJson.locked_dates)) {
           setLockedDates(new Set(globalJson.locked_dates as string[]));
-          console.log(
-            "[TransportCalendar] GLOBAL locked_dates:",
-            globalJson.locked_dates,
-          );
         } else if (Array.isArray(globalJson.allocations)) {
           setLockedDates(buildGlobalLockedDates(globalJson.allocations));
-          console.log(
-            "[TransportCalendar] GLOBAL locked from allocations (fallback)",
-          );
         }
       }
 
@@ -124,14 +122,7 @@ export default function TransportCalendar({
           (data.locked_dates as string[]).forEach((d) => merged.add(d));
           return merged;
         });
-        console.log(
-          "[TransportCalendar] PROJECT locked_dates (merged):",
-          data.locked_dates,
-        );
       } else {
-        console.log(
-          "[TransportCalendar] PROJECT locked_dates empty, keep GLOBAL",
-        );
       }
     } catch (error) {
       console.error("Error fetching allocations:", error);
@@ -252,8 +243,15 @@ export default function TransportCalendar({
         }
         acc[taskId].allocations.push(allocation);
         acc[taskId].totalAmount += allocation.amount;
-        // Calculate required days based on total allocations for this task
-        acc[taskId].requiredDays = acc[taskId].allocations.length;
+
+        // Calculate required days based on new satuan system or legacy system
+        if (allocation.task.volume && allocation.task.volume > 0) {
+          // New satuan system: use volume as required days
+          acc[taskId].requiredDays = allocation.task.volume;
+        } else {
+          // Legacy system: use allocations length
+          acc[taskId].requiredDays = acc[taskId].allocations.length;
+        }
         return acc;
       },
       {} as Record<
@@ -380,8 +378,9 @@ export default function TransportCalendar({
                       </p>
                       <p className="text-sm font-medium text-emerald-700">
                         {taskGroup.allocations.length} dari{" "}
-                        {taskGroup.requiredDays} hari transport belum
-                        dialokasikan • Total: Rp{" "}
+                        {taskGroup.requiredDays}{" "}
+                        {taskGroup.task.volume ? "volume" : "hari transport"}{" "}
+                        belum dialokasikan • Total: Rp{" "}
                         {taskGroup.totalAmount.toLocaleString()}
                       </p>
                       <div className="w-full bg-emerald-200 rounded-full h-2 mt-2">
@@ -394,7 +393,8 @@ export default function TransportCalendar({
                       </div>
                       <p className="text-xs text-emerald-600 mt-1">
                         {taskGroup.requiredDays - taskGroup.allocations.length}{" "}
-                        hari teralokasi, {taskGroup.allocations.length} tersisa
+                        {taskGroup.task.volume ? "volume" : "hari"} teralokasi,{" "}
+                        {taskGroup.allocations.length} tersisa
                       </p>
                     </div>
                   </div>
@@ -407,8 +407,10 @@ export default function TransportCalendar({
                         className="bg-emerald-600 hover:bg-emerald-700"
                       >
                         <MapPin className="w-3 h-3 mr-1" />
-                        Alokasikan Hari {index + 1} dari{" "}
-                        {taskGroup.requiredDays}
+                        Alokasikan {taskGroup.task.volume
+                          ? "Volume"
+                          : "Hari"}{" "}
+                        {index + 1} dari {taskGroup.requiredDays}
                       </Button>
                     ))}
                   </div>

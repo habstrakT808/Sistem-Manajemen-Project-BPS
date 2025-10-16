@@ -90,23 +90,18 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    console.log("🔍 DEBUG: Member detail API called!");
-
     const supabase = (await createClient()) as any;
     const svc = createServiceClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
     const { id: memberId } = await params;
-    console.log("🔍 DEBUG: Member ID:", memberId);
 
     // Auth check
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser();
-    console.log("🔍 DEBUG: Auth user:", user?.id);
-    console.log("🔍 DEBUG: Auth error:", authError);
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -123,8 +118,6 @@ export async function GET(
       .eq("id", memberId)
       .single();
 
-    console.log("🔍 DEBUG: Member info:", memberInfo);
-    console.log("🔍 DEBUG: Member error:", memberError);
     if (memberError || !memberInfo) {
       return NextResponse.json({ error: "Member not found" }, { status: 404 });
     }
@@ -155,8 +148,6 @@ export async function GET(
       )
       .eq("user_id", memberId)
       .in("projects.id", ownedProjectIds);
-
-    console.log("🔍 DEBUG: Project assignments:", projectAssignments);
 
     // Enrich projects with task data and progress
     const currentProjects = await Promise.all(
@@ -221,8 +212,6 @@ export async function GET(
       )
       .in("project_id", ownedProjectIds)
       .or(`assignee_user_id.eq.${memberId},pegawai_id.eq.${memberId}`);
-
-    console.log("🔍 DEBUG: All tasks:", allTasks);
 
     // Calculate task statistics
     const totalTasks = (allTasks || []).length;
@@ -490,7 +479,6 @@ export async function GET(
       },
     };
 
-    console.log("🔍 DEBUG: Final member detail data:", memberDetail);
     return NextResponse.json({ data: memberDetail });
   } catch (error) {
     console.error("Member Detail API Error:", error);

@@ -382,12 +382,6 @@ export async function GET(request: NextRequest) {
       const budget = budgetByProject.get(p.id) || { transport: 0, honor: 0 };
       const totalBudget = budget.transport + budget.honor;
 
-      console.log(`[DEBUG] Project ${p.nama_project} budget:`, {
-        transport: budget.transport,
-        honor: budget.honor,
-        total: totalBudget,
-      });
-
       // Update assignments with calculated budget values for backward compatibility
       const updatedAssignments = assignments.map((assignment) => ({
         ...assignment,

@@ -206,9 +206,6 @@ export async function POST(request: NextRequest) {
         mockEventsStorage.set(user.id, []);
       }
       mockEventsStorage.get(user.id)!.push(mockEvent);
-      console.log(
-        `Stored event in memory for user ${user.id}, total events: ${mockEventsStorage.get(user.id)!.length}`,
-      );
 
       return NextResponse.json({
         data: mockEvent,
@@ -447,9 +444,6 @@ async function getComprehensiveScheduleData(
       console.warn("Personal events query error:", eventsError.message);
       // If there's an error (like table not found), use in-memory storage
       const userEvents = mockEventsStorage.get(userId) || [];
-      console.log(
-        `Using in-memory storage for user ${userId}, found ${userEvents.length} events`,
-      );
       events = userEvents.filter((event) => {
         const eventStart = new Date(event.start_date);
         const eventEnd = new Date(event.end_date);
@@ -457,12 +451,8 @@ async function getComprehensiveScheduleData(
         const monthEnd = new Date(endDate);
         return eventStart <= monthEnd && eventEnd >= monthStart;
       });
-      console.log(
-        `Filtered to ${events.length} events for month ${month}/${year}`,
-      );
     } else {
       events = eventsData || [];
-      console.log(`Using database storage, found ${events.length} events`);
     }
   } catch (error) {
     console.warn("Personal events table not found, using in-memory storage");

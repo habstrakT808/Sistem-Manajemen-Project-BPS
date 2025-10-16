@@ -172,15 +172,6 @@ export function ProtectedRoute({
           }
         }
 
-        console.log("[ProtectedRoute] Debug:", {
-          currentPath,
-          hasTeamId,
-          activeProject: activeProject?.id,
-          activeTeam: activeTeam?.id,
-          storedRole: getStoredRole(),
-          requireProjectRole,
-        });
-
         // Allow access if either an active project OR an active team matches the role.
         // This lets team leaders access `/ketua-tim` after picking a team, even
         // when no specific project has been selected yet.

@@ -6,15 +6,12 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    console.log("🔍 DEBUG: Debug member detail API called!");
-
     const serviceClient = createServiceClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
     const { id: memberId } = await params;
-    console.log("🔍 DEBUG: Testing with member ID:", memberId);
 
     // Get member personal info
     const { data: memberInfo, error: memberError } = await serviceClient
@@ -24,9 +21,6 @@ export async function GET(
       )
       .eq("id", memberId)
       .single();
-
-    console.log("🔍 DEBUG: Member info:", memberInfo);
-    console.log("🔍 DEBUG: Member error:", memberError);
 
     if (memberError || !memberInfo) {
       return NextResponse.json({ error: "Member not found" }, { status: 404 });
@@ -49,8 +43,6 @@ export async function GET(
       )
       .eq("user_id", memberId);
 
-    console.log("🔍 DEBUG: Project assignments:", projectAssignments);
-
     // Get all tasks for this member - use both assignee_user_id and pegawai_id for compatibility
     const { data: allTasks } = await serviceClient
       .from("tasks")
@@ -68,8 +60,6 @@ export async function GET(
       )
       .or(`assignee_user_id.eq.${memberId},pegawai_id.eq.${memberId}`);
 
-    console.log("🔍 DEBUG: All tasks:", allTasks);
-
     // Calculate task statistics
     const totalTasks = (allTasks || []).length;
     const pendingTasks = (allTasks || []).filter(
@@ -83,14 +73,6 @@ export async function GET(
     ).length;
     const completionRate =
       totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-
-    console.log("🔍 DEBUG: Task statistics:", {
-      totalTasks,
-      pendingTasks,
-      inProgressTasks,
-      completedTasks,
-      completionRate,
-    });
 
     // Get monthly earnings
     const earningsMonth = new Date().getMonth() + 1;
@@ -114,11 +96,6 @@ export async function GET(
       (sum: number, record: { amount: number }) => sum + record.amount,
       0,
     );
-
-    console.log("🔍 DEBUG: Monthly earnings:", {
-      currentMonthEarnings,
-      currentMonthTotal,
-    });
 
     // Build 6-month earnings history from real ledger data (use current date)
     const nowForHistory = new Date();
@@ -409,7 +386,6 @@ export async function GET(
       },
     };
 
-    console.log("🔍 DEBUG: Final member detail data:", memberDetail);
     return NextResponse.json({ data: memberDetail });
   } catch (error) {
     console.error("🔍 DEBUG: Debug member detail API error:", error);

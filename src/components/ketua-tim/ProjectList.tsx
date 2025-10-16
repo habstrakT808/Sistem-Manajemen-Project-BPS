@@ -146,12 +146,8 @@ export default function ProjectList() {
     const budget = list.reduce((total, assignment) => {
       const transport = assignment.uang_transport || 0;
       const honor = assignment.honor || 0;
-      console.log(
-        `[DEBUG] Assignment budget - Transport: ${transport}, Honor: ${honor}`,
-      );
       return total + transport + honor;
     }, 0);
-    console.log(`[DEBUG] Total project budget calculated: ${budget}`);
     return budget;
   };
 

@@ -188,10 +188,41 @@ export async function GET(request: NextRequest) {
       0,
     );
 
+    // Calculate budget from tasks using new "Satuan" system
+    const { data: satuanTasks, error: satuanTasksError } =
+      ownedProjectIds.length
+        ? await (svc as any)
+            .from("tasks")
+            .select("rate_per_satuan, volume, total_amount")
+            .in("project_id", ownedProjectIds)
+            .not("satuan_id", "is", null)
+        : { data: [], error: null };
+
+    const satuanBudget = (satuanTasks || []).reduce(
+      (
+        sum: number,
+        task: {
+          total_amount: number | null;
+          rate_per_satuan: number | null;
+          volume: number | null;
+        },
+      ) => {
+        // Use total_amount if available, otherwise calculate from rate_per_satuan * volume
+        if (task.total_amount) {
+          return sum + task.total_amount;
+        } else if (task.rate_per_satuan && task.volume) {
+          const calculated = task.rate_per_satuan * task.volume;
+          return sum + calculated;
+        }
+        return sum;
+      },
+      0,
+    );
+
     const monthlyBudget =
       totalSpendingFromAssignments > 0
-        ? totalSpendingFromAssignments
-        : transportTotal + mitraTotal;
+        ? totalSpendingFromAssignments + satuanBudget
+        : transportTotal + mitraTotal + satuanBudget;
 
     const stats: DashboardStats = {
       my_projects: allProjectsCount || 0,

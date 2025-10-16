@@ -481,7 +481,6 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
               ) : (
                 <div className="grid grid-cols-1 gap-4">
                   {pegawaiAssignments.map((assignment) => {
-                    console.log("Pegawai assignment:", assignment);
                     return (
                       <div
                         key={assignment.id}
@@ -543,7 +542,6 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
               ) : (
                 <div className="grid grid-cols-1 gap-4">
                   {mitraAssignments.map((assignment) => {
-                    console.log("Mitra assignment:", assignment);
                     return (
                       <div
                         key={assignment.id}

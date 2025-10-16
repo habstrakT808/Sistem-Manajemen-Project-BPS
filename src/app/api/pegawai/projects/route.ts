@@ -31,7 +31,6 @@ export async function GET(request: Request) {
     const supabase = await createClient();
     const { searchParams } = new URL(request.url);
     const teamId = searchParams.get("team_id");
-    console.log("[API] /api/pegawai/projects - teamId:", teamId);
     const svc = createServiceClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -181,16 +180,8 @@ export async function GET(request: Request) {
         // Check if project belongs to the selected team
         const belongsToTeam = p.team_id === teamId;
 
-        console.log(
-          `[API] Project ${p.id} (${p.nama_project}): isInMemberSet=${isInMemberSet}, belongsToTeam=${belongsToTeam}, team_id=${p.team_id}, expected_team_id=${teamId}`,
-        );
-
         return isInMemberSet && belongsToTeam;
       });
-
-      console.log(
-        `[API] Total merged projects: ${mergedProjects.length}, filtered projects: ${filteredProjects.length}`,
-      );
 
       let baseProjects: Array<ProjectData> = filteredProjects.map((p: any) => ({
         project_id: p.id,

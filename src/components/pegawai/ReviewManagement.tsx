@@ -41,6 +41,7 @@ import {
   History,
   TrendingUp,
   BarChart3,
+  X,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
@@ -177,6 +178,47 @@ export function ReviewManagement() {
       setSubmitting(false);
     }
   }, [selectedReview, reviewForm, refetch]);
+
+  const handleSkipReview = useCallback(
+    async (review: PendingReview) => {
+      if (
+        !confirm(
+          "Are you sure you want to skip this review? This action cannot be undone.",
+        )
+      ) {
+        return;
+      }
+
+      setSubmitting(true);
+      try {
+        const response = await fetch("/api/pegawai/reviews", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            project_id: review.project.id,
+            mitra_id: review.mitra.id,
+            action: "skip",
+          }),
+        });
+
+        if (!response.ok) {
+          const errorResult = await response.json();
+          throw new Error(errorResult.error || "Failed to skip review");
+        }
+
+        toast.success("Review skipped successfully!");
+        await refetch();
+      } catch (error) {
+        console.error("Error skipping review:", error);
+        toast.error(
+          error instanceof Error ? error.message : "Failed to skip review",
+        );
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [refetch],
+  );
 
   const handleEditReview = useCallback(async () => {
     if (
@@ -589,13 +631,21 @@ export function ReviewManagement() {
                         )}
                       </div>
 
-                      <div className="ml-6">
+                      <div className="ml-6 flex space-x-3">
                         <Button
                           onClick={() => openReviewDialog(review)}
                           className="bg-orange-600 hover:bg-orange-700 text-white"
                         >
                           <Send className="w-4 h-4 mr-2" />
                           Submit Review
+                        </Button>
+                        <Button
+                          onClick={() => handleSkipReview(review)}
+                          variant="outline"
+                          className="border-gray-300 text-gray-600 hover:bg-gray-50"
+                        >
+                          <X className="w-4 h-4 mr-2" />
+                          Skip
                         </Button>
                       </div>
                     </div>

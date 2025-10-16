@@ -69,15 +69,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       .eq("id", taskId)
       .single();
 
-    console.log("Debug - Task exists check:", {
-      taskId,
-      userId: user.id,
-      taskExists,
-      existsError,
-    });
-
     if (existsError) {
-      console.log("Debug - Task does not exist:", existsError);
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
@@ -86,12 +78,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const hasAccess =
       taskExistsData.assignee_user_id === user.id ||
       taskExistsData.pegawai_id === user.id;
-    console.log("Debug - User access:", {
-      assignee_user_id: taskExistsData.assignee_user_id,
-      pegawai_id: taskExistsData.pegawai_id,
-      user_id: user.id,
-      hasAccess,
-    });
 
     if (!hasAccess) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
@@ -120,7 +106,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       .single();
 
     if (taskError || !task) {
-      console.log("Debug - Task fetch error:", taskError);
       return NextResponse.json(
         { error: "Failed to fetch task details" },
         { status: 500 },
@@ -136,7 +121,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       .single();
 
     if (projectError) {
-      console.log("Debug - Project fetch error:", projectError);
       return NextResponse.json(
         { error: "Failed to fetch project details" },
         { status: 500 },

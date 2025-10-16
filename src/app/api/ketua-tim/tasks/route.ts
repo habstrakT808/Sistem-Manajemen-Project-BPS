@@ -15,6 +15,10 @@ interface TaskFormData {
   deskripsi_tugas: string;
   transport_days?: number;
   honor_amount?: number;
+  // New fields for satuan system
+  satuan_id?: string;
+  rate_per_satuan?: number;
+  volume?: number;
 }
 
 interface TaskUpdateData {
@@ -23,6 +27,10 @@ interface TaskUpdateData {
   tanggal_tugas?: string;
   status?: "pending" | "in_progress" | "completed";
   response_pegawai?: string;
+  // New fields for satuan system
+  satuan_id?: string;
+  rate_per_satuan?: number;
+  volume?: number;
 }
 
 export async function POST(request: NextRequest) {
@@ -46,6 +54,10 @@ export async function POST(request: NextRequest) {
       deskripsi_tugas: body.deskripsi_tugas || body.description || "",
       transport_days: body.transport_days || 0,
       honor_amount: body.honor_amount || 0,
+      // New fields for satuan system
+      satuan_id: body.satuan_id,
+      rate_per_satuan: body.rate_per_satuan || 0,
+      volume: body.volume || 1,
     };
 
     // Extract title separately to avoid confusion
@@ -164,9 +176,22 @@ export async function POST(request: NextRequest) {
       taskData.transport_days = normalized.transport_days || 0;
     } else {
       taskData.assignee_mitra_id = normalized.assignee_mitra_id;
-      taskData.honor_amount = normalized.honor_amount || 0;
+      // Use satuan system for mitra tasks if available, otherwise fallback to honor_amount
+      if (normalized.satuan_id) {
+        taskData.honor_amount =
+          (normalized.rate_per_satuan || 0) * (normalized.volume || 1);
+      } else {
+        taskData.honor_amount = normalized.honor_amount || 0;
+      }
       taskData.has_transport = false;
       taskData.transport_days = 0;
+    }
+
+    // Add satuan system fields
+    if (normalized.satuan_id) {
+      taskData.satuan_id = normalized.satuan_id;
+      taskData.rate_per_satuan = normalized.rate_per_satuan || 0;
+      taskData.volume = normalized.volume || 1;
     }
 
     const { data: task, error: taskError } = await (svc as any)
@@ -180,30 +205,45 @@ export async function POST(request: NextRequest) {
     }
 
     // Create transport allocations if needed (only for member assignments)
-    if (
-      normalized.assignee_type === "member" &&
-      normalized.transport_days &&
-      normalized.transport_days > 0
-    ) {
-      // Create multiple allocations based on transport_days
-      const transportAllocations = [];
-      for (let i = 0; i < normalized.transport_days; i++) {
-        transportAllocations.push({
-          task_id: task.id,
-          user_id: normalized.assignee_user_id || normalized.pegawai_id,
-          amount: 150000, // Fixed amount per allocation
-          created_by: user.id,
-          created_at: new Date().toISOString(),
-        });
+    if (normalized.assignee_type === "member") {
+      let transportAllocations = [];
+
+      // New satuan system: create allocations based on volume
+      if (normalized.satuan_id && normalized.volume && normalized.volume > 0) {
+        const amountPerAllocation = normalized.rate_per_satuan || 0;
+        for (let i = 0; i < normalized.volume; i++) {
+          transportAllocations.push({
+            task_id: task.id,
+            user_id: normalized.assignee_user_id || normalized.pegawai_id,
+            amount: amountPerAllocation,
+            created_by: user.id,
+            created_at: new Date().toISOString(),
+          });
+        }
+      }
+      // Legacy system: create allocations based on transport_days
+      else if (normalized.transport_days && normalized.transport_days > 0) {
+        for (let i = 0; i < normalized.transport_days; i++) {
+          transportAllocations.push({
+            task_id: task.id,
+            user_id: normalized.assignee_user_id || normalized.pegawai_id,
+            amount: 150000, // Fixed amount per allocation
+            created_by: user.id,
+            created_at: new Date().toISOString(),
+          });
+        }
       }
 
-      const { error: transportError } = await (svc as any)
-        .from("task_transport_allocations")
-        .insert(transportAllocations);
+      // Insert allocations if any were created
+      if (transportAllocations.length > 0) {
+        const { error: transportError } = await (svc as any)
+          .from("task_transport_allocations")
+          .insert(transportAllocations);
 
-      if (transportError) {
-        console.error("Transport allocation error:", transportError);
-        // Don't fail the task creation if transport allocation fails
+        if (transportError) {
+          console.error("Transport allocation error:", transportError);
+          // Don't fail the task creation if transport allocation fails
+        }
       }
     }
 
@@ -284,6 +324,10 @@ export async function GET(request: NextRequest) {
         response_pegawai,
         created_at,
         updated_at,
+        satuan_id,
+        rate_per_satuan,
+        volume,
+        total_amount,
         task_transport_allocations(id, amount, allocation_date, allocated_at, canceled_at)
       `,
       )
@@ -445,6 +489,17 @@ export async function PUT(request: NextRequest) {
 
     if (updateData.response_pegawai !== undefined) {
       updateFields.response_pegawai = updateData.response_pegawai;
+    }
+
+    // Add satuan system fields
+    if (updateData.satuan_id !== undefined) {
+      updateFields.satuan_id = updateData.satuan_id;
+    }
+    if (updateData.rate_per_satuan !== undefined) {
+      updateFields.rate_per_satuan = updateData.rate_per_satuan;
+    }
+    if (updateData.volume !== undefined) {
+      updateFields.volume = updateData.volume;
     }
 
     const { data: updatedTask, error: updateError } = await (svc as any)

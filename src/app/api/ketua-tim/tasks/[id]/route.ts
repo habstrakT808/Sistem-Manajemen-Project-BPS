@@ -342,7 +342,6 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
     const { id: taskId } = await params;
-    console.log("DELETE request for task ID:", taskId);
 
     // Auth check
     const {
@@ -350,55 +349,39 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       error: authError,
     } = await supabase.auth.getUser();
     if (authError || !user) {
-      console.log("Auth error:", authError);
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    console.log("User ID:", user.id);
-
     // Use service client to bypass RLS policies
-    console.log("Querying task with service client:", taskId);
     const { data: queryResult, error: queryError } = await (svc as any)
       .from("tasks")
       .select("id, title, project_id")
       .eq("id", taskId)
       .single();
 
-    console.log("Task query result:", { queryResult, queryError });
-
     if (queryError || !queryResult) {
-      console.log("Task not found or error:", queryError);
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
     const task = queryResult;
 
     // Get project info separately
-    console.log("Querying project with ID:", task.project_id);
     const { data: projectResult, error: projectError } = await (svc as any)
       .from("projects")
       .select("id, leader_user_id, ketua_tim_id")
       .eq("id", task.project_id)
       .single();
 
-    console.log("Project query result:", { projectResult, projectError });
-
     if (projectError || !projectResult) {
-      console.log("Project not found or error:", projectError);
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
     const project = projectResult;
 
     // Check if user has access to this project
-    console.log("Project info:", project);
-    console.log("User ID:", user.id);
-    console.log("Project leader_user_id:", project.leader_user_id);
-    console.log("Project ketua_tim_id:", project.ketua_tim_id);
 
     const hasAccess =
       project.leader_user_id === user.id || project.ketua_tim_id === user.id;
-    console.log("Has access:", hasAccess);
 
     if (!hasAccess) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });

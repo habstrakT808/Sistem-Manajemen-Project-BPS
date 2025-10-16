@@ -56,7 +56,7 @@ export async function GET() {
     const supabase = await createClient();
     const serviceClient = createServiceClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
     // Auth check
@@ -90,22 +90,9 @@ export async function GET() {
       .select("project_id")
       .eq("user_id", user.id);
 
-    // Additional validation: Check if user actually has tasks in these projects
-    // This ensures the user was actually involved in the project work
-    const { data: userTasks } = await serviceClient
-      .from("tasks")
-      .select("project_id")
-      .eq("assignee_user_id", user.id);
-
-    const userTaskProjectIds = new Set(
-      (userTasks || []).map((task: { project_id: string }) => task.project_id)
-    );
-
-    // Filter project members to only include projects where user actually has tasks
-    const validProjectMembers = (projectMembers || []).filter(
-      (member: { project_id: string }) =>
-        userTaskProjectIds.has(member.project_id)
-    );
+    // Use all project members - no need to validate tasks
+    // Being a project member is sufficient to review mitra
+    const validProjectMembers = projectMembers || [];
 
     if (!validProjectMembers || validProjectMembers.length === 0) {
       return NextResponse.json({
@@ -121,7 +108,7 @@ export async function GET() {
     }
 
     const projectIds = validProjectMembers.map(
-      (member: { project_id: string }) => member.project_id
+      (member: { project_id: string }) => member.project_id,
     );
 
     // Then get completed projects
@@ -136,7 +123,7 @@ export async function GET() {
         status,
         leader_user_id,
         ketua_tim_id
-      `
+      `,
       )
       .in("id", projectIds)
       .eq("status", "completed");
@@ -146,8 +133,8 @@ export async function GET() {
       new Set(
         (completedProjects || [])
           .map((p: any) => p.leader_user_id || p.ketua_tim_id)
-          .filter(Boolean)
-      )
+          .filter(Boolean),
+      ),
     );
 
     const { data: leaders } = await serviceClient
@@ -176,11 +163,11 @@ export async function GET() {
               "Unknown",
           },
         },
-      })
+      }),
     );
 
     const completedProjectIds = (completedProjectMembers || []).map(
-      (member: { project_id: string }) => member.project_id
+      (member: { project_id: string }) => member.project_id,
     );
 
     if (completedProjectIds.length === 0) {
@@ -217,7 +204,7 @@ export async function GET() {
         rating,
         komentar,
         created_at
-      `
+      `,
       )
       .eq("pegawai_id", user.id);
 
@@ -225,18 +212,18 @@ export async function GET() {
     const mitraIds = Array.from(
       new Set(
         finalMitraAssignments.map(
-          (ma: { assignee_id: string }) => ma.assignee_id
-        )
-      )
+          (ma: { assignee_id: string }) => ma.assignee_id,
+        ),
+      ),
     );
     const { data: mitraData } = await serviceClient
       .from("mitra")
       .select(
-        "id, nama_mitra, jenis, kontak, alamat, deskripsi, rating_average"
+        "id, nama_mitra, jenis, kontak, alamat, deskripsi, rating_average",
       )
       .in(
         "id",
-        mitraIds.length ? mitraIds : ["00000000-0000-0000-0000-000000000000"]
+        mitraIds.length ? mitraIds : ["00000000-0000-0000-0000-000000000000"],
       );
 
     // Create maps for efficient lookup
@@ -276,7 +263,7 @@ export async function GET() {
             | "completed",
           ketua_tim_name: usersSingle?.nama_lengkap ?? "",
         });
-      }
+      },
     );
 
     const mitraMap = new Map();
@@ -293,14 +280,24 @@ export async function GET() {
       }) => {
         const key = `${assignment.project_id}-${assignment.assignee_id}`;
         mitraAssignmentMap.set(key, assignment);
-      }
+      },
     );
 
     const existingReviewsSet = new Set();
+    const skippedReviewsSet = new Set();
     (existingReviews || []).forEach(
-      (review: { project_id: string; mitra_id: string }) => {
-        existingReviewsSet.add(`${review.project_id}-${review.mitra_id}`);
-      }
+      (review: {
+        project_id: string;
+        mitra_id: string;
+        rating: number | null;
+      }) => {
+        const key = `${review.project_id}-${review.mitra_id}`;
+        existingReviewsSet.add(key);
+        // Track skipped reviews separately (rating is null)
+        if (review.rating === null) {
+          skippedReviewsSet.add(key);
+        }
+      },
     );
 
     // Calculate pending reviews
@@ -320,7 +317,7 @@ export async function GET() {
             const startDate = new Date(project.tanggal_mulai);
             const endDate = new Date(project.deadline);
             const collaborationDuration = Math.ceil(
-              (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+              (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
             );
 
             pendingReviews.push({
@@ -331,11 +328,12 @@ export async function GET() {
             });
           }
         }
-      }
+      },
     );
 
-    // Calculate completed reviews
+    // Calculate completed reviews (exclude skipped reviews)
     const completedReviews: CompletedReview[] = (existingReviews || [])
+      .filter((review: { rating: number | null }) => review.rating !== null)
       .map(
         (review: {
           id: string;
@@ -375,11 +373,11 @@ export async function GET() {
             created_at: review.created_at,
             can_edit: canEdit,
           };
-        }
+        },
       )
       .sort(
         (a, b) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
       );
 
     // Calculate stats
@@ -416,7 +414,7 @@ export async function GET() {
     console.error("Reviews GET API Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -426,7 +424,7 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const serviceClient = createServiceClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
     const body = await request.json();
@@ -460,7 +458,7 @@ export async function POST(request: NextRequest) {
     if (!project_id || !mitra_id || !rating || rating < 1 || rating > 5) {
       return NextResponse.json(
         { error: "Invalid input data" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -475,7 +473,7 @@ export async function POST(request: NextRequest) {
     if (!projectCheck) {
       return NextResponse.json(
         { error: "Project not found or not completed" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -490,7 +488,7 @@ export async function POST(request: NextRequest) {
     if (!pegawaiAssignment) {
       return NextResponse.json(
         { error: "You were not assigned to this project" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -506,7 +504,7 @@ export async function POST(request: NextRequest) {
     if (!mitraAssignment) {
       return NextResponse.json(
         { error: "Mitra was not assigned to this project" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -522,7 +520,7 @@ export async function POST(request: NextRequest) {
     if (existingReview) {
       return NextResponse.json(
         { error: "Review already exists for this mitra in this project" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -559,7 +557,142 @@ export async function POST(request: NextRequest) {
     console.error("Reviews POST API Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
+    );
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const supabase = await createClient();
+    const serviceClient = createServiceClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    );
+
+    const body = await request.json();
+    const { project_id, mitra_id, action } = body;
+
+    // Auth check
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Role validation
+    const { data: userProfile, error: profileError } = await serviceClient
+      .from("users")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (
+      profileError ||
+      !userProfile ||
+      (userProfile as any).role !== "pegawai"
+    ) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    // Validate input
+    if (!project_id || !mitra_id || action !== "skip") {
+      return NextResponse.json(
+        { error: "Invalid input data" },
+        { status: 400 },
+      );
+    }
+
+    // Verify project is completed and pegawai was assigned
+    const { data: projectCheck } = await serviceClient
+      .from("projects")
+      .select("id, status")
+      .eq("id", project_id)
+      .eq("status", "completed")
+      .single();
+
+    if (!projectCheck) {
+      return NextResponse.json(
+        { error: "Project not found or not completed" },
+        { status: 400 },
+      );
+    }
+
+    // Verify pegawai was assigned to this project
+    const { data: pegawaiAssignment } = await serviceClient
+      .from("project_members")
+      .select("id")
+      .eq("project_id", project_id)
+      .eq("user_id", user.id)
+      .single();
+
+    if (!pegawaiAssignment) {
+      return NextResponse.json(
+        { error: "You were not assigned to this project" },
+        { status: 400 },
+      );
+    }
+
+    // Verify mitra was assigned to this project
+    const { data: mitraAssignment } = await serviceClient
+      .from("project_assignments")
+      .select("id")
+      .eq("project_id", project_id)
+      .eq("assignee_type", "mitra")
+      .eq("assignee_id", mitra_id)
+      .single();
+
+    if (!mitraAssignment) {
+      return NextResponse.json(
+        { error: "Mitra was not assigned to this project" },
+        { status: 400 },
+      );
+    }
+
+    // Check if review already exists
+    const { data: existingReview } = await serviceClient
+      .from("mitra_reviews")
+      .select("id")
+      .eq("project_id", project_id)
+      .eq("mitra_id", mitra_id)
+      .eq("pegawai_id", user.id)
+      .single();
+
+    if (existingReview) {
+      return NextResponse.json(
+        { error: "Review already exists for this mitra in this project" },
+        { status: 400 },
+      );
+    }
+
+    // Create a "skipped" review with null rating
+    const { data: skippedReview, error: insertError } = await serviceClient
+      .from("mitra_reviews")
+      .insert({
+        project_id,
+        mitra_id,
+        pegawai_id: user.id,
+        rating: null, // null rating indicates skipped
+        komentar: "Review skipped - no direct collaboration",
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      throw insertError;
+    }
+
+    return NextResponse.json({
+      message: "Review skipped successfully",
+      data: skippedReview,
+    });
+  } catch (error) {
+    console.error("Reviews PATCH API Error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
     );
   }
 }
@@ -569,7 +702,7 @@ export async function PUT(request: NextRequest) {
     const supabase = await createClient();
     const serviceClient = createServiceClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
     const body = await request.json();
@@ -603,7 +736,7 @@ export async function PUT(request: NextRequest) {
     if (!review_id || !rating || rating < 1 || rating > 5) {
       return NextResponse.json(
         { error: "Invalid input data" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -627,7 +760,7 @@ export async function PUT(request: NextRequest) {
     if (reviewDate <= thirtyDaysAgo) {
       return NextResponse.json(
         { error: "Review can only be edited within 30 days of submission" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -651,7 +784,7 @@ export async function PUT(request: NextRequest) {
     console.error("Reviews PUT API Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

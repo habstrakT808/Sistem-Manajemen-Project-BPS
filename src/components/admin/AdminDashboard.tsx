@@ -65,40 +65,15 @@ export default function AdminDashboard() {
     return () => clearTimeout(timeout);
   }, []);
 
-  // Add detailed logging for all state changes
   useEffect(() => {
-    console.log("=== AdminDashboard State Debug ===");
-    console.log("authLoading:", authLoading);
-    console.log("isLoading:", isLoading);
-    console.log("user:", user?.id || "null");
-    console.log("userProfile:", userProfile?.role || "null");
-    console.log("error:", error);
-    console.log("stats:", stats);
-    console.log(
-      "showLoading condition (isLoading || authLoading):",
-      isLoading || authLoading,
-    );
-    console.log("=== End Debug ===");
-  });
-
-  useEffect(() => {
-    console.log("=== AdminDashboard useEffect triggered ===");
-    console.log("user:", user?.id || "null");
-    console.log("authLoading:", authLoading);
-    console.log("userProfile:", userProfile?.role || "null");
-
     const fetchRealStats = async () => {
-      console.log("=== fetchRealStats started ===");
-
       // Don't fetch if auth is still loading
       if (authLoading) {
-        console.log("Auth still loading, waiting...");
         return;
       }
 
       // Don't fetch if no user or auth is still loading
       if (!user || authLoading) {
-        console.log("No user found or auth loading, skipping stats fetch");
         setIsLoading(false);
         return;
       }
