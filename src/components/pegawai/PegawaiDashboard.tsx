@@ -80,7 +80,7 @@ interface DashboardData {
   assigned_projects: AssignedProject[];
 }
 
-async function fetchPegawaiDashboard(): Promise<DashboardData> {
+async function _fetchPegawaiDashboard(): Promise<DashboardData> {
   const response = await fetch("/api/pegawai/dashboard", { cache: "no-store" });
   const result = await response.json();
   if (!response.ok) {

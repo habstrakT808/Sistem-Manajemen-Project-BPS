@@ -38,12 +38,6 @@ export function useAuth(): UseAuthReturn {
       retryCount: number = 0,
     ): Promise<Database["public"]["Tables"]["users"]["Row"] | null> => {
       try {
-        console.log(
-          "=== fetchUserProfile: Fetching profile for user:",
-          userId,
-          "Retry:",
-          retryCount,
-        );
         const { data, error } = await supabase
           .from("users")
           .select("*")
@@ -62,7 +56,6 @@ export function useAuth(): UseAuthReturn {
           // Retry up to 3 times with exponential backoff
           if (retryCount < 3) {
             const delay = Math.pow(2, retryCount) * 500; // 500ms, 1s, 2s
-            console.log(`=== fetchUserProfile: Retrying in ${delay}ms...`);
             await new Promise((resolve) => setTimeout(resolve, delay));
             return fetchUserProfile(userId, retryCount + 1);
           }
@@ -70,7 +63,6 @@ export function useAuth(): UseAuthReturn {
           return null;
         }
 
-        console.log("=== fetchUserProfile: Profile loaded successfully:", data);
         return data;
       } catch (err) {
         console.error("=== fetchUserProfile: Exception fetching profile:", err);
@@ -78,9 +70,6 @@ export function useAuth(): UseAuthReturn {
         // Retry up to 3 times with exponential backoff
         if (retryCount < 3) {
           const delay = Math.pow(2, retryCount) * 500;
-          console.log(
-            `=== fetchUserProfile: Retrying in ${delay}ms due to exception...`,
-          );
           await new Promise((resolve) => setTimeout(resolve, delay));
           return fetchUserProfile(userId, retryCount + 1);
         }
@@ -123,7 +112,6 @@ export function useAuth(): UseAuthReturn {
   }, [supabase.auth, fetchUserProfile]);
 
   const signOut = async () => {
-    console.log("Signing out user - starting logout process");
     setLoading(true);
 
     // Start cleanup immediately while trying to sign out from Supabase
@@ -136,8 +124,6 @@ export function useAuth(): UseAuthReturn {
 
         // Clear all browser storage
         if (typeof window !== "undefined") {
-          console.log("Clearing browser storage...");
-
           // Clear localStorage and sessionStorage
           window.localStorage.clear();
           window.sessionStorage.clear();
@@ -156,22 +142,16 @@ export function useAuth(): UseAuthReturn {
               document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
             }
           });
-
-          console.log("Browser storage cleared successfully");
         }
 
         // Clear React Query cache
         try {
-          console.log("Clearing React Query cache...");
           queryClient.clear();
           queryClient.invalidateQueries();
           queryClient.removeQueries();
-          console.log("React Query cache cleared successfully");
         } catch (err) {
           console.warn("Error clearing React Query cache:", err);
         }
-
-        console.log("Logout cleanup completed, navigating to home page...");
 
         // Force navigation to home page
         if (typeof window !== "undefined") {
@@ -189,8 +169,6 @@ export function useAuth(): UseAuthReturn {
 
     // Try to sign out from Supabase with a shorter timeout
     try {
-      console.log("Calling supabase.auth.signOut()...");
-
       // Create a timeout promise with shorter duration
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => reject(new Error("Logout timeout")), 2000); // 2 second timeout
@@ -210,7 +188,6 @@ export function useAuth(): UseAuthReturn {
       if (result?.error) {
         console.warn("Supabase signOut error:", result.error);
       } else {
-        console.log("Supabase signOut completed successfully");
       }
 
       // Perform cleanup regardless of signOut result

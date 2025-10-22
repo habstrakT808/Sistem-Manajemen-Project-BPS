@@ -10,7 +10,6 @@ export default function TestDashboard() {
   useEffect(() => {
     const testConnection = async () => {
       try {
-        console.log("Testing database connection...");
         const supabase = createClient();
 
         // Simple test query
@@ -22,7 +21,6 @@ export default function TestDashboard() {
           console.error("Database error:", error);
           setTestResult(`Database Error: ${error.message}`);
         } else {
-          console.log("Database connection successful, user count:", data);
           setTestResult(`Database OK - User count: ${data || 0}`);
         }
       } catch (error) {

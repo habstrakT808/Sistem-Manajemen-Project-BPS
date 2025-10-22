@@ -367,9 +367,9 @@ export default function PersonalSchedule() {
   };
 
   // Disable project span indicators on calendar (only tasks should show)
-  const hasProjectSpanOnDate = (_date: Date) => false;
+  const _hasProjectSpanOnDate = (_date: Date) => false;
 
-  const getProjectSpanCount = (_date: Date) => 0;
+  const _getProjectSpanCount = (_date: Date) => 0;
 
   const getEffectiveWorkloadLevel = (date: Date) => {
     // Use task span concurrency for coloring per requirement

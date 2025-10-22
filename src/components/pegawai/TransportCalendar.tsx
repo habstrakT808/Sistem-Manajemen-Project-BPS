@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Calendar,
   ChevronLeft,
@@ -85,7 +85,7 @@ export default function TransportCalendar({
     calendarDays.push(day);
   }
 
-  const fetchAllocations = async () => {
+  const fetchAllocations = useCallback(async () => {
     try {
       // 1) Always load global locked dates first
       const globalRes = await fetch(`/api/pegawai/transport-allocations`, {
@@ -130,11 +130,11 @@ export default function TransportCalendar({
     } finally {
       setLoading(false);
     }
-  };
+  }, [projectId]);
 
   useEffect(() => {
     fetchAllocations();
-  }, [projectId]);
+  }, [projectId, fetchAllocations]);
 
   const handleAllocateTransport = async () => {
     if (!selectedAllocation || !selectedDate) return;
@@ -327,7 +327,7 @@ export default function TransportCalendar({
 
   const pendingAllocations = getPendingAllocations();
   const pendingAllocationsByTask = getPendingAllocationsByTask();
-  const allocatedAllocationsByTask = getAllocatedAllocationsByTask();
+  const _allocatedAllocationsByTask = getAllocatedAllocationsByTask();
 
   if (loading) {
     return (

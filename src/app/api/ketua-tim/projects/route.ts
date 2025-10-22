@@ -93,8 +93,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate mitra monthly limits
-    const currentMonth = new Date().getMonth() + 1;
-    const currentYear = new Date().getFullYear();
+    const _currentMonth = new Date().getMonth() + 1;
+    const _currentYear = new Date().getFullYear();
 
     // Use service client for limit checks and writes to avoid RLS recursion
     const svc = createServiceClient<Database>(
@@ -112,29 +112,8 @@ export async function POST(request: NextRequest) {
 
     const teamId = userTeam?.id || null;
 
-    for (const mitraAssignment of formData.mitra_assignments) {
-      const { data: currentTotal } = await (svc as any).rpc(
-        "get_mitra_monthly_total",
-        {
-          mitra_id: mitraAssignment.mitra_id,
-          month: currentMonth,
-          year: currentYear,
-        },
-      );
-
-      const totalAmount =
-        (currentTotal?.[0]?.total_amount || 0) + mitraAssignment.honor;
-
-      if (totalAmount > 3300000) {
-        return NextResponse.json(
-          {
-            error: `Mitra monthly limit exceeded. Current total would be: ${totalAmount}`,
-            mitra_id: mitraAssignment.mitra_id,
-          },
-          { status: 400 },
-        );
-      }
-    }
+    // Note: Mitra monthly limit checking is now handled in the frontend
+    // with a warning dialog instead of blocking the request
 
     // Create project
     const { data: project, error: projectError } = await (svc as any)
@@ -336,43 +315,54 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Calculate budget from tasks table (same logic as financial API)
+    // Calculate budget from tasks table using new satuan system
     const budgetByProject = new Map<
       string,
       { transport: number; honor: number }
     >();
     if (projectIds.length > 0) {
-      // Get transport budget from tasks (transport_days * 150,000)
-      const { data: transportTasks } = await (svc as any)
+      // Get ALL tasks with their satuan system data
+      const { data: allTasks } = await (svc as any)
         .from("tasks")
-        .select("project_id, transport_days")
-        .in("project_id", projectIds)
-        .not("transport_days", "is", null);
+        .select(
+          "project_id, assignee_user_id, assignee_mitra_id, rate_per_satuan, volume, total_amount, transport_days, honor_amount",
+        )
+        .in("project_id", projectIds);
 
-      // Get honor budget from tasks
-      const { data: honorTasks } = await (svc as any)
-        .from("tasks")
-        .select("project_id, honor_amount")
-        .in("project_id", projectIds)
-        .not("assignee_mitra_id", "is", null);
-
-      // Calculate transport budget (150,000 per transport day)
-      for (const task of transportTasks || []) {
+      // Calculate budget from tasks
+      for (const task of allTasks || []) {
         const rec = budgetByProject.get(task.project_id) || {
           transport: 0,
           honor: 0,
         };
-        rec.transport += (task.transport_days || 0) * 150000;
-        budgetByProject.set(task.project_id, rec);
-      }
 
-      // Calculate honor budget
-      for (const task of honorTasks || []) {
-        const rec = budgetByProject.get(task.project_id) || {
-          transport: 0,
-          honor: 0,
-        };
-        rec.honor += task.honor_amount || 0;
+        // Determine if this is pegawai (transport) or mitra (honor)
+        if (task.assignee_user_id) {
+          // This is a pegawai task - count as transport
+          if (task.total_amount) {
+            // Use pre-calculated total_amount
+            rec.transport += task.total_amount;
+          } else if (task.rate_per_satuan && task.volume) {
+            // Calculate from satuan system
+            rec.transport += task.rate_per_satuan * task.volume;
+          } else if (task.transport_days) {
+            // Fallback to old system (transport_days * 150,000)
+            rec.transport += task.transport_days * 150000;
+          }
+        } else if (task.assignee_mitra_id) {
+          // This is a mitra task - count as honor
+          if (task.total_amount) {
+            // Use pre-calculated total_amount
+            rec.honor += task.total_amount;
+          } else if (task.rate_per_satuan && task.volume) {
+            // Calculate from satuan system
+            rec.honor += task.rate_per_satuan * task.volume;
+          } else if (task.honor_amount) {
+            // Fallback to old honor_amount field
+            rec.honor += task.honor_amount;
+          }
+        }
+
         budgetByProject.set(task.project_id, rec);
       }
     }

@@ -57,6 +57,8 @@ import {
   X,
   Building2,
   User,
+  AlertCircle,
+  CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/utils";
@@ -143,6 +145,7 @@ interface TaskFormData {
   project_id: string;
   assignee_user_id: string;
   assignee_mitra_id: string;
+  assignee_mitra_ids: string[]; // New field for multiple mitra selection
   assignee_type: "member" | "mitra";
   title: string;
   description: string;
@@ -161,6 +164,7 @@ const initialFormData: TaskFormData = {
   project_id: "",
   assignee_user_id: "",
   assignee_mitra_id: "",
+  assignee_mitra_ids: [], // Initialize as empty array
   assignee_type: "member",
   title: "",
   description: "",
@@ -174,6 +178,9 @@ const initialFormData: TaskFormData = {
   rate_per_satuan: 0,
   volume: 1,
 };
+
+// Debug log for initial form data
+console.log("🔧 DEBUG: initialFormData defined:", initialFormData);
 
 async function fetchTasksRequest(
   selectedStatus: string,
@@ -237,11 +244,13 @@ async function _fetchMitraOptions(
 async function fetchProjectMitra(projectId: string): Promise<MitraOption[]> {
   if (!projectId) return [];
 
+  console.log("🔧 DEBUG: Fetching project mitra for projectId:", projectId);
   const response = await fetch(`/api/ketua-tim/projects/${projectId}/mitra`);
   if (!response.ok) {
     throw new Error("Failed to fetch project mitra");
   }
   const data = await response.json();
+  console.log("🔧 DEBUG: Project mitra API response:", data);
   return data.data || [];
 }
 
@@ -278,6 +287,43 @@ export default function TaskManagement() {
   const [creating, setCreating] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [transportAllocated, setTransportAllocated] = useState(false);
+  const [showMitraLimitWarning, setShowMitraLimitWarning] = useState(false);
+  const [mitraLimitExceededAmount, setMitraLimitExceededAmount] = useState(0);
+  const [pendingMitraAssignment, setPendingMitraAssignment] = useState<{
+    mitraId: string;
+    honorAmount: number;
+  } | null>(null);
+  const [mitraSearchTerm, setMitraSearchTerm] = useState("");
+
+  // Reset transport allocation state when create dialog opens
+  useEffect(() => {
+    if (isCreateDialogOpen) {
+      // Force reset transportAllocated to false
+      setTransportAllocated(false);
+      // Reset mitra search term
+      setMitraSearchTerm("");
+      console.log(
+        "🔧 DEBUG: Create dialog opened - transportAllocated reset to false",
+      );
+      console.log(
+        "🔧 DEBUG: Current formData.assignee_type:",
+        formData.assignee_type,
+      );
+      console.log(
+        "🔧 DEBUG: Current transportAllocated state:",
+        transportAllocated,
+      );
+
+      // Double-check reset after a small delay
+      setTimeout(() => {
+        setTransportAllocated(false);
+        console.log(
+          "🔧 DEBUG: Double-check reset - transportAllocated set to false",
+        );
+      }, 100);
+    }
+  }, [isCreateDialogOpen, formData.assignee_type, transportAllocated]);
 
   // Helper function to truncate text
   const truncateText = (text: string, maxLength: number = 40) => {
@@ -285,8 +331,68 @@ export default function TaskManagement() {
     return `${text.substring(0, maxLength)}...`;
   };
 
+  // Function to check if mitra will exceed monthly limit
+  const checkMitraLimit = (mitraId: string, honorAmount: number): boolean => {
+    const mitra = (mitraData || []).find((m: any) => m.id === mitraId);
+    if (!mitra?.monthly_usage) return false;
+
+    const currentTotal = mitra.monthly_usage.current_total || 0;
+    const newTotal = currentTotal + honorAmount;
+    const limit = mitra.monthly_usage.remaining_limit + currentTotal;
+
+    if (newTotal > limit) {
+      setMitraLimitExceededAmount(newTotal);
+      return true;
+    }
+    return false;
+  };
+
+  // Function to check if transport is allocated for a task
+  const checkTransportAllocation = async (taskId: string) => {
+    try {
+      console.log(
+        "🔧 DEBUG: Checking transport allocation for taskId:",
+        taskId,
+      );
+
+      // Use the API endpoint to check actual transport allocations
+      const response = await fetch(
+        `/api/ketua-tim/tasks/${taskId}/transport-allocations`,
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log("🔧 DEBUG: Transport allocations API response:", data);
+
+        // Check if there are any active transport allocations
+        const hasActiveAllocations =
+          data.activeAllocations && data.activeAllocations.length > 0;
+
+        setTransportAllocated(hasActiveAllocations);
+        console.log("🔧 DEBUG: Transport allocation check result:", {
+          taskId,
+          hasActiveAllocations,
+          totalAllocations: data.allocations?.length || 0,
+          activeAllocationsCount: data.activeAllocations?.length || 0,
+          allAllocations: data.allocations,
+          activeAllocations: data.activeAllocations,
+          isCreateDialogOpen,
+        });
+      } else {
+        console.error(
+          "🔧 DEBUG: Failed to fetch transport allocations:",
+          response.status,
+        );
+        setTransportAllocated(false);
+      }
+    } catch (error) {
+      console.error("🔧 DEBUG: Error checking transport allocation:", error);
+      setTransportAllocated(false);
+    }
+  };
+
   // Calculate transport days from task duration
-  const calculateTransportDays = (startDate: string, endDate: string) => {
+  const _calculateTransportDays = (startDate: string, endDate: string) => {
     const start = new Date(startDate);
     const end = new Date(endDate);
     const diffTime = Math.abs(end.getTime() - start.getTime());
@@ -336,6 +442,20 @@ export default function TaskManagement() {
     staleTime: 0, // Always consider data stale to ensure fresh data
   });
 
+  // Fetch mitra data with monthly usage for budget indicator
+  const { data: mitraData } = useQuery({
+    queryKey: ["mitra-with-budget"],
+    queryFn: async () => {
+      const response = await fetch(
+        "/api/ketua-tim/team-data?include_workload=true",
+      );
+      if (!response.ok) throw new Error("Failed to fetch mitra data");
+      const result = await response.json();
+      return result.mitra || [];
+    },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+
   const { data: projects, refetch: refetchProjects } = useQuery({
     queryKey: ["ketua", "projects", "forTasks"],
     queryFn: fetchProjectsRequest,
@@ -351,7 +471,13 @@ export default function TaskManagement() {
 
   const { data: mitraOptions, isLoading: loadingMitra } = useQuery({
     queryKey: ["project-mitra", formData.project_id],
-    queryFn: () => fetchProjectMitra(formData.project_id),
+    queryFn: () => {
+      console.log(
+        "🔧 DEBUG: useQuery fetchProjectMitra called for projectId:",
+        formData.project_id,
+      );
+      return fetchProjectMitra(formData.project_id);
+    },
     enabled:
       (formData.assignee_type === "mitra" ||
         (isEditDialogOpen && selectedTask?.assignee_type === "mitra")) &&
@@ -390,6 +516,79 @@ export default function TaskManagement() {
     return () => window.removeEventListener("focus", handleFocus);
   }, [refetchProjects]);
 
+  const proceedWithCreateTask = async () => {
+    // This function proceeds with task creation after limit warning confirmation
+    setCreating(true);
+    try {
+      if (
+        formData.assignee_type === "mitra" &&
+        formData.assignee_mitra_ids.length > 0
+      ) {
+        // Create multiple tasks for multiple mitra
+        const tasksToCreate = formData.assignee_mitra_ids.map((mitraId) => ({
+          ...formData,
+          assignee_mitra_id: mitraId,
+          assignee_user_id: "", // Clear user_id for mitra tasks
+        }));
+
+        // Create tasks sequentially to handle errors properly
+        const results = [];
+        for (const taskData of tasksToCreate) {
+          const response = await fetch("/api/ketua-tim/tasks", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(taskData),
+          });
+
+          const result = await response.json();
+          if (!response.ok) {
+            throw new Error(
+              result.error ||
+                `Failed to create task for mitra ${taskData.assignee_mitra_id}`,
+            );
+          }
+          results.push(result);
+        }
+
+        toast.success(
+          `${results.length} tasks created successfully for ${formData.assignee_mitra_ids.length} mitra!`,
+        );
+      } else {
+        // Single task creation (for member or single mitra)
+        const response = await fetch("/api/ketua-tim/tasks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+        });
+
+        const result = await response.json();
+        if (!response.ok)
+          throw new Error(result.error || "Failed to create task");
+
+        toast.success("Task created successfully!");
+      }
+
+      setFormData(initialFormData);
+      setTransportAllocated(false);
+      setIsCreateDialogOpen(false);
+      setShowMitraLimitWarning(false);
+      setPendingMitraAssignment(null);
+
+      // Invalidate all related queries instantly with correct query keys
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: ["ketua", "dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["mitra-with-budget"] });
+    } catch (error) {
+      console.error("Error creating task:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to create task",
+      );
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const handleCreateTask = async () => {
     // Validate common fields
     if (
@@ -409,9 +608,34 @@ export default function TaskManagement() {
       return;
     }
 
-    if (formData.assignee_type === "mitra" && !formData.assignee_mitra_id) {
-      toast.error("Please select a mitra");
+    if (
+      formData.assignee_type === "mitra" &&
+      formData.assignee_mitra_ids.length === 0
+    ) {
+      toast.error("Please select at least one mitra");
       return;
+    }
+
+    // Check mitra limit for mitra assignments
+    if (
+      formData.assignee_type === "mitra" &&
+      formData.assignee_mitra_ids.length > 0
+    ) {
+      const totalAmount = formData.rate_per_satuan * formData.volume;
+
+      // Check each selected mitra for limit
+      for (const mitraId of formData.assignee_mitra_ids) {
+        const exceeds = checkMitraLimit(mitraId, totalAmount);
+        if (exceeds) {
+          // Show warning dialog and store pending assignment
+          setPendingMitraAssignment({
+            mitraId: mitraId,
+            honorAmount: totalAmount,
+          });
+          setShowMitraLimitWarning(true);
+          return; // Stop here, user needs to confirm
+        }
+      }
     }
 
     // Validate task dates are within project dates
@@ -472,34 +696,8 @@ export default function TaskManagement() {
       return;
     }
 
-    setCreating(true);
-    try {
-      const response = await fetch("/api/ketua-tim/tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
-
-      const result = await response.json();
-      if (!response.ok)
-        throw new Error(result.error || "Failed to create task");
-
-      toast.success("Task created successfully!");
-      setFormData(initialFormData);
-      setIsCreateDialogOpen(false);
-
-      // Invalidate all related queries instantly with correct query keys
-      queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
-      queryClient.invalidateQueries({ queryKey: ["ketua", "dashboard"] });
-    } catch (error) {
-      console.error("Error creating task:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to create task",
-      );
-    } finally {
-      setCreating(false);
-    }
+    // All validations passed, proceed with creation
+    await proceedWithCreateTask();
   };
 
   const handleViewTask = (task: TaskData) => {
@@ -509,11 +707,18 @@ export default function TaskManagement() {
 
   const handleEditTask = (task: TaskData) => {
     setSelectedTask(task);
+
+    // Determine assignee_type based on existing data
+    const assigneeType = task.assignee_mitra_id ? "mitra" : "member";
+
     setFormData({
       project_id: task.project_id,
       assignee_user_id: task.assignee_user_id || "",
       assignee_mitra_id: task.assignee_mitra_id || "",
-      assignee_type: task.assignee_type || "member",
+      assignee_mitra_ids: task.assignee_mitra_id
+        ? [task.assignee_mitra_id]
+        : [], // Single mitra for edit
+      assignee_type: assigneeType,
       title: task.title || "",
       description: task.deskripsi_tugas || "",
       start_date: task.start_date ? String(task.start_date).split("T")[0] : "",
@@ -526,10 +731,18 @@ export default function TaskManagement() {
       rate_per_satuan: task.rate_per_satuan || 0,
       volume: task.volume || 1,
     });
+
+    // Check transport allocation status for pegawai
+    if (assigneeType === "member") {
+      checkTransportAllocation(task.id); // Call directly
+    } else {
+      setTransportAllocated(false); // Mitra can always edit
+    }
+
     setIsEditDialogOpen(true);
   };
 
-  const handleUpdateTask = async () => {
+  const proceedWithUpdateTask = async () => {
     if (!selectedTask) return;
 
     setUpdating(true);
@@ -548,11 +761,15 @@ export default function TaskManagement() {
       setFormData(initialFormData);
       setSelectedTask(null);
       setIsEditDialogOpen(false);
+      setTransportAllocated(false);
+      setShowMitraLimitWarning(false);
+      setPendingMitraAssignment(null);
 
       // Invalidate queries with correct query keys
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       queryClient.invalidateQueries({ queryKey: ["ketua", "dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["mitra-with-budget"] });
     } catch (error) {
       console.error("Error updating task:", error);
       toast.error(
@@ -561,6 +778,54 @@ export default function TaskManagement() {
     } finally {
       setUpdating(false);
     }
+  };
+
+  const handleUpdateTask = async () => {
+    if (!selectedTask) return;
+
+    // Validate transport fields for pegawai if transport is allocated
+    if (formData.assignee_type === "member" && transportAllocated) {
+      // Check if transport fields are being changed
+      const originalTask = selectedTask;
+      const hasTransportChanges =
+        formData.rate_per_satuan !== (originalTask.rate_per_satuan || 0) ||
+        formData.volume !== (originalTask.volume || 1) ||
+        formData.satuan_id !== (originalTask.satuan_id || "");
+
+      if (hasTransportChanges) {
+        toast.error("Tidak dapat mengubah transport yang sudah dialokasikan");
+        return;
+      }
+    }
+
+    // Check mitra limit for mitra assignments if honor amount changed
+    if (formData.assignee_type === "mitra" && formData.assignee_mitra_id) {
+      const originalTask = selectedTask;
+      const originalAmount =
+        (originalTask.rate_per_satuan || 0) * (originalTask.volume || 1);
+      const newAmount = formData.rate_per_satuan * formData.volume;
+
+      // Only check limit if amount increased
+      if (newAmount > originalAmount) {
+        const amountDifference = newAmount - originalAmount;
+        const exceeds = checkMitraLimit(
+          formData.assignee_mitra_id,
+          amountDifference,
+        );
+
+        if (exceeds) {
+          // Show warning dialog
+          setPendingMitraAssignment({
+            mitraId: formData.assignee_mitra_id,
+            honorAmount: newAmount,
+          });
+          setShowMitraLimitWarning(true);
+          return;
+        }
+      }
+    }
+
+    await proceedWithUpdateTask();
   };
 
   const handleDeleteTask = async () => {
@@ -703,15 +968,53 @@ export default function TaskManagement() {
         <div className="flex items-center space-x-2">
           <Dialog
             open={isCreateDialogOpen}
-            onOpenChange={setIsCreateDialogOpen}
+            onOpenChange={(open) => {
+              console.log(
+                "🔧 DEBUG: Dialog onOpenChange called with open:",
+                open,
+              );
+              setIsCreateDialogOpen(open);
+              if (open) {
+                console.log(
+                  "🔧 DEBUG: Dialog opening - resetting form in onOpenChange",
+                );
+                console.log(
+                  "🔧 DEBUG: transportAllocated before reset:",
+                  transportAllocated,
+                );
+                // Reset form when opening dialog
+                setFormData(initialFormData);
+                setTransportAllocated(false);
+                console.log("🔧 DEBUG: onOpenChange form reset completed");
+                console.log("🔧 DEBUG: transportAllocated after reset:", false);
+              }
+            }}
           >
             <DialogTrigger asChild>
-              <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold px-4 py-2 rounded-xl">
+              <Button
+                onClick={() => {
+                  console.log(
+                    "🔧 DEBUG: DialogTrigger 'Buat Tugas' clicked - resetting form",
+                  );
+                  console.log(
+                    "🔧 DEBUG: transportAllocated before reset:",
+                    transportAllocated,
+                  );
+                  setFormData(initialFormData);
+                  setTransportAllocated(false);
+                  console.log("🔧 DEBUG: DialogTrigger form reset completed");
+                  console.log(
+                    "🔧 DEBUG: transportAllocated after reset:",
+                    false,
+                  );
+                }}
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold px-4 py-2 rounded-xl"
+              >
                 <Plus className="w-4 h-4 mr-2" />
                 Buat Tugas
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Buat Tugas Baru</DialogTitle>
                 <DialogDescription>
@@ -858,61 +1161,177 @@ export default function TaskManagement() {
                   </div>
                 )}
 
-                {/* Mitra Selection */}
+                {/* Mitra Selection - Multi Select */}
                 {formData.assignee_type === "mitra" && (
                   <div className="space-y-2">
                     <Label htmlFor="mitra">Mitra *</Label>
-                    <Select
-                      value={formData.assignee_mitra_id}
-                      onValueChange={(value) => {
-                        const selectedMitra = mitraOptions?.find(
-                          (m) => m.id === value,
-                        );
-                        setFormData((prev) => ({
-                          ...prev,
-                          assignee_mitra_id: value,
-                          honor_amount: 0, // Will be calculated from satuan system
-                        }));
-                      }}
-                      disabled={!formData.project_id || loadingMitra}
-                    >
-                      <SelectTrigger>
-                        <SelectValue
-                          placeholder={
-                            !formData.project_id
-                              ? "Pilih proyek terlebih dahulu"
-                              : loadingMitra
-                                ? "Memuat mitra proyek..."
-                                : (mitraOptions?.length || 0) === 0
-                                  ? "Tidak ada mitra pada proyek ini"
-                                  : "Pilih mitra"
-                          }
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(mitraOptions || []).map((mitra) => (
-                          <SelectItem key={mitra.id} value={mitra.id}>
-                            <div className="flex items-center justify-between w-full">
-                              <div className="flex flex-col">
-                                <span className="font-medium">
-                                  {mitra.nama_mitra}
-                                </span>
-                                <div className="flex items-center space-x-2 text-xs text-gray-500">
-                                  <span className="capitalize">
-                                    {mitra.jenis}
-                                  </span>
-                                  {mitra.rating_average > 0 && (
-                                    <span>
-                                      ★ {mitra.rating_average.toFixed(1)}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
+
+                    {/* Search Input */}
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                      <Input
+                        placeholder="Cari mitra..."
+                        value={mitraSearchTerm}
+                        onChange={(e) => setMitraSearchTerm(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+
+                    <div className="border rounded-lg p-3 max-h-[300px] overflow-y-auto bg-gray-50">
+                      {!formData.project_id ? (
+                        <div className="text-sm text-gray-500 text-center py-4">
+                          Pilih proyek terlebih dahulu
+                        </div>
+                      ) : loadingMitra ? (
+                        <div className="text-sm text-gray-500 text-center py-4">
+                          Memuat mitra proyek...
+                        </div>
+                      ) : (mitraOptions?.length || 0) === 0 ? (
+                        <div className="text-sm text-gray-500 text-center py-4">
+                          Tidak ada mitra pada proyek ini
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {/* Header */}
+                          <div className="grid grid-cols-12 gap-2 text-xs font-semibold text-gray-600 border-b pb-2">
+                            <div className="col-span-1 text-center">✓</div>
+                            <div className="col-span-7">Nama Mitra</div>
+                            <div className="col-span-4 text-right">
+                              Remaining
                             </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                          </div>
+
+                          {/* Mitra List */}
+                          {(() => {
+                            const filteredMitra = (mitraOptions || []).filter(
+                              (mitra) => {
+                                if (!mitraSearchTerm) return true;
+                                return mitra.nama_mitra
+                                  .toLowerCase()
+                                  .includes(mitraSearchTerm.toLowerCase());
+                              },
+                            );
+
+                            if (filteredMitra.length === 0 && mitraSearchTerm) {
+                              return (
+                                <div className="text-sm text-gray-500 text-center py-4">
+                                  Tidak ada mitra yang cocok dengan &quot;
+                                  {mitraSearchTerm}&quot;
+                                </div>
+                              );
+                            }
+
+                            return filteredMitra.map((mitra) => {
+                              // Find mitra budget data from mitraData
+                              const mitraBudget = (mitraData || []).find(
+                                (m: any) => m.id === mitra.id,
+                              );
+                              const isSelected =
+                                formData.assignee_mitra_ids.includes(mitra.id);
+
+                              return (
+                                <div
+                                  key={mitra.id}
+                                  className="grid grid-cols-12 gap-2 items-center py-2 hover:bg-white rounded px-2 transition-colors"
+                                >
+                                  {/* Checkbox */}
+                                  <div className="col-span-1 flex justify-center">
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setFormData((prev) => ({
+                                            ...prev,
+                                            assignee_mitra_ids: [
+                                              ...prev.assignee_mitra_ids,
+                                              mitra.id,
+                                            ],
+                                          }));
+                                        } else {
+                                          setFormData((prev) => ({
+                                            ...prev,
+                                            assignee_mitra_ids:
+                                              prev.assignee_mitra_ids.filter(
+                                                (id) => id !== mitra.id,
+                                              ),
+                                          }));
+                                        }
+                                      }}
+                                      className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                                    />
+                                  </div>
+
+                                  {/* Nama Mitra */}
+                                  <div className="col-span-7">
+                                    <div className="font-medium text-gray-900">
+                                      {mitra.nama_mitra}
+                                    </div>
+                                    <div className="flex items-center space-x-2 text-xs text-gray-500">
+                                      <span className="capitalize">
+                                        {mitra.jenis}
+                                      </span>
+                                      {mitra.rating_average > 0 && (
+                                        <span>
+                                          ★ {mitra.rating_average.toFixed(1)}/5
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Remaining Budget */}
+                                  <div className="col-span-4 text-right">
+                                    {mitraBudget?.monthly_usage ? (
+                                      <div>
+                                        <div className="text-sm font-semibold text-gray-900">
+                                          {formatCurrency(
+                                            mitraBudget.monthly_usage
+                                              .remaining_limit,
+                                          )}
+                                        </div>
+                                        <div className="text-xs text-gray-500">
+                                          {mitraBudget.monthly_usage.limit_percentage.toFixed(
+                                            1,
+                                          )}
+                                          % used
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="text-sm text-gray-400">
+                                        No data
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            });
+                          })()}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Selected Count & Search Results */}
+                    <div className="flex justify-between items-center text-sm">
+                      {formData.assignee_mitra_ids.length > 0 && (
+                        <div className="text-blue-600 font-medium">
+                          {formData.assignee_mitra_ids.length} mitra dipilih
+                        </div>
+                      )}
+                      {mitraSearchTerm && (
+                        <div className="text-gray-500">
+                          {(() => {
+                            const filteredCount = (mitraOptions || []).filter(
+                              (mitra) => {
+                                return mitra.nama_mitra
+                                  .toLowerCase()
+                                  .includes(mitraSearchTerm.toLowerCase());
+                              },
+                            ).length;
+                            return `${filteredCount} dari ${mitraOptions?.length || 0} mitra`;
+                          })()}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -1150,6 +1569,7 @@ export default function TaskManagement() {
                   onClick={() => {
                     setIsCreateDialogOpen(false);
                     setFormData(initialFormData);
+                    setTransportAllocated(false);
                   }}
                   disabled={creating}
                 >
@@ -1329,7 +1749,25 @@ export default function TaskManagement() {
                     : "Buat tugas pertama Anda untuk memulai"}
                 </p>
                 <Button
-                  onClick={() => setIsCreateDialogOpen(true)}
+                  onClick={() => {
+                    console.log(
+                      "🔧 DEBUG: Button 'Buat Tugas' clicked - resetting form",
+                    );
+                    console.log(
+                      "🔧 DEBUG: transportAllocated before reset:",
+                      transportAllocated,
+                    );
+                    setFormData(initialFormData);
+                    setTransportAllocated(false);
+                    setIsCreateDialogOpen(true);
+                    console.log(
+                      "🔧 DEBUG: Form reset completed, opening dialog",
+                    );
+                    console.log(
+                      "🔧 DEBUG: transportAllocated after reset:",
+                      false,
+                    );
+                  }}
                   className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
                 >
                   <Plus className="w-4 h-4 mr-2" />
@@ -1587,7 +2025,7 @@ export default function TaskManagement() {
 
       {/* View Task Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Task Details</DialogTitle>
             <DialogDescription>
@@ -1779,7 +2217,7 @@ export default function TaskManagement() {
 
       {/* Edit Task Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Tugas</DialogTitle>
             <DialogDescription>
@@ -1826,56 +2264,63 @@ export default function TaskManagement() {
               </Select>
             </div>
 
-            {/* Assignee Type Selection */}
+            {/* Assignee Type Display (Read-only) */}
             <div className="space-y-2">
-              <Label>Tipe Penugasan *</Label>
-              <div className="grid grid-cols-2 gap-3">
-                <Button
-                  type="button"
-                  variant={
-                    formData.assignee_type === "member" ? "default" : "outline"
-                  }
-                  onClick={() => {
-                    setFormData((prev) => ({
-                      ...prev,
-                      assignee_type: "member",
-                      assignee_mitra_id: "",
-                      honor_amount: 0,
-                    }));
-                  }}
-                  className={`flex items-center justify-center space-x-2 h-12 ${
-                    formData.assignee_type === "member"
-                      ? "bg-blue-600 hover:bg-blue-700 text-white"
-                      : "border-2 border-gray-200 hover:border-blue-300"
-                  }`}
-                >
-                  <User className="w-4 h-4" />
-                  <span>Anggota Tim</span>
-                </Button>
-                <Button
-                  type="button"
-                  variant={
-                    formData.assignee_type === "mitra" ? "default" : "outline"
-                  }
-                  onClick={() => {
-                    setFormData((prev) => ({
-                      ...prev,
-                      assignee_type: "mitra",
-                      assignee_user_id: "",
-                      transport_days: 0,
-                      has_transport: false,
-                    }));
-                  }}
-                  className={`flex items-center justify-center space-x-2 h-12 ${
-                    formData.assignee_type === "mitra"
-                      ? "bg-green-600 hover:bg-green-700 text-white"
-                      : "border-2 border-gray-200 hover:border-green-300"
-                  }`}
-                >
-                  <Building2 className="w-4 h-4" />
-                  <span>Mitra</span>
-                </Button>
+              <Label>Tipe Penugasan</Label>
+              <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg border">
+                {formData.assignee_type === "member" ? (
+                  <>
+                    <User className="w-4 h-4 text-blue-600" />
+                    <span className="text-blue-600 font-medium">
+                      Anggota Tim
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <Building2 className="w-4 h-4 text-green-600" />
+                    <span className="text-green-600 font-medium">Mitra</span>
+                  </>
+                )}
+                <span className="text-sm text-gray-500 ml-2">
+                  (Tidak dapat diubah)
+                </span>
               </div>
+
+              {/* Mitra Budget Info */}
+              {formData.assignee_type === "mitra" &&
+                formData.assignee_mitra_id &&
+                (() => {
+                  const mitraBudget = (mitraData || []).find(
+                    (m: any) => m.id === formData.assignee_mitra_id,
+                  );
+
+                  return mitraBudget?.monthly_usage ? (
+                    <div className="p-3 bg-gradient-to-r from-orange-50 to-red-50 rounded-lg border border-orange-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <DollarSign className="w-4 h-4 text-orange-600" />
+                          <span className="text-sm font-medium text-gray-700">
+                            Budget Mitra Bulan Ini
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-semibold text-orange-600">
+                            {formatCurrency(
+                              mitraBudget.monthly_usage.remaining_limit,
+                            )}{" "}
+                            remaining
+                          </div>
+                          <div className="text-xs text-gray-600">
+                            {mitraBudget.monthly_usage.limit_percentage.toFixed(
+                              1,
+                            )}
+                            % used this month
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
             </div>
 
             <div className="space-y-2">
@@ -1958,7 +2403,15 @@ export default function TaskManagement() {
             {/* Satuan System for All Assignee Types */}
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-satuan_id">Satuan *</Label>
+                <Label htmlFor="edit-satuan_id">
+                  Satuan *
+                  {formData.assignee_type === "member" &&
+                    transportAllocated && (
+                      <span className="text-orange-600 text-xs ml-2">
+                        (Transport sudah dialokasikan - tidak dapat diubah)
+                      </span>
+                    )}
+                </Label>
                 <Select
                   value={formData.satuan_id}
                   onValueChange={(value) =>
@@ -1967,9 +2420,36 @@ export default function TaskManagement() {
                       satuan_id: value,
                     }))
                   }
-                  disabled={loadingSatuan}
+                  disabled={
+                    loadingSatuan ||
+                    (formData.assignee_type === "member" && transportAllocated)
+                  }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger
+                    className={
+                      formData.assignee_type === "member" && transportAllocated
+                        ? "bg-orange-50 border-orange-200"
+                        : ""
+                    }
+                    onClick={() => {
+                      console.log("🔧 DEBUG: Satuan SelectTrigger clicked");
+                      console.log("🔧 DEBUG: loadingSatuan:", loadingSatuan);
+                      console.log(
+                        "🔧 DEBUG: formData.assignee_type:",
+                        formData.assignee_type,
+                      );
+                      console.log(
+                        "🔧 DEBUG: transportAllocated:",
+                        transportAllocated,
+                      );
+                      console.log(
+                        "🔧 DEBUG: Field disabled:",
+                        loadingSatuan ||
+                          (formData.assignee_type === "member" &&
+                            transportAllocated),
+                      );
+                    }}
+                  >
                     <SelectValue
                       placeholder={
                         loadingSatuan
@@ -2013,9 +2493,28 @@ export default function TaskManagement() {
                 <div className="space-y-2">
                   <Label htmlFor="edit-rate_per_satuan">
                     Rate Per Satuan *
+                    {formData.assignee_type === "member" &&
+                      transportAllocated && (
+                        <span className="text-orange-600 text-xs ml-2">
+                          (Transport sudah dialokasikan - tidak dapat diubah)
+                        </span>
+                      )}
                   </Label>
-                  <div className="flex items-center space-x-3 p-4 border border-blue-200 rounded-xl bg-blue-50">
-                    <DollarSign className="w-5 h-5 text-blue-600" />
+                  <div
+                    className={`flex items-center space-x-3 p-4 border rounded-xl ${
+                      formData.assignee_type === "member" && transportAllocated
+                        ? "border-orange-200 bg-orange-50"
+                        : "border-blue-200 bg-blue-50"
+                    }`}
+                  >
+                    <DollarSign
+                      className={`w-5 h-5 ${
+                        formData.assignee_type === "member" &&
+                        transportAllocated
+                          ? "text-orange-600"
+                          : "text-blue-600"
+                      }`}
+                    />
                     <div className="flex-1">
                       <div className="font-semibold text-gray-900">
                         Rate Per Satuan
@@ -2039,15 +2538,58 @@ export default function TaskManagement() {
                         }
                         placeholder="150000"
                         className="text-center"
+                        disabled={
+                          formData.assignee_type === "member" &&
+                          transportAllocated
+                        }
+                        onFocus={() => {
+                          console.log(
+                            "🔧 DEBUG: Rate Per Satuan field focused",
+                          );
+                          console.log(
+                            "🔧 DEBUG: formData.assignee_type:",
+                            formData.assignee_type,
+                          );
+                          console.log(
+                            "🔧 DEBUG: transportAllocated:",
+                            transportAllocated,
+                          );
+                          console.log(
+                            "🔧 DEBUG: Field disabled:",
+                            formData.assignee_type === "member" &&
+                              transportAllocated,
+                          );
+                        }}
                       />
                     </div>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="edit-volume">Volume *</Label>
-                  <div className="flex items-center space-x-3 p-4 border border-green-200 rounded-xl bg-green-50">
-                    <MapPin className="w-5 h-5 text-green-600" />
+                  <Label htmlFor="edit-volume">
+                    Volume *
+                    {formData.assignee_type === "member" &&
+                      transportAllocated && (
+                        <span className="text-orange-600 text-xs ml-2">
+                          (Transport sudah dialokasikan - tidak dapat diubah)
+                        </span>
+                      )}
+                  </Label>
+                  <div
+                    className={`flex items-center space-x-3 p-4 border rounded-xl ${
+                      formData.assignee_type === "member" && transportAllocated
+                        ? "border-orange-200 bg-orange-50"
+                        : "border-green-200 bg-green-50"
+                    }`}
+                  >
+                    <MapPin
+                      className={`w-5 h-5 ${
+                        formData.assignee_type === "member" &&
+                        transportAllocated
+                          ? "text-orange-600"
+                          : "text-green-600"
+                      }`}
+                    />
                     <div className="flex-1">
                       <div className="font-semibold text-gray-900">Volume</div>
                       <div className="text-sm text-gray-500">Jumlah satuan</div>
@@ -2066,6 +2608,26 @@ export default function TaskManagement() {
                         }
                         placeholder="1"
                         className="text-center"
+                        disabled={
+                          formData.assignee_type === "member" &&
+                          transportAllocated
+                        }
+                        onFocus={() => {
+                          console.log("🔧 DEBUG: Volume field focused");
+                          console.log(
+                            "🔧 DEBUG: formData.assignee_type:",
+                            formData.assignee_type,
+                          );
+                          console.log(
+                            "🔧 DEBUG: transportAllocated:",
+                            transportAllocated,
+                          );
+                          console.log(
+                            "🔧 DEBUG: Field disabled:",
+                            formData.assignee_type === "member" &&
+                              transportAllocated,
+                          );
+                        }}
                       />
                     </div>
                   </div>
@@ -2104,6 +2666,7 @@ export default function TaskManagement() {
                 setIsEditDialogOpen(false);
                 setFormData(initialFormData);
                 setSelectedTask(null);
+                setTransportAllocated(false);
               }}
               disabled={updating}
             >
@@ -2179,6 +2742,97 @@ export default function TaskManagement() {
                   Hapus Tugas
                 </>
               )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Mitra Limit Warning Dialog */}
+      <AlertDialog
+        open={showMitraLimitWarning}
+        onOpenChange={setShowMitraLimitWarning}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center text-orange-600">
+              <AlertCircle className="w-6 h-6 mr-2" />
+              Peringatan: Limit Mitra Terlampaui
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <div className="text-gray-700">
+                  Mitra yang Anda pilih akan{" "}
+                  <strong>melampaui limit bulanan</strong> jika tugas ini
+                  diberikan.
+                </div>
+                {pendingMitraAssignment && (
+                  <div className="p-4 bg-orange-50 rounded-lg border border-orange-200 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-gray-700">
+                        Mitra:
+                      </span>
+                      <span className="text-sm font-semibold text-gray-900">
+                        {(() => {
+                          const mitra = (mitraData || []).find(
+                            (m: any) => m.id === pendingMitraAssignment.mitraId,
+                          );
+                          return mitra?.nama_mitra || "Unknown";
+                        })()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-gray-700">
+                        Total yang akan menjadi:
+                      </span>
+                      <span className="text-lg font-bold text-orange-600">
+                        {formatCurrency(mitraLimitExceededAmount)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs text-gray-600">
+                      <span>Limit Bulanan:</span>
+                      <span>
+                        {(() => {
+                          const mitra = (mitraData || []).find(
+                            (m: any) => m.id === pendingMitraAssignment.mitraId,
+                          );
+                          const currentTotal =
+                            mitra?.monthly_usage?.current_total || 0;
+                          const limit =
+                            (mitra?.monthly_usage?.remaining_limit || 0) +
+                            currentTotal;
+                          return formatCurrency(limit);
+                        })()}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                <div className="text-gray-700 mt-3">
+                  <strong>Apakah Anda yakin ingin melanjutkan?</strong>
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setShowMitraLimitWarning(false);
+                setPendingMitraAssignment(null);
+              }}
+            >
+              Tidak, Batalkan
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (isEditDialogOpen) {
+                  await proceedWithUpdateTask();
+                } else {
+                  await proceedWithCreateTask();
+                }
+              }}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              <CheckCircle2 className="w-4 h-4 mr-2" />
+              Ya, Lanjutkan
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

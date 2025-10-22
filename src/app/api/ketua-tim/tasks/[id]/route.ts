@@ -35,6 +35,10 @@ type KetuaTimTaskUpdateData = TasksUpdate & {
   has_transport?: boolean;
   transport_days?: number;
   honor_amount?: number;
+  // New satuan system fields
+  satuan_id?: string;
+  rate_per_satuan?: number;
+  volume?: number;
 };
 
 export async function PUT(request: NextRequest, { params }: RouteParams) {
@@ -59,7 +63,9 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     // Verify task ownership via service client to avoid RLS issues
     const { data: task, error: taskError } = await (svc as unknown as any)
       .from("tasks")
-      .select("id, project_id, assignee_user_id, pegawai_id, has_transport")
+      .select(
+        "id, project_id, assignee_user_id, pegawai_id, has_transport, transport_days, satuan_id, rate_per_satuan, volume, assignee_mitra_id",
+      )
       .eq("id", taskId)
       .single();
 
@@ -135,6 +141,14 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     if (body.status !== undefined) (updateFields as any).status = body.status;
     if (body.transport_days !== undefined)
       (updateFields as any).transport_days = body.transport_days;
+
+    // Handle new satuan system fields
+    if ((body as any).satuan_id !== undefined)
+      (updateFields as any).satuan_id = (body as any).satuan_id;
+    if ((body as any).rate_per_satuan !== undefined)
+      (updateFields as any).rate_per_satuan = (body as any).rate_per_satuan;
+    if ((body as any).volume !== undefined)
+      (updateFields as any).volume = (body as any).volume;
 
     // Handle Mitra-specific fields
     if (body.assignee_type !== undefined) {
@@ -295,6 +309,73 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
         if (transportError) {
           console.error("Transport allocation error:", transportError);
+        }
+      }
+    }
+
+    // Handle satuan system changes (rate_per_satuan and volume)
+    const hasSatuanChange =
+      ((body as any).satuan_id !== undefined &&
+        (body as any).satuan_id !== (task as any).satuan_id) ||
+      ((body as any).rate_per_satuan !== undefined &&
+        (body as any).rate_per_satuan !== (task as any).rate_per_satuan) ||
+      ((body as any).volume !== undefined &&
+        (body as any).volume !== (task as any).volume);
+
+    if (hasSatuanChange) {
+      // Only pegawai can have transport allocations, not Mitra
+      const currentAssigneeType =
+        body.assignee_type ||
+        ((task as unknown as { assignee_mitra_id?: string }).assignee_mitra_id
+          ? "mitra"
+          : "member");
+
+      if (currentAssigneeType === "member") {
+        const userIdParam =
+          body.assignee_user_id ||
+          (task as unknown as { assignee_user_id?: string }).assignee_user_id ||
+          (task as unknown as { pegawai_id?: string }).pegawai_id ||
+          null;
+
+        if (userIdParam) {
+          // Get the new values (use body values if provided, otherwise use existing)
+          const newVolume =
+            (body as any).volume !== undefined
+              ? (body as any).volume
+              : (task as any).volume || 1;
+          const newRatePerSatuan =
+            (body as any).rate_per_satuan !== undefined
+              ? (body as any).rate_per_satuan
+              : (task as any).rate_per_satuan || 0;
+
+          if (newVolume > 0 && newRatePerSatuan > 0) {
+            // Cancel existing allocations
+            await (svc as any)
+              .from("task_transport_allocations")
+              .update({ canceled_at: new Date().toISOString() })
+              .eq("task_id", taskId)
+              .is("canceled_at", null);
+
+            // Create new allocations based on new volume
+            const transportAllocations = [];
+            for (let i = 0; i < newVolume; i++) {
+              transportAllocations.push({
+                task_id: taskId,
+                user_id: userIdParam,
+                amount: newRatePerSatuan,
+                created_by: user.id,
+                created_at: new Date().toISOString(),
+              });
+            }
+
+            const { error: transportError } = await (svc as any)
+              .from("task_transport_allocations")
+              .insert(transportAllocations);
+
+            if (transportError) {
+              console.error("Transport allocation error:", transportError);
+            }
+          }
         }
       }
     }

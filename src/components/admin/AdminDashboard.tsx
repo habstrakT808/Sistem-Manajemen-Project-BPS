@@ -35,13 +35,7 @@ interface DashboardStats {
 }
 
 export default function AdminDashboard() {
-  console.log("AdminDashboard component is rendering");
   const { user, userProfile, loading: authLoading } = useAuthContext();
-  console.log("Auth state:", {
-    user: user?.id,
-    userProfile: userProfile?.role,
-    authLoading,
-  });
   const [stats, setStats] = useState<DashboardStats>({
     total_users: 0,
     total_projects: 0,
@@ -58,7 +52,6 @@ export default function AdminDashboard() {
   // Force loading to false after 5 seconds as a fallback
   useEffect(() => {
     const timeout = setTimeout(() => {
-      console.log("TIMEOUT: Forcing loading to false after 5 seconds");
       setIsLoading(false);
     }, 5000);
 
@@ -82,8 +75,6 @@ export default function AdminDashboard() {
         setIsLoading(true);
         setError(null);
 
-        console.log("Fetching dashboard stats from API for user:", user.id);
-
         const response = await fetch("/api/admin/dashboard", {
           method: "GET",
           headers: {
@@ -98,7 +89,6 @@ export default function AdminDashboard() {
         }
 
         const newStats = await response.json();
-        console.log("Dashboard stats loaded successfully from API:", newStats);
 
         setStats(newStats);
       } catch (err) {
@@ -122,19 +112,8 @@ export default function AdminDashboard() {
       }
     };
 
-    console.log("=== About to call fetchRealStats ===");
     fetchRealStats();
   }, [user, authLoading, userProfile?.role]); // Re-run when user, authLoading, or role changes
-
-  // Debug logging
-  console.log("AdminDashboard render:", {
-    isLoading,
-    authLoading,
-    user: user?.id,
-    stats,
-    error,
-    showLoading: isLoading || authLoading,
-  });
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("id-ID", {

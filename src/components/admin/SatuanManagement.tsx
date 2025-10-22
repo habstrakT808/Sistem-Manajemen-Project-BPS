@@ -25,15 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Plus,
-  Edit,
-  Trash2,
-  Save,
-  X,
-  CheckCircle,
-  AlertCircle,
-} from "lucide-react";
+import { Plus, Edit, Trash2, Save, X, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
 interface SatuanData {
@@ -309,7 +301,7 @@ export default function SatuanManagement() {
 
       {/* Create Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Tambah Satuan Baru</DialogTitle>
             <DialogDescription>
@@ -366,7 +358,7 @@ export default function SatuanManagement() {
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Edit Satuan</DialogTitle>
             <DialogDescription>

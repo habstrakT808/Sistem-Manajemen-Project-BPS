@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useMemo, useState, useCallback } from "react";
+import React, { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -69,7 +69,7 @@ interface ProjectDetail {
 }
 
 async function fetchProjectDetailRequest(
-  projectId: string
+  projectId: string,
 ): Promise<ProjectDetail> {
   const response = await fetch(`/api/pegawai/projects/${projectId}`, {
     cache: "no-store",
@@ -87,10 +87,13 @@ export default function ProjectDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const router = useRouter();
-  const queryClient = useQueryClient();
+  const _queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
 
-  const { id } = useMemo(() => ({ id: undefined as unknown as string }), []);
+  const { id: _id } = useMemo(
+    () => ({ id: undefined as unknown as string }),
+    [],
+  );
 
   // Resolve params with a small wrapper so component stays client-only
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -229,7 +232,7 @@ export default function ProjectDetailPage({
   const StatusIcon = getStatusIcon(project.status);
   const daysUntilDeadline = Math.ceil(
     (new Date(project.deadline).getTime() - new Date().getTime()) /
-      (1000 * 60 * 60 * 24)
+      (1000 * 60 * 60 * 24),
   );
 
   return (
@@ -303,7 +306,7 @@ export default function ProjectDetailPage({
                       </div>
                       <div className="text-gray-600">
                         {new Date(project.tanggal_mulai).toLocaleDateString(
-                          "id-ID"
+                          "id-ID",
                         )}
                       </div>
                     </div>
@@ -545,7 +548,7 @@ export default function ProjectDetailPage({
                       </Badge>
                       <span className="text-sm text-gray-500">
                         {new Date(task.tanggal_tugas).toLocaleDateString(
-                          "id-ID"
+                          "id-ID",
                         )}
                       </span>
                     </div>

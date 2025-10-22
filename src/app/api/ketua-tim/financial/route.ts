@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
     const ownedTaskIds = (ownedTasks || []).map((t: any) => t.id);
 
     // Get ALL tasks with their transport/honor amounts (not just allocated ones)
-    const { data: allTasksWithAmounts, error: tasksError } =
+    const { data: allTasksWithAmounts, error: _tasksError } =
       ownedTaskIds.length > 0
         ? await (svc as any)
             .from("tasks")
@@ -411,7 +411,7 @@ export async function GET(request: NextRequest) {
       .slice(0, 5);
 
     // Get honor spending by mitra from financial_records
-    const { data: allHonorRecords } =
+    const { data: _allHonorRecords } =
       ownedIdArray.length > 0
         ? await (svc as any)
             .from("financial_records")

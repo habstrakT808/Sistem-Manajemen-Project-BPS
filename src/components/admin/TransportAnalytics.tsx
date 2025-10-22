@@ -33,15 +33,6 @@ import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
 
 interface FinancialData {
   period: string;
@@ -53,6 +44,18 @@ interface FinancialData {
     name: string;
     amount: number;
     projects: Set<string>;
+  }>;
+  // New: detailed transactions for Overview tab
+  transactions?: Array<{
+    recipient_name: string;
+    recipient_type: "pegawai" | "mitra";
+    project_name: string;
+    task_title: string;
+    task_id: string;
+    volume: number;
+    rate: number;
+    amount: number;
+    date: string;
   }>;
   filters: {
     pegawaiId?: string;
@@ -89,6 +92,9 @@ async function fetchFinancialData(
     projectId?: string;
     teamId?: string;
     type?: string;
+    year?: string;
+    month?: string;
+    day?: string;
   },
 ): Promise<FinancialData> {
   const params = new URLSearchParams({
@@ -179,6 +185,13 @@ export default function TransportAnalytics() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showSatuanManagement, setShowSatuanManagement] = useState(false);
 
+  // Date filters - more granular control
+  const [dateFilters, setDateFilters] = useState({
+    year: new Date().getFullYear().toString(),
+    month: (new Date().getMonth() + 1).toString(),
+    day: "all",
+  });
+
   // Filters
   const [filters, setFilters] = useState({
     pegawaiId: "",
@@ -215,8 +228,9 @@ export default function TransportAnalytics() {
     isFetching,
     refetch,
   } = useQuery<FinancialData, Error>({
-    queryKey: ["admin", "financial", { selectedPeriod, filters }],
-    queryFn: () => fetchFinancialData(selectedPeriod, filters),
+    queryKey: ["admin", "financial", { selectedPeriod, filters, dateFilters }],
+    queryFn: () =>
+      fetchFinancialData(selectedPeriod, { ...filters, ...dateFilters }),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -236,9 +250,22 @@ export default function TransportAnalytics() {
     staleTime: 10 * 60 * 1000, // Cache for 10 minutes
   });
 
-  const month = selectedDate.getMonth() + 1;
-  const year = selectedDate.getFullYear();
-  const ymd = format(selectedDate, "yyyy-MM-dd");
+  // Calculate date values based on dateFilters
+  const year = parseInt(dateFilters.year);
+  const month =
+    dateFilters.month === "all"
+      ? new Date().getMonth() + 1
+      : parseInt(dateFilters.month);
+  const _day =
+    dateFilters.day === "all"
+      ? selectedDate.getDate()
+      : parseInt(dateFilters.day);
+
+  // Build ymd string for specific day queries
+  const ymd =
+    dateFilters.day === "all"
+      ? format(selectedDate, "yyyy-MM-dd")
+      : `${dateFilters.year}-${dateFilters.month.padStart(2, "0")}-${dateFilters.day.padStart(2, "0")}`;
 
   // Update filter data when response changes
   useEffect(() => {
@@ -469,239 +496,346 @@ export default function TransportAnalytics() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white border-0 shadow-xl rounded-xl p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-4">
-            <Filter className="w-5 h-5 text-gray-600" />
-            <h3 className="text-lg font-semibold text-gray-900">Filter Data</h3>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Filter Tanggal */}
+        <div className="bg-white border-0 shadow-xl rounded-xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-4">
+              <CalendarIcon className="w-5 h-5 text-gray-600" />
+              <h3 className="text-lg font-semibold text-gray-900">
+                Filter Tanggal
+              </h3>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const now = new Date();
+                setDateFilters({
+                  year: now.getFullYear().toString(),
+                  month: (now.getMonth() + 1).toString(),
+                  day: "all",
+                });
+              }}
+              className="text-gray-600 hover:text-gray-800"
+            >
+              Reset
+            </Button>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setFilters({
-                pegawaiId: "",
-                mitraId: "",
-                projectId: "",
-                teamId: "",
-                type: "all",
-              });
-              setSearchTerms({
-                pegawai: "",
-                mitra: "",
-                project: "",
-                team: "",
-              });
-            }}
-            className="text-gray-600 hover:text-gray-800"
-          >
-            Clear Filter
-          </Button>
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-2 block">
+                Tahun
+              </label>
+              <Select
+                value={dateFilters.year}
+                onValueChange={(value) =>
+                  setDateFilters({ ...dateFilters, year: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Tahun</SelectItem>
+                  {Array.from({ length: 5 }, (_, _i) => {
+                    const year = new Date().getFullYear() - _i;
+                    return (
+                      <SelectItem key={year} value={year.toString()}>
+                        {year}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-2 block">
+                Bulan
+              </label>
+              <Select
+                value={dateFilters.month}
+                onValueChange={(value) =>
+                  setDateFilters({ ...dateFilters, month: value, day: "all" })
+                }
+                disabled={dateFilters.year === "all"}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Bulan</SelectItem>
+                  {Array.from({ length: 12 }, (_, _i) => {
+                    const monthNum = _i + 1;
+                    const monthName = format(new Date(2024, _i, 1), "MMMM", {
+                      locale: localeId,
+                    });
+                    return (
+                      <SelectItem key={monthNum} value={monthNum.toString()}>
+                        {monthName}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-2 block">
+                Tanggal
+              </label>
+              <Select
+                value={dateFilters.day}
+                onValueChange={(value) =>
+                  setDateFilters({ ...dateFilters, day: value })
+                }
+                disabled={
+                  dateFilters.year === "all" || dateFilters.month === "all"
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  <SelectItem value="all">Semua Tanggal</SelectItem>
+                  {Array.from({ length: 31 }, (_, _i) => {
+                    const day = _i + 1;
+                    return (
+                      <SelectItem key={day} value={day.toString()}>
+                        {day}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">
-              Tipe Data
-            </label>
-            <Select
-              value={filters.type}
-              onValueChange={(value) => setFilters({ ...filters, type: value })}
+
+        {/* Filter Data */}
+        <div className="bg-white border-0 shadow-xl rounded-xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-4">
+              <Filter className="w-5 h-5 text-gray-600" />
+              <h3 className="text-lg font-semibold text-gray-900">
+                Filter Data
+              </h3>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setFilters({
+                  pegawaiId: "",
+                  mitraId: "",
+                  projectId: "",
+                  teamId: "",
+                  type: "all",
+                });
+                setSearchTerms({
+                  pegawai: "",
+                  mitra: "",
+                  project: "",
+                  team: "",
+                });
+              }}
+              className="text-gray-600 hover:text-gray-800"
             >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Semua</SelectItem>
-                <SelectItem value="pegawai">Pegawai Saja</SelectItem>
-                <SelectItem value="mitra">Mitra Saja</SelectItem>
-              </SelectContent>
-            </Select>
+              Clear Filter
+            </Button>
           </div>
-          <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">
-              Pegawai
-            </label>
-            <Select
-              value={filters.pegawaiId}
-              onValueChange={(value) =>
-                setFilters({ ...filters, pegawaiId: value })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Semua Pegawai" />
-              </SelectTrigger>
-              <SelectContent className="max-h-60 overflow-y-auto">
-                <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                  Semua Pegawai
-                </div>
-                <div className="px-2 py-1">
-                  <input
-                    ref={pegawaiSearchRef}
-                    type="text"
-                    placeholder="Cari pegawai..."
-                    className="w-full px-2 py-1 text-sm border rounded"
-                    value={searchTerms.pegawai}
-                    onChange={(e) => {
-                      setSearchTerms({
-                        ...searchTerms,
-                        pegawai: e.target.value,
-                      });
-                    }}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onKeyDown={(e) => e.stopPropagation()}
-                  />
-                </div>
-                {filterData.pegawai
-                  .filter((p) =>
-                    p.name
-                      .toLowerCase()
-                      .includes(searchTerms.pegawai.toLowerCase()),
-                  )
-                  .map((pegawai) => (
-                    <SelectItem key={pegawai.id} value={pegawai.id}>
-                      {pegawai.name}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">
-              Mitra
-            </label>
-            <Select
-              value={filters.mitraId}
-              onValueChange={(value) =>
-                setFilters({ ...filters, mitraId: value })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Semua Mitra" />
-              </SelectTrigger>
-              <SelectContent className="max-h-60 overflow-y-auto">
-                <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                  Semua Mitra
-                </div>
-                <div className="px-2 py-1">
-                  <input
-                    ref={mitraSearchRef}
-                    type="text"
-                    placeholder="Cari mitra..."
-                    className="w-full px-2 py-1 text-sm border rounded"
-                    value={searchTerms.mitra}
-                    onChange={(e) => {
-                      setSearchTerms({ ...searchTerms, mitra: e.target.value });
-                    }}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onKeyDown={(e) => e.stopPropagation()}
-                  />
-                </div>
-                {filterData.mitra
-                  .filter((m) =>
-                    m.name
-                      .toLowerCase()
-                      .includes(searchTerms.mitra.toLowerCase()),
-                  )
-                  .map((mitra) => (
-                    <SelectItem key={mitra.id} value={mitra.id}>
-                      {mitra.name}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">
-              Proyek
-            </label>
-            <Select
-              value={filters.projectId}
-              onValueChange={(value) =>
-                setFilters({ ...filters, projectId: value })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Semua Proyek" />
-              </SelectTrigger>
-              <SelectContent className="max-h-60 overflow-y-auto">
-                <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                  Semua Proyek
-                </div>
-                <div className="px-2 py-1">
-                  <input
-                    ref={projectSearchRef}
-                    type="text"
-                    placeholder="Cari proyek..."
-                    className="w-full px-2 py-1 text-sm border rounded"
-                    value={searchTerms.project}
-                    onChange={(e) => {
-                      setSearchTerms({
-                        ...searchTerms,
-                        project: e.target.value,
-                      });
-                    }}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onKeyDown={(e) => e.stopPropagation()}
-                  />
-                </div>
-                {filterData.projects
-                  .filter((p) =>
-                    p.name
-                      .toLowerCase()
-                      .includes(searchTerms.project.toLowerCase()),
-                  )
-                  .map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {project.name}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">
-              Tim
-            </label>
-            <Select
-              value={filters.teamId}
-              onValueChange={(value) =>
-                setFilters({ ...filters, teamId: value })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Semua Tim" />
-              </SelectTrigger>
-              <SelectContent className="max-h-60 overflow-y-auto">
-                <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                  Semua Tim
-                </div>
-                <div className="px-2 py-1">
-                  <input
-                    ref={teamSearchRef}
-                    type="text"
-                    placeholder="Cari tim..."
-                    className="w-full px-2 py-1 text-sm border rounded"
-                    value={searchTerms.team}
-                    onChange={(e) => {
-                      setSearchTerms({ ...searchTerms, team: e.target.value });
-                    }}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onKeyDown={(e) => e.stopPropagation()}
-                  />
-                </div>
-                {filterData.teams
-                  .filter((t) =>
-                    t.name
-                      .toLowerCase()
-                      .includes(searchTerms.team.toLowerCase()),
-                  )
-                  .map((team) => (
-                    <SelectItem key={team.id} value={team.id}>
-                      {team.name}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-2 block">
+                Pegawai
+              </label>
+              <Select
+                value={filters.pegawaiId}
+                onValueChange={(value) =>
+                  setFilters({ ...filters, pegawaiId: value })
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Semua Pegawai" />
+                </SelectTrigger>
+                <SelectContent className="max-h-60 overflow-y-auto">
+                  <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                    Semua Pegawai
+                  </div>
+                  <div className="px-2 py-1">
+                    <input
+                      ref={pegawaiSearchRef}
+                      type="text"
+                      placeholder="Cari pegawai..."
+                      className="w-full px-2 py-1 text-sm border rounded"
+                      value={searchTerms.pegawai}
+                      onChange={(e) => {
+                        setSearchTerms({
+                          ...searchTerms,
+                          pegawai: e.target.value,
+                        });
+                      }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                  {filterData.pegawai
+                    .filter((p) =>
+                      p.name
+                        .toLowerCase()
+                        .includes(searchTerms.pegawai.toLowerCase()),
+                    )
+                    .map((pegawai) => (
+                      <SelectItem key={pegawai.id} value={pegawai.id}>
+                        {pegawai.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-2 block">
+                Mitra
+              </label>
+              <Select
+                value={filters.mitraId}
+                onValueChange={(value) =>
+                  setFilters({ ...filters, mitraId: value })
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Semua Mitra" />
+                </SelectTrigger>
+                <SelectContent className="max-h-60 overflow-y-auto">
+                  <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                    Semua Mitra
+                  </div>
+                  <div className="px-2 py-1">
+                    <input
+                      ref={mitraSearchRef}
+                      type="text"
+                      placeholder="Cari mitra..."
+                      className="w-full px-2 py-1 text-sm border rounded"
+                      value={searchTerms.mitra}
+                      onChange={(e) => {
+                        setSearchTerms({
+                          ...searchTerms,
+                          mitra: e.target.value,
+                        });
+                      }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                  {filterData.mitra
+                    .filter((m) =>
+                      m.name
+                        .toLowerCase()
+                        .includes(searchTerms.mitra.toLowerCase()),
+                    )
+                    .map((mitra) => (
+                      <SelectItem key={mitra.id} value={mitra.id}>
+                        {mitra.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-2 block">
+                Proyek
+              </label>
+              <Select
+                value={filters.projectId}
+                onValueChange={(value) =>
+                  setFilters({ ...filters, projectId: value })
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Semua Proyek" />
+                </SelectTrigger>
+                <SelectContent className="max-h-60 overflow-y-auto">
+                  <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                    Semua Proyek
+                  </div>
+                  <div className="px-2 py-1">
+                    <input
+                      ref={projectSearchRef}
+                      type="text"
+                      placeholder="Cari proyek..."
+                      className="w-full px-2 py-1 text-sm border rounded"
+                      value={searchTerms.project}
+                      onChange={(e) => {
+                        setSearchTerms({
+                          ...searchTerms,
+                          project: e.target.value,
+                        });
+                      }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                  {filterData.projects
+                    .filter((p) =>
+                      p.name
+                        .toLowerCase()
+                        .includes(searchTerms.project.toLowerCase()),
+                    )
+                    .map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-2 block">
+                Tim
+              </label>
+              <Select
+                value={filters.teamId}
+                onValueChange={(value) =>
+                  setFilters({ ...filters, teamId: value })
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Semua Tim" />
+                </SelectTrigger>
+                <SelectContent className="max-h-60 overflow-y-auto">
+                  <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                    Semua Tim
+                  </div>
+                  <div className="px-2 py-1">
+                    <input
+                      ref={teamSearchRef}
+                      type="text"
+                      placeholder="Cari tim..."
+                      className="w-full px-2 py-1 text-sm border rounded"
+                      value={searchTerms.team}
+                      onChange={(e) => {
+                        setSearchTerms({
+                          ...searchTerms,
+                          team: e.target.value,
+                        });
+                      }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                  {filterData.teams
+                    .filter((t) =>
+                      t.name
+                        .toLowerCase()
+                        .includes(searchTerms.team.toLowerCase()),
+                    )
+                    .map((team) => (
+                      <SelectItem key={team.id} value={team.id}>
+                        {team.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
       </div>
@@ -750,45 +884,185 @@ export default function TransportAnalytics() {
       {/* Tab Content */}
       {activeTab === "overview" && (
         <div className="space-y-8">
-          {/* Top Spenders */}
+          {/* All Spending based on filters */}
           <div className="border-0 shadow-xl rounded-xl overflow-hidden bg-white">
             <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6">
               <h2 className="text-xl font-bold text-white flex items-center">
                 <Users className="w-6 h-6 mr-3" />
-                Pengeluaran Tertinggi
+                Semua Pengeluaran
+                {(filters.pegawaiId ||
+                  filters.mitraId ||
+                  filters.projectId ||
+                  filters.teamId ||
+                  filters.type !== "all") && (
+                  <Badge className="ml-3 bg-white/20 text-white border-white/30">
+                    Terfilter
+                  </Badge>
+                )}
               </h2>
               <p className="text-blue-100 text-sm mt-1">
-                Ranking pegawai dan mitra dengan pengeluaran tertinggi
+                {filters.pegawaiId
+                  ? `Menampilkan pengeluaran untuk pegawai ${filterData.pegawai.find((p) => p.id === filters.pegawaiId)?.name || "terpilih"}`
+                  : filters.mitraId
+                    ? `Menampilkan pengeluaran untuk mitra ${filterData.mitra.find((m) => m.id === filters.mitraId)?.name || "terpilih"}`
+                    : filters.projectId
+                      ? `Menampilkan pengeluaran untuk proyek ${filterData.projects.find((p) => p.id === filters.projectId)?.name || "terpilih"}`
+                      : "Menampilkan semua pengeluaran yang sesuai dengan filter"}
               </p>
             </div>
-            <div className="p-6 space-y-4">
-              {financialData.topSpenders.slice(0, 10).map((spender, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between p-3 rounded-lg bg-blue-50 border border-blue-100"
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center">
-                      <span className="text-white font-bold text-sm">
-                        {index + 1}
-                      </span>
+            <div className="p-6">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                        No
+                      </th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                        Nama
+                      </th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                        Proyek
+                      </th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                        Tugas
+                      </th>
+                      <th className="text-center py-3 px-4 font-semibold text-gray-700">
+                        Volume
+                      </th>
+                      <th className="text-right py-3 px-4 font-semibold text-gray-700">
+                        Rate
+                      </th>
+                      <th className="text-right py-3 px-4 font-semibold text-gray-700">
+                        Total Pengeluaran
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      const rawTransactions =
+                        financialData.transactions ||
+                        financialData.topSpenders.map((s, _i) => ({
+                          recipient_name: s.name,
+                          recipient_type: s.name.includes("@")
+                            ? ("pegawai" as const)
+                            : ("mitra" as const),
+                          project_name: Array.from(s.projects).join(", "),
+                          task_title: "-",
+                          task_id: "",
+                          volume: 1,
+                          rate: s.amount,
+                          amount: s.amount,
+                          date: "",
+                        }));
+
+                      // Group by task_id and aggregate volume
+                      const groupedMap = new Map<
+                        string,
+                        {
+                          recipient_name: string;
+                          project_name: string;
+                          task_title: string;
+                          volume: number;
+                          rate: number;
+                          amount: number;
+                        }
+                      >();
+
+                      rawTransactions.forEach((t) => {
+                        const key = `${t.task_id || "no-task"}-${t.recipient_name}`;
+                        if (groupedMap.has(key)) {
+                          const existing = groupedMap.get(key)!;
+                          existing.volume += t.volume || 1;
+                          existing.amount += t.amount;
+                        } else {
+                          groupedMap.set(key, {
+                            recipient_name: t.recipient_name,
+                            project_name: t.project_name,
+                            task_title: t.task_title,
+                            volume: t.volume || 1,
+                            rate: t.rate || t.amount,
+                            amount: t.amount,
+                          });
+                        }
+                      });
+
+                      const groupedTransactions = Array.from(
+                        groupedMap.values(),
+                      );
+
+                      return groupedTransactions.map((transaction, index) => (
+                        <tr
+                          key={index}
+                          className="border-b border-gray-100 hover:bg-blue-50 transition-colors"
+                        >
+                          <td className="py-3 px-4 text-gray-600">
+                            {index + 1}
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="font-medium text-gray-900">
+                              {transaction.recipient_name}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="text-gray-900">
+                              {transaction.project_name || "-"}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="text-gray-700">
+                              {transaction.task_title || "-"}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <span className="text-gray-900 font-medium">
+                              {transaction.volume}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <span className="text-gray-700">
+                              {formatCurrency(transaction.rate)}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <span className="font-semibold text-blue-600">
+                              {formatCurrency(transaction.amount)}
+                            </span>
+                          </td>
+                        </tr>
+                      ));
+                    })()}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-gray-50 font-semibold">
+                      <td colSpan={6} className="py-3 px-4 text-gray-900">
+                        Total Keseluruhan
+                      </td>
+                      <td className="py-3 px-4 text-right text-blue-600">
+                        {formatCurrency(
+                          (
+                            financialData.transactions ||
+                            financialData.topSpenders.map((s) => ({
+                              amount: s.amount,
+                            }))
+                          ).reduce((sum, t) => sum + t.amount, 0),
+                        )}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+                {(!financialData.transactions ||
+                  financialData.transactions.length === 0) &&
+                  financialData.topSpenders.length === 0 && (
+                    <div className="text-center py-12 text-gray-500">
+                      <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                      <p className="text-lg">Tidak ada data pengeluaran</p>
+                      <p className="text-sm mt-2">
+                        Coba ubah filter atau periode waktu
+                      </p>
                     </div>
-                    <div>
-                      <div className="font-medium text-gray-900">
-                        {spender.name}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {spender.projects.size} proyek
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-semibold text-blue-600">
-                      {formatCurrency(spender.amount)}
-                    </div>
-                  </div>
-                </div>
-              ))}
+                  )}
+              </div>
             </div>
           </div>
         </div>
@@ -803,15 +1077,42 @@ export default function TransportAnalytics() {
                   Kalender Pengeluaran
                 </h2>
                 <div className="text-white text-sm">
-                  {format(selectedDate, "MMMM yyyy", { locale: localeId })}
+                  {dateFilters.month !== "all"
+                    ? format(
+                        new Date(
+                          parseInt(dateFilters.year),
+                          parseInt(dateFilters.month) - 1,
+                          1,
+                        ),
+                        "MMMM yyyy",
+                        { locale: localeId },
+                      )
+                    : "Semua Bulan"}
                 </div>
               </div>
             </div>
             <div className="p-5">
               <Calendar
                 mode="single"
-                month={selectedDate}
-                onMonthChange={(d) => d && setSelectedDate(d)}
+                month={
+                  dateFilters.month !== "all"
+                    ? new Date(
+                        parseInt(dateFilters.year),
+                        parseInt(dateFilters.month) - 1,
+                        1,
+                      )
+                    : selectedDate
+                }
+                onMonthChange={(d) => {
+                  if (d) {
+                    setDateFilters({
+                      ...dateFilters,
+                      year: d.getFullYear().toString(),
+                      month: (d.getMonth() + 1).toString(),
+                    });
+                    setSelectedDate(d);
+                  }
+                }}
                 selected={selectedDate}
                 onSelect={(d) => d && setSelectedDate(d)}
                 className="!w-full"
@@ -901,15 +1202,42 @@ export default function TransportAnalytics() {
                   Kalender Alokasi Transport
                 </h2>
                 <div className="text-white text-sm">
-                  {format(selectedDate, "MMMM yyyy", { locale: localeId })}
+                  {dateFilters.month !== "all"
+                    ? format(
+                        new Date(
+                          parseInt(dateFilters.year),
+                          parseInt(dateFilters.month) - 1,
+                          1,
+                        ),
+                        "MMMM yyyy",
+                        { locale: localeId },
+                      )
+                    : "Semua Bulan"}
                 </div>
               </div>
             </div>
             <div className="p-5">
               <Calendar
                 mode="single"
-                month={selectedDate}
-                onMonthChange={(d) => d && setSelectedDate(d)}
+                month={
+                  dateFilters.month !== "all"
+                    ? new Date(
+                        parseInt(dateFilters.year),
+                        parseInt(dateFilters.month) - 1,
+                        1,
+                      )
+                    : selectedDate
+                }
+                onMonthChange={(d) => {
+                  if (d) {
+                    setDateFilters({
+                      ...dateFilters,
+                      year: d.getFullYear().toString(),
+                      month: (d.getMonth() + 1).toString(),
+                    });
+                    setSelectedDate(d);
+                  }
+                }}
                 selected={selectedDate}
                 onSelect={(d) => d && setSelectedDate(d)}
                 className="!w-full"

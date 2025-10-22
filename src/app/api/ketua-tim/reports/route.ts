@@ -44,7 +44,6 @@ interface ReportData {
 
 export async function GET(request: NextRequest) {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const supabase = (await createClient()) as any;
     const { searchParams } = new URL(request.url);
     const period = searchParams.get("period") || "current_month";
@@ -112,7 +111,7 @@ export async function GET(request: NextRequest) {
           uang_transport,
           honor
         )
-      `
+      `,
       )
       .eq("ketua_tim_id", user.id)
       .gte("created_at", startDate.toISOString())
@@ -137,13 +136,13 @@ export async function GET(request: NextRequest) {
           const transportBudget = (project.project_assignments || []).reduce(
             (sum: number, assignment: { uang_transport: number | null }) =>
               sum + (assignment.uang_transport || 0),
-            0
+            0,
           );
 
           const honorBudget = (project.project_assignments || []).reduce(
             (sum: number, assignment: { honor: number | null }) =>
               sum + (assignment.honor || 0),
-            0
+            0,
           );
 
           const totalBudget = transportBudget + honorBudget;
@@ -156,7 +155,7 @@ export async function GET(request: NextRequest) {
 
           const totalTasks = (tasks || []).length;
           const completedTasks = (tasks || []).filter(
-            (t: { status: string }) => t.status === "completed"
+            (t: { status: string }) => t.status === "completed",
           ).length;
           const progress =
             totalTasks > 0
@@ -174,8 +173,8 @@ export async function GET(request: NextRequest) {
             honor_budget: honorBudget,
             progress,
           };
-        }
-      )
+        },
+      ),
     );
 
     // Get financial summary
@@ -189,7 +188,7 @@ export async function GET(request: NextRequest) {
         amount,
         recipient_type,
         projects!inner (ketua_tim_id)
-      `
+      `,
       )
       .eq("projects.ketua_tim_id", user.id)
       .eq("bulan", currentMonth)
@@ -197,33 +196,33 @@ export async function GET(request: NextRequest) {
 
     const totalSpending = (financialRecords || []).reduce(
       (sum: number, record: { amount: number }) => sum + record.amount,
-      0
+      0,
     );
 
     const transportSpending = (financialRecords || [])
       .filter(
         (record: { recipient_type: string }) =>
-          record.recipient_type === "pegawai"
+          record.recipient_type === "pegawai",
       )
       .reduce(
         (sum: number, record: { amount: number }) => sum + record.amount,
-        0
+        0,
       );
 
     const honorSpending = (financialRecords || [])
       .filter(
         (record: { recipient_type: string }) =>
-          record.recipient_type === "mitra"
+          record.recipient_type === "mitra",
       )
       .reduce(
         (sum: number, record: { amount: number }) => sum + record.amount,
-        0
+        0,
       );
 
     const totalProjectBudget = processedProjects.reduce(
       (sum: number, project: { total_budget: number }) =>
         sum + project.total_budget,
-      0
+      0,
     );
 
     // Get team summary
@@ -234,7 +233,7 @@ export async function GET(request: NextRequest) {
         assignee_id,
         users!inner (nama_lengkap),
         projects!inner (ketua_tim_id, created_at)
-      `
+      `,
       )
       .eq("assignee_type", "pegawai")
       .eq("projects.ketua_tim_id", user.id)
@@ -248,9 +247,9 @@ export async function GET(request: NextRequest) {
             (member: {
               assignee_id: string;
               users: { nama_lengkap: string };
-            }) => [member.assignee_id, member.users.nama_lengkap]
-          )
-        ).entries()
+            }) => [member.assignee_id, member.users.nama_lengkap],
+          ),
+        ).entries(),
       ).map(async ([memberId, memberName]) => {
         // Get projects assigned
         const { data: memberProjects } = await supabase
@@ -258,7 +257,7 @@ export async function GET(request: NextRequest) {
           .select(
             `
             projects!inner (ketua_tim_id, created_at)
-          `
+          `,
           )
           .eq("assignee_type", "pegawai")
           .eq("assignee_id", memberId)
@@ -273,7 +272,7 @@ export async function GET(request: NextRequest) {
             `
             status,
             projects!inner (ketua_tim_id, created_at)
-          `
+          `,
           )
           .eq("pegawai_id", memberId)
           .eq("projects.ketua_tim_id", user.id)
@@ -288,7 +287,7 @@ export async function GET(request: NextRequest) {
             `
             amount,
             projects!inner (ketua_tim_id)
-          `
+          `,
           )
           .eq("recipient_type", "pegawai")
           .eq("recipient_id", memberId)
@@ -298,7 +297,7 @@ export async function GET(request: NextRequest) {
 
         const totalEarnings = (memberEarnings || []).reduce(
           (sum: number, record: { amount: number }) => sum + record.amount,
-          0
+          0,
         );
 
         return {
@@ -307,7 +306,7 @@ export async function GET(request: NextRequest) {
           tasks_completed: (memberTasks || []).length,
           total_earnings: totalEarnings,
         };
-      })
+      }),
     );
 
     // Get mitra summary
@@ -318,7 +317,7 @@ export async function GET(request: NextRequest) {
         assignee_id,
         mitra!inner (nama_mitra),
         projects!inner (ketua_tim_id, created_at)
-      `
+      `,
       )
       .eq("assignee_type", "mitra")
       .eq("projects.ketua_tim_id", user.id)
@@ -332,9 +331,9 @@ export async function GET(request: NextRequest) {
             (member: {
               assignee_id: string;
               mitra: { nama_mitra: string };
-            }) => [member.assignee_id, member.mitra.nama_mitra]
-          )
-        ).entries()
+            }) => [member.assignee_id, member.mitra.nama_mitra],
+          ),
+        ).entries(),
       ).map(async ([mitraId, mitraName]) => {
         // Get projects assigned
         const { data: mitraProjects } = await supabase
@@ -342,7 +341,7 @@ export async function GET(request: NextRequest) {
           .select(
             `
             projects!inner (ketua_tim_id, created_at)
-          `
+          `,
           )
           .eq("assignee_type", "mitra")
           .eq("assignee_id", mitraId)
@@ -357,7 +356,7 @@ export async function GET(request: NextRequest) {
             `
             amount,
             projects!inner (ketua_tim_id)
-          `
+          `,
           )
           .eq("recipient_type", "mitra")
           .eq("recipient_id", mitraId)
@@ -367,7 +366,7 @@ export async function GET(request: NextRequest) {
 
         const totalPayments = (mitraPayments || []).reduce(
           (sum: number, record: { amount: number }) => sum + record.amount,
-          0
+          0,
         );
 
         return {
@@ -376,7 +375,7 @@ export async function GET(request: NextRequest) {
           total_payments: totalPayments,
           remaining_limit: 3300000 - totalPayments,
         };
-      })
+      }),
     );
 
     const reportData: ReportData = {
@@ -406,7 +405,7 @@ export async function GET(request: NextRequest) {
     console.error("Reports API Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

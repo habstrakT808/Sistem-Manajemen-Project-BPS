@@ -82,11 +82,6 @@ export function LoginForm() {
 
   // Complete state reset when URL role parameter changes
   useEffect(() => {
-    console.log(
-      "LoginForm - URL role parameter changed to:",
-      role,
-      "- performing complete state reset",
-    );
     setIsRedirecting(false);
     setLoading(false);
     setError("");

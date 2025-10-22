@@ -26,7 +26,7 @@ interface DbProject {
   status: string;
 }
 
-interface DbTaskRow {
+interface _DbTaskRow {
   id: string;
   deskripsi_tugas: string;
   tanggal_tugas: string;
@@ -35,7 +35,7 @@ interface DbTaskRow {
   projects: DbProject;
 }
 
-interface DbPersonalEvent {
+interface _DbPersonalEvent {
   id: string;
   user_id: string;
   title: string;
@@ -61,7 +61,7 @@ interface ScheduleTask {
   project_id: string;
 }
 
-interface WorkloadIndicator {
+interface _WorkloadIndicator {
   date: string;
   workload_level: "low" | "medium" | "high";
   event_count: number;
@@ -454,7 +454,7 @@ async function getComprehensiveScheduleData(
     } else {
       events = eventsData || [];
     }
-  } catch (error) {
+  } catch {
     console.warn("Personal events table not found, using in-memory storage");
     // Use in-memory storage as fallback
     const userEvents = mockEventsStorage.get(userId) || [];
@@ -468,7 +468,7 @@ async function getComprehensiveScheduleData(
   }
 
   // Skip workload indicators RPC if function doesn't exist
-  let workloadData: any[] = [];
+  let _workloadData: any[] = [];
   try {
     const { data: workloadDataResult, error: workloadError } =
       await serviceClient.rpc("get_workload_indicator", {
@@ -480,9 +480,9 @@ async function getComprehensiveScheduleData(
     if (workloadError) {
       console.warn("Workload indicator RPC error:", workloadError.message);
     } else {
-      workloadData = workloadDataResult || [];
+      _workloadData = workloadDataResult || [];
     }
-  } catch (error) {
+  } catch {
     console.warn(
       "Workload indicator function not found, skipping workload data",
     );

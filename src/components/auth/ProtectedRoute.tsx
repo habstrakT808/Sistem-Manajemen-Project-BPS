@@ -87,33 +87,19 @@ export function ProtectedRoute({
       if (currentPath === "/pegawai/projects" && hasTeamId) {
         // Allow access to projects page with team_id regardless of activeProject/activeTeam
         // The ProjectListView component will handle the team_id and show appropriate projects
-        console.log(
-          "[ProtectedRoute] Allowing access to /pegawai/projects with team_id:",
-          hasTeamId,
-        );
         return;
       }
 
       if (requireProjectRole) {
         // For ketua-tim pages, check if user has leader role in active project/team
         if (requireProjectRole === "leader") {
-          console.log("ProtectedRoute: Checking ketua-tim access", {
-            loading,
-            userProfile: userProfile?.role,
-            activeProject: activeProject?.role,
-            activeTeam: activeTeam?.role,
-            currentPath,
-          });
-
           // Wait for userProfile to load
           if (loading) {
-            console.log("Still loading userProfile, waiting...");
             return; // Still loading, wait
           }
 
           // If userProfile is still undefined after loading, wait a bit more
           if (!userProfile && !loading) {
-            console.log("UserProfile is undefined, waiting for it to load...");
             // Wait maximum 3 seconds for userProfile to load
             setTimeout(() => {
               if (!userProfile) {

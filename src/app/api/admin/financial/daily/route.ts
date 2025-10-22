@@ -211,10 +211,10 @@ export async function GET(request: NextRequest) {
     const year = Number(yearParam || now.getFullYear());
 
     const pad2 = (n: number) => (n < 10 ? `0${n}` : String(n));
-    const monthStartStr = `${year}-${pad2(month)}-01`;
+    const _monthStartStr = `${year}-${pad2(month)}-01`;
     const nextMonth = month === 12 ? 1 : month + 1;
     const nextMonthYear = month === 12 ? year + 1 : year;
-    const monthEndStr = `${nextMonthYear}-${pad2(nextMonth)}-01`;
+    const _monthEndStr = `${nextMonthYear}-${pad2(nextMonth)}-01`;
 
     // Get all tasks for the month
     const { data: allTasks } = await (svc as any)

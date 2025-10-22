@@ -87,28 +87,70 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       throw membersError;
     }
 
-    let projectMembers = (members || []).map((member: ProjectMember) => ({
-      id: member.users.id,
-      nama_lengkap: member.users.nama_lengkap,
-      email: member.users.email,
-      role: member.role,
-    }));
-    // Merge with project_assignments (pegawai) and deduplicate, not just fallback
+    // First, get all pegawai assignments to determine who is actually working on this project
     const { data: assigns, error: assignsError } = await (svc as any)
       .from("project_assignments")
       .select("assignee_id")
       .eq("project_id", projectId)
       .eq("assignee_type", "pegawai");
 
+    // Get the set of user IDs who are assigned as pegawai (workers)
+    const assignedPegawaiIds = new Set<string>(
+      (assigns || [])
+        .map((a: { assignee_id: string }) => a.assignee_id)
+        .filter(Boolean),
+    );
+
+    // Map members - only include those who are explicitly assigned as pegawai
+    let projectMembers = (members || [])
+      .filter((member: ProjectMember) => {
+        const userId = member.users.id;
+        const isAssigned = assignedPegawaiIds.has(userId);
+        console.log(
+          `🔍 DEBUG - Checking ${member.users.nama_lengkap} (${userId}): ${isAssigned ? "✅ INCLUDED" : "❌ FILTERED OUT"}`,
+        );
+        // Include member only if they are in project_assignments as pegawai
+        return isAssigned;
+      })
+      .map((member: ProjectMember) => ({
+        id: member.users.id,
+        nama_lengkap: member.users.nama_lengkap,
+        email: member.users.email,
+        role: member.role,
+      }));
+
+    console.log(
+      "🔍 DEBUG - Final projectMembers count:",
+      projectMembers.length,
+    );
+
+    // Fallback: If no project_assignments found, include all project_members who have "member" role
+    // This handles cases where project uses project_members table only
+    if (assignedPegawaiIds.size === 0 && members && members.length > 0) {
+      console.log(
+        "⚠️ FALLBACK: No pegawai assignments found, using all project_members with 'member' role",
+      );
+      projectMembers = (members || []).map((member: ProjectMember) => ({
+        id: member.users.id,
+        nama_lengkap: member.users.nama_lengkap,
+        email: member.users.email,
+        role: member.role,
+      }));
+      console.log(
+        "⚠️ FALLBACK: projectMembers after fallback:",
+        projectMembers.length,
+      );
+    }
+
+    // Add any assigned pegawai that aren't in project_members yet
     if (!assignsError && assigns && assigns.length > 0) {
       const existingIds = new Set(
         projectMembers.map((m: { id: string }) => m.id),
       );
-      const leaderId = (project as { leader_user_id?: string }).leader_user_id;
-      const ketuaId = (project as { ketua_tim_id?: string }).ketua_tim_id;
+      // Get user IDs that are assigned but not yet in projectMembers
       const userIds = (assigns as Array<{ assignee_id: string }>)
         .map((a) => a.assignee_id)
-        .filter((uid) => !!uid); // Include all assigned users, including leader
+        .filter((uid) => !!uid && !existingIds.has(uid)); // Only include if not already in list
 
       if (userIds.length > 0) {
         const { data: userRows } = await (svc as any)

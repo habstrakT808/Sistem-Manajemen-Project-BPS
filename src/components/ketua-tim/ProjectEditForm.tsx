@@ -19,12 +19,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   ArrowLeft,
   Save,
   Users,
   FileText,
-  Loader2,
   AlertTriangle,
+  Loader2,
   CheckCircle,
   Clock,
   Search,
@@ -32,6 +42,7 @@ import {
 
 import { toast } from "sonner";
 import Link from "next/link";
+import { formatCurrency } from "@/lib/utils";
 
 interface ProjectData {
   id: string;
@@ -68,6 +79,11 @@ interface Mitra {
   nama_mitra: string;
   jenis: string;
   rating_average: number;
+  monthly_usage?: {
+    current_total: number;
+    remaining_limit: number;
+    limit_percentage: number;
+  };
 }
 
 interface ProjectEditFormProps {
@@ -98,6 +114,15 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
   const [pegawaiTransport, setPegawaiTransport] = useState<
     Record<string, number>
   >({});
+  const [showMitraLimitWarning, setShowMitraLimitWarning] = useState(false);
+  const [mitraLimitWarnings, setMitraLimitWarnings] = useState<
+    Array<{
+      mitraId: string;
+      mitraName: string;
+      newTotal: number;
+      limit: number;
+    }>
+  >([]);
   const [mitraHonor, setMitraHonor] = useState<Record<string, number>>({});
   const [pegawaiSearchTerm, setPegawaiSearchTerm] = useState("");
   const [mitraSearchTerm, setMitraSearchTerm] = useState("");
@@ -168,22 +193,21 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
 
   const fetchUsersAndMitra = useCallback(async () => {
     try {
-      const [usersResponse, mitraResponse] = await Promise.all([
-        fetch("/api/ketua-tim/team"),
-        fetch("/api/admin/mitra"),
-      ]);
+      // Use team-data endpoint to get ALL available pegawai and mitra, not just those in projects
+      const response = await fetch(
+        "/api/ketua-tim/team-data?include_workload=false",
+      );
 
-      if (usersResponse.ok) {
-        const usersData = await usersResponse.json();
-        setUsers(usersData.data || []);
-      }
-
-      if (mitraResponse.ok) {
-        const mitraData = await mitraResponse.json();
-        setMitra(mitraData.data || []);
+      if (response.ok) {
+        const result = await response.json();
+        setUsers(result.pegawai || []);
+        setMitra(result.mitra || []);
+      } else {
+        throw new Error("Failed to fetch team data");
       }
     } catch (error) {
       console.error("Error fetching users and mitra:", error);
+      toast.error("Failed to load team members");
     }
   }, []);
 
@@ -236,12 +260,44 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
     }
   };
 
-  const handleSave = async () => {
-    if (!validateStep(currentStep)) {
-      toast.error("Please complete all required fields");
-      return;
+  const checkMitraLimits = (): boolean => {
+    const warnings: Array<{
+      mitraId: string;
+      mitraName: string;
+      newTotal: number;
+      limit: number;
+    }> = [];
+
+    for (const mitraId of selectedMitra) {
+      const mitraObj = mitra.find((m) => m.id === mitraId);
+      if (!mitraObj?.monthly_usage) continue;
+
+      const honor = mitraHonor[mitraId] || 0;
+      const currentTotal = mitraObj.monthly_usage.current_total || 0;
+      const newTotal = currentTotal + honor;
+      const limit =
+        (mitraObj.monthly_usage.remaining_limit || 0) + currentTotal;
+
+      if (newTotal > limit) {
+        warnings.push({
+          mitraId: mitraObj.id,
+          mitraName: mitraObj.nama_mitra,
+          newTotal,
+          limit,
+        });
+      }
     }
 
+    if (warnings.length > 0) {
+      setMitraLimitWarnings(warnings);
+      setShowMitraLimitWarning(true);
+      return true; // Has warnings
+    }
+
+    return false; // No warnings
+  };
+
+  const proceedWithSave = async () => {
     setSaving(true);
     try {
       const assignments = [
@@ -283,6 +339,16 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
       queryClient.invalidateQueries({ queryKey: ["ketua", "dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["ketua", "financial"] });
       queryClient.invalidateQueries({ queryKey: ["ketua", "team"] });
+      // Invalidate project members cache so task assignment dropdown updates
+      queryClient.invalidateQueries({ queryKey: ["project-members"] });
+      queryClient.invalidateQueries({ queryKey: ["project-detail"] });
+      // Invalidate project mitra cache so task creation dropdown updates
+      console.log(
+        "🔧 DEBUG: Invalidating project-mitra cache for projectId:",
+        projectId,
+      );
+      queryClient.invalidateQueries({ queryKey: ["project-mitra"] });
+      queryClient.invalidateQueries({ queryKey: ["project-mitra", projectId] });
 
       const detailHref = `/ketua-tim/projects/${projectId}`;
       router.prefetch(detailHref);
@@ -292,7 +358,25 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
       toast.error("Failed to update project");
     } finally {
       setSaving(false);
+      setShowMitraLimitWarning(false);
+      setMitraLimitWarnings([]);
     }
+  };
+
+  const handleSave = async () => {
+    if (!validateStep(currentStep)) {
+      toast.error("Please complete all required fields");
+      return;
+    }
+
+    // Check mitra limits first
+    const hasWarnings = checkMitraLimits();
+    if (hasWarnings) {
+      return; // Show warning dialog, user must confirm
+    }
+
+    // No warnings, proceed directly
+    await proceedWithSave();
   };
 
   const handlePegawaiSelection = (userId: string, checked: boolean) => {
@@ -851,6 +935,81 @@ export default function ProjectEditForm({ projectId }: ProjectEditFormProps) {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Mitra Limit Warning Dialog */}
+      <AlertDialog
+        open={showMitraLimitWarning}
+        onOpenChange={setShowMitraLimitWarning}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center text-orange-600">
+              <AlertTriangle className="w-6 h-6 mr-2" />
+              Peringatan: Limit Mitra Terlampaui
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <div className="text-gray-700">
+                  {mitraLimitWarnings.length} mitra akan{" "}
+                  <strong>melampaui limit bulanan</strong> jika perubahan ini
+                  disimpan.
+                </div>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {mitraLimitWarnings.map((warning) => (
+                    <div
+                      key={warning.mitraId}
+                      className="p-4 bg-orange-50 rounded-lg border border-orange-200 space-y-2"
+                    >
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium text-gray-700">
+                          Mitra:
+                        </span>
+                        <span className="text-sm font-semibold text-gray-900">
+                          {warning.mitraName}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium text-gray-700">
+                          Total yang akan menjadi:
+                        </span>
+                        <span className="text-lg font-bold text-orange-600">
+                          {formatCurrency(warning.newTotal)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs text-gray-600">
+                        <span>Limit Bulanan:</span>
+                        <span>{formatCurrency(warning.limit)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-gray-700 mt-3">
+                  <strong>Apakah Anda yakin ingin melanjutkan?</strong>
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setShowMitraLimitWarning(false);
+                setMitraLimitWarnings([]);
+              }}
+            >
+              Tidak, Batalkan
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                await proceedWithSave();
+              }}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              <CheckCircle className="w-4 h-4 mr-2" />
+              Ya, Lanjutkan
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

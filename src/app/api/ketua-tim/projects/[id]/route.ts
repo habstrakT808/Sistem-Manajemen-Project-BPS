@@ -182,7 +182,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const { data: projectTasks } = await (svc as any)
       .from("tasks")
       .select(
-        "id, project_id, assignee_user_id, assignee_mitra_id, status, honor_amount",
+        "id, project_id, assignee_user_id, assignee_mitra_id, status, honor_amount, rate_per_satuan, volume, total_amount",
       )
       .eq("project_id", projectId);
 
@@ -201,42 +201,57 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       ? Math.round((tasksCompleted / totalTasks) * 100)
       : 0;
 
-    // 2) Transport actuals via allocations + earnings_ledger
-    const taskIds = (projectTasks || []).map((t: any) => t.id);
-    const { data: allocations } = taskIds.length
-      ? await (svc as any)
-          .from("task_transport_allocations")
-          .select("id, task_id")
-          .in("task_id", taskIds)
-          .is("canceled_at", null)
-      : { data: [] };
-    const allocationIds = (allocations || []).map((a: any) => a.id);
-    const { data: ledgerRows } = allocationIds.length
-      ? await (svc as any)
-          .from("earnings_ledger")
-          .select("user_id, amount, source_id")
-          .eq("type", "transport")
-          .in("source_id", allocationIds)
-      : { data: [] };
+    // 2) Transport actuals using satuan system from tasks (budget, not actual paid)
     const transportByUser = new Map<string, number>();
-    (ledgerRows || []).forEach((e: any) => {
-      const uid = e.user_id as string;
-      const amt = Number(e.amount || 0);
-      transportByUser.set(uid, (transportByUser.get(uid) || 0) + amt);
-    });
+    (projectTasks || [])
+      .filter((t: any) => t.assignee_user_id)
+      .forEach((t: any) => {
+        const uid = t.assignee_user_id as string;
+        let transportAmount = 0;
 
-    // 3) Mitra honor actuals via tasks.honor_amount
+        // Calculate transport using satuan system (priority order)
+        if (t.total_amount) {
+          // Use pre-calculated total_amount
+          transportAmount = Number(t.total_amount);
+        } else if (t.rate_per_satuan && t.volume) {
+          // Calculate from satuan system
+          transportAmount = Number(t.rate_per_satuan) * Number(t.volume);
+        } else if (t.honor_amount) {
+          // Some legacy tasks might have honor_amount for transport
+          transportAmount = Number(t.honor_amount);
+        }
+
+        if (transportAmount > 0) {
+          transportByUser.set(
+            uid,
+            (transportByUser.get(uid) || 0) + transportAmount,
+          );
+        }
+      });
+
+    // 3) Mitra honor actuals using satuan system
     const honorByMitra = new Map<string, number>();
     (projectTasks || [])
-      .filter(
-        (t: any) => t.assignee_mitra_id && Number(t.honor_amount || 0) > 0,
-      )
+      .filter((t: any) => t.assignee_mitra_id)
       .forEach((t: any) => {
         const mid = t.assignee_mitra_id as string;
-        honorByMitra.set(
-          mid,
-          (honorByMitra.get(mid) || 0) + Number(t.honor_amount || 0),
-        );
+        let honorAmount = 0;
+
+        // Calculate honor using satuan system (priority order)
+        if (t.total_amount) {
+          // Use pre-calculated total_amount
+          honorAmount = Number(t.total_amount);
+        } else if (t.rate_per_satuan && t.volume) {
+          // Calculate from satuan system
+          honorAmount = Number(t.rate_per_satuan) * Number(t.volume);
+        } else if (t.honor_amount) {
+          // Fallback to old honor_amount field
+          honorAmount = Number(t.honor_amount);
+        }
+
+        if (honorAmount > 0) {
+          honorByMitra.set(mid, (honorByMitra.get(mid) || 0) + honorAmount);
+        }
       });
 
     // Attach computed totals into assignments if present

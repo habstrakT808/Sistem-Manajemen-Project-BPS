@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 function PegawaiLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { activeTeam } = useActiveTeam();
+  const { activeTeam: _activeTeam } = useActiveTeam();
 
   // Don't use sidebar layout for:
   // 1. Team selection page (/pegawai)

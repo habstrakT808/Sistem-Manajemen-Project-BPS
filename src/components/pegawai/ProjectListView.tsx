@@ -100,7 +100,7 @@ export default function ProjectListView() {
     }
   };
   const { setActiveTeam } = useActiveTeam();
-  const { userProfile } = useAuthContext();
+  const { userProfile: _userProfile } = useAuthContext();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -112,7 +112,6 @@ export default function ProjectListView() {
   // Invalidate and refetch data when teamId changes
   useEffect(() => {
     if (teamId) {
-      console.log("[ProjectListView] TeamId changed to:", teamId);
       // Invalidate all pegawai queries to ensure fresh data
       queryClient.invalidateQueries({
         queryKey: ["pegawai", "projects"],
@@ -144,21 +143,6 @@ export default function ProjectListView() {
   // Debug logging for projects data
   useEffect(() => {
     if (projects && projects.length > 0) {
-      console.log(
-        "[ProjectListView] Projects loaded:",
-        projects.length,
-        "projects for teamId:",
-        teamId,
-      );
-      console.log(
-        "[ProjectListView] Project details:",
-        projects.map((p) => ({
-          id: p.id,
-          name: p.nama_project,
-          status: p.status,
-          user_role: p.user_role,
-        })),
-      );
     }
   }, [projects, teamId]);
 
@@ -184,11 +168,6 @@ export default function ProjectListView() {
   // Debug: log projects data
   React.useEffect(() => {
     if (projects.length > 0) {
-      console.log("Projects data:", projects);
-      console.log(
-        "Leader projects:",
-        projects.filter((p) => p.user_role === "leader"),
-      );
     }
   }, [projects]);
 
@@ -725,13 +704,6 @@ export default function ProjectListView() {
                 <div
                   key={project.id}
                   onClick={() => {
-                    console.log(
-                      "Project selected:",
-                      project.nama_project,
-                      "User role:",
-                      project.user_role,
-                    );
-
                     if (project.user_role === "member") {
                       // If user is member, go directly to pegawai dashboard
                       setActiveProject({

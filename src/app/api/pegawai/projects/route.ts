@@ -102,7 +102,7 @@ export async function GET(request: Request) {
       let extraMemberProjects: any[] = [];
 
       // 5) Also include projects where current user is a member but project.team_id is null
-      const { data: memberProjectsNoTeam } = await (svc as any)
+      const { data: _memberProjectsNoTeam } = await (svc as any)
         .from("projects")
         .select(
           "id, nama_project, deskripsi, status, tanggal_mulai, deadline, leader_user_id, team_id",

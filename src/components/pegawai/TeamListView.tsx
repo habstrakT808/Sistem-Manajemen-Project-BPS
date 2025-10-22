@@ -44,7 +44,7 @@ async function fetchTeams(): Promise<TeamItem[]> {
 export default function TeamListView() {
   const router = useRouter();
   const { setActiveTeam } = useActiveTeam();
-  const { setActiveProject } = useActiveProject();
+  const { setActiveProject: _setActiveProject } = useActiveProject();
   const { user, userProfile, signOut } = useAuthContext();
 
   // Note: Removed automatic clearing of activeProject/activeTeam

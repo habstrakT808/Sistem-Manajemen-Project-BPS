@@ -316,7 +316,7 @@ export async function GET(request: Request) {
               scopedCompletedIds.length > 0 ? scopedCompletedIds : ["__none__"],
             );
 
-          const hasReview = new Set(
+          const _hasReview = new Set(
             (existingReviews || []).map(
               (r: any) => `${r.project_id}:${r.mitra_id}`,
             ),
@@ -324,7 +324,7 @@ export async function GET(request: Request) {
 
           // Count assignments without any review OR with review but rating is null
           const pendingFromAssignments = assignments.filter((a) => {
-            const key = `${a.project_id}:${a.assignee_id}`;
+            const _key = `${a.project_id}:${a.assignee_id}`;
             const match = (existingReviews || []).find(
               (r: any) =>
                 r.project_id === a.project_id && r.mitra_id === a.assignee_id,

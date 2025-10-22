@@ -189,7 +189,7 @@ export async function GET(request: NextRequest) {
     );
 
     // Calculate budget from tasks using new "Satuan" system
-    const { data: satuanTasks, error: satuanTasksError } =
+    const { data: satuanTasks, error: _satuanTasksError } =
       ownedProjectIds.length
         ? await (svc as any)
             .from("tasks")

@@ -93,8 +93,8 @@ interface PreferenceSettings {
 
 function SettingsPageContent() {
   const { user, signOut } = useAuth();
-  const { activeTeam } = useActiveTeam();
-  const router = useRouter();
+  const { activeTeam: _activeTeam } = useActiveTeam();
+  const _router = useRouter();
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
