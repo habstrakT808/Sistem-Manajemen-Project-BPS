@@ -38,6 +38,7 @@ export interface UserProfile {
   email: string;
   nama_lengkap: string;
   role: "admin" | "ketua_tim" | "pegawai";
+  nip?: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;

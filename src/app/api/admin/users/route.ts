@@ -23,7 +23,9 @@ export async function GET(request: NextRequest) {
 
     let query: any = (supabaseAdmin as any)
       .from("users")
-      .select("id, email, role, nama_lengkap, no_telepon, alamat, is_active");
+      .select(
+        "id, email, role, nama_lengkap, no_telepon, alamat, nip, is_active",
+      );
 
     if (role) {
       query = query.eq("role", role);
@@ -61,6 +63,7 @@ export async function POST(request: NextRequest) {
       nama_lengkap,
       no_telepon,
       alamat,
+      nip,
       is_active,
     } = body;
 
@@ -153,6 +156,7 @@ export async function POST(request: NextRequest) {
       nama_lengkap,
       no_telepon: no_telepon || null,
       alamat: alamat || null,
+      nip: nip || null,
       is_active: is_active !== undefined ? is_active : true,
     };
 
@@ -215,8 +219,16 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, email, role, nama_lengkap, no_telepon, alamat, is_active } =
-      body;
+    const {
+      id,
+      email,
+      role,
+      nama_lengkap,
+      no_telepon,
+      alamat,
+      nip,
+      is_active,
+    } = body;
 
     // Only require id for partial updates
     if (!id) {
@@ -248,6 +260,7 @@ export async function PUT(request: NextRequest) {
     if (nama_lengkap !== undefined) updateData.nama_lengkap = nama_lengkap;
     if (no_telepon !== undefined) updateData.no_telepon = no_telepon || null;
     if (alamat !== undefined) updateData.alamat = alamat || null;
+    if (nip !== undefined) updateData.nip = nip || null;
     if (typeof is_active === "boolean") updateData.is_active = is_active;
 
     // Update public.users table

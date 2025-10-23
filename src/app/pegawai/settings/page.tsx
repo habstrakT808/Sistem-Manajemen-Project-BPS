@@ -61,6 +61,7 @@ interface ProfileData {
   nama_lengkap: string;
   no_telepon?: string;
   alamat?: string;
+  nip?: string;
   avatar_url?: string;
   bio?: string;
   joined_date: string;
@@ -115,6 +116,7 @@ function SettingsPageContent() {
     nama_lengkap: "",
     no_telepon: "",
     alamat: "",
+    nip: "",
     bio: "",
   });
 
@@ -175,6 +177,7 @@ function SettingsPageContent() {
             nama_lengkap: profile.nama_lengkap || "",
             no_telepon: profile.no_telepon || "",
             alamat: profile.alamat || "",
+            nip: profile.nip || "",
             bio: profile.bio || "",
           });
         }
@@ -230,6 +233,7 @@ function SettingsPageContent() {
               nama_lengkap: profileForm.nama_lengkap,
               no_telepon: profileForm.no_telepon,
               alamat: profileForm.alamat,
+              nip: profileForm.nip,
               bio: profileForm.bio,
             }) as any,
         );
@@ -495,9 +499,14 @@ function SettingsPageContent() {
                 <h2 className="text-3xl font-bold mb-2">
                   {profileData?.nama_lengkap || "Profil Pegawai"}
                 </h2>
-                <p className="text-blue-100 text-lg mb-4">
+                <p className="text-blue-100 text-lg mb-2">
                   {profileData?.email || user?.email}
                 </p>
+                {profileData?.nip && (
+                  <p className="text-blue-200 text-base mb-4">
+                    NIP: {profileData.nip}
+                  </p>
+                )}
                 <div className="flex flex-wrap justify-center md:justify-start gap-4 text-sm text-blue-100">
                   <div className="flex items-center space-x-2">
                     <Calendar className="w-4 h-4" />
@@ -691,6 +700,27 @@ function SettingsPageContent() {
                       className="border-gray-200 rounded-xl h-12 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300"
                     />
                   </div>
+                  <div className="space-y-3">
+                    <Label
+                      htmlFor="nip"
+                      className="text-sm font-semibold text-gray-700"
+                    >
+                      NIP (Nomor Induk Pegawai)
+                    </Label>
+                    <Input
+                      id="nip"
+                      value={profileForm.nip}
+                      onChange={(e) =>
+                        setProfileForm((prev) => ({
+                          ...prev,
+                          nip: e.target.value,
+                        }))
+                      }
+                      disabled={!editingProfile}
+                      placeholder="Masukkan NIP (opsional)"
+                      className="border-gray-200 rounded-xl h-12 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300"
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-3">
@@ -728,6 +758,7 @@ function SettingsPageContent() {
                             nama_lengkap: profileData?.nama_lengkap || "",
                             no_telepon: profileData?.no_telepon || "",
                             alamat: profileData?.alamat || "",
+                            nip: profileData?.nip || "",
                             bio: profileData?.bio || "",
                           });
                         }}

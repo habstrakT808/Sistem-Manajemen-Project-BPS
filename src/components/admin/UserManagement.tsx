@@ -151,7 +151,8 @@ export function UserManagement() {
     const term = searchTerm.toLowerCase();
     return (
       (u.nama_lengkap || "").toLowerCase().includes(term) ||
-      (u.email || "").toLowerCase().includes(term)
+      (u.email || "").toLowerCase().includes(term) ||
+      (u.nip || "").toLowerCase().includes(term)
     );
   });
 
@@ -184,7 +185,7 @@ export function UserManagement() {
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
           <Input
-            placeholder="Cari pengguna..."
+            placeholder="Cari pengguna (nama, email, NIP)..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -209,6 +210,7 @@ export function UserManagement() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nama</TableHead>
+                <TableHead>NIP</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Peran</TableHead>
                 <TableHead>Proyek</TableHead>
@@ -244,9 +246,9 @@ export function UserManagement() {
                         <div className="font-semibold text-gray-900">
                           {user.nama_lengkap || "-"}
                         </div>
-                        <div className="text-sm text-gray-500">
-                          {user.email}
-                        </div>
+                      </TableCell>
+                      <TableCell className="text-gray-700">
+                        {user.nip || "-"}
                       </TableCell>
                       <TableCell className="text-gray-700">
                         {user.email}

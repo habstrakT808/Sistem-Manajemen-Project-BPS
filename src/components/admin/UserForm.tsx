@@ -40,6 +40,7 @@ interface FormData {
   nama_lengkap: string;
   no_telepon: string;
   alamat: string;
+  nip: string;
   is_active: boolean;
 }
 
@@ -51,6 +52,7 @@ export function UserForm({ user, onClose, onSuccess }: UserFormProps) {
     nama_lengkap: user?.nama_lengkap || "",
     no_telepon: user?.no_telepon || "",
     alamat: user?.alamat || "",
+    nip: user?.nip || "",
     is_active: user?.is_active ?? true,
   });
   const [showPassword, setShowPassword] = useState(false);
@@ -77,6 +79,7 @@ export function UserForm({ user, onClose, onSuccess }: UserFormProps) {
             nama_lengkap: formData.nama_lengkap,
             no_telepon: formData.no_telepon || null,
             alamat: formData.alamat || null,
+            nip: formData.nip || null,
             is_active: formData.is_active,
           }),
         });
@@ -103,6 +106,7 @@ export function UserForm({ user, onClose, onSuccess }: UserFormProps) {
             nama_lengkap: formData.nama_lengkap,
             no_telepon: formData.no_telepon || null,
             alamat: formData.alamat || null,
+            nip: formData.nip || null,
             is_active: formData.is_active,
           }),
         });
@@ -216,6 +220,19 @@ export function UserForm({ user, onClose, onSuccess }: UserFormProps) {
                     setFormData({ ...formData, nama_lengkap: e.target.value })
                   }
                   required
+                />
+              </div>
+
+              {/* NIP */}
+              <div className="space-y-2">
+                <Label htmlFor="nip">NIP (Nomor Induk Pegawai)</Label>
+                <Input
+                  id="nip"
+                  value={formData.nip}
+                  onChange={(e) =>
+                    setFormData({ ...formData, nip: e.target.value })
+                  }
+                  placeholder="Masukkan NIP (opsional)"
                 />
               </div>
 

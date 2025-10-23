@@ -12,6 +12,7 @@ const ProfileUpdateSchema = z.object({
   nama_lengkap: z.string().min(1, "Name is required").max(100),
   no_telepon: z.string().optional(),
   alamat: z.string().optional(),
+  nip: z.string().optional(),
   bio: z.string().max(500, "Bio must be less than 500 characters").optional(),
 });
 
@@ -58,6 +59,7 @@ export async function GET() {
         nama_lengkap,
         no_telepon,
         alamat,
+        nip,
         created_at,
         updated_at
       `,
@@ -72,6 +74,7 @@ export async function GET() {
             | "nama_lengkap"
             | "no_telepon"
             | "alamat"
+            | "nip"
             | "created_at"
             | "updated_at"
           > & {})
@@ -186,6 +189,7 @@ export async function PUT(request: NextRequest) {
       nama_lengkap: validatedData.nama_lengkap,
       no_telepon: normalizedPhone,
       alamat: normalizedAlamat,
+      nip: validatedData.nip || null,
       updated_at: new Date().toISOString(),
     };
 
@@ -205,7 +209,7 @@ export async function PUT(request: NextRequest) {
       throw new Error(updateError.message);
     }
 
-    // Update metadata mirror fields (bio, nama_lengkap, no_telepon, alamat)
+    // Update metadata mirror fields (bio, nama_lengkap, no_telepon, alamat, nip)
     const { error: metadataError } = await supabase.auth.updateUser({
       data: {
         ...user.user_metadata,
@@ -215,6 +219,7 @@ export async function PUT(request: NextRequest) {
           : {}),
         ...(normalizedPhone ? { no_telepon: normalizedPhone } : {}),
         ...(normalizedAlamat ? { alamat: normalizedAlamat } : {}),
+        ...(validatedData.nip ? { nip: validatedData.nip } : {}),
       },
     });
 

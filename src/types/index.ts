@@ -13,6 +13,7 @@ export interface User {
   nama_lengkap: string;
   no_telepon?: string;
   alamat?: string;
+  nip?: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -240,6 +241,7 @@ export interface CreateUserForm {
   nama_lengkap: string;
   no_telepon?: string;
   alamat?: string;
+  nip?: string;
 }
 
 export interface TransportAllocationForm {

@@ -12,6 +12,7 @@ const ProfileUpdateSchema = z.object({
   nama_lengkap: z.string().min(1, "Name is required").max(100),
   no_telepon: z.string().optional(),
   alamat: z.string().optional(),
+  nip: z.string().optional(),
   bio: z.string().max(500, "Bio must be less than 500 characters").optional(),
   position: z.string().optional(),
   department: z.string().optional(),
@@ -113,6 +114,7 @@ export async function GET() {
         nama_lengkap,
         no_telepon,
         alamat,
+        nip,
         created_at,
         updated_at
       `,
@@ -127,6 +129,7 @@ export async function GET() {
             | "nama_lengkap"
             | "no_telepon"
             | "alamat"
+            | "nip"
             | "created_at"
             | "updated_at"
           > & {})
@@ -299,6 +302,7 @@ export async function PUT(request: NextRequest) {
           nama_lengkap: validatedData.nama_lengkap,
           no_telepon: normalizedPhone,
           alamat: normalizedAlamat,
+          nip: validatedData.nip || null,
           updated_at: new Date().toISOString(),
         } as any;
 
@@ -332,6 +336,7 @@ export async function PUT(request: NextRequest) {
               ? { no_telepon: validatedData.no_telepon }
               : {}),
             ...(validatedData.alamat ? { alamat: validatedData.alamat } : {}),
+            ...(validatedData.nip ? { nip: validatedData.nip } : {}),
             ...(validatedData.position
               ? { position: validatedData.position }
               : {}),

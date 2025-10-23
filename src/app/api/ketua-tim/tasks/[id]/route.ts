@@ -348,14 +348,15 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
               ? (body as any).rate_per_satuan
               : (task as any).rate_per_satuan || 0;
 
-          if (newVolume > 0 && newRatePerSatuan > 0) {
-            // Cancel existing allocations
-            await (svc as any)
-              .from("task_transport_allocations")
-              .update({ canceled_at: new Date().toISOString() })
-              .eq("task_id", taskId)
-              .is("canceled_at", null);
+          // Always cancel existing allocations first
+          await (svc as any)
+            .from("task_transport_allocations")
+            .update({ canceled_at: new Date().toISOString() })
+            .eq("task_id", taskId)
+            .is("canceled_at", null);
 
+          // Only create new allocations if volume > 0 and rate > 0
+          if (newVolume > 0 && newRatePerSatuan > 0) {
             // Create new allocations based on new volume
             const transportAllocations = [];
             for (let i = 0; i < newVolume; i++) {

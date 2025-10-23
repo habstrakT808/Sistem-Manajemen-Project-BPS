@@ -154,10 +154,10 @@ interface TaskFormData {
   transport_days: number;
   has_transport: boolean;
   honor_amount: number;
-  // New fields for satuan system
+  // New fields for satuan system - can be string for empty values
   satuan_id: string;
-  rate_per_satuan: number;
-  volume: number;
+  rate_per_satuan: number | string; // Allow string for empty input
+  volume: number | string; // Allow string for empty input
 }
 
 const initialFormData: TaskFormData = {
@@ -173,10 +173,10 @@ const initialFormData: TaskFormData = {
   transport_days: 0,
   has_transport: false,
   honor_amount: 0,
-  // New fields for satuan system
+  // New fields for satuan system - empty by default for no transport
   satuan_id: "",
-  rate_per_satuan: 0,
-  volume: 1,
+  rate_per_satuan: "", // Empty string for no transport
+  volume: "", // Empty string for no transport
 };
 
 // Debug log for initial form data
@@ -528,7 +528,16 @@ export default function TaskManagement() {
         const tasksToCreate = formData.assignee_mitra_ids.map((mitraId) => ({
           ...formData,
           assignee_mitra_id: mitraId,
-          assignee_user_id: "", // Clear user_id for mitra tasks
+          assignee_user_id: null, // Clear user_id for mitra tasks
+          satuan_id: formData.satuan_id || null,
+          rate_per_satuan:
+            typeof formData.rate_per_satuan === "string"
+              ? parseFloat(formData.rate_per_satuan) || 0
+              : formData.rate_per_satuan,
+          volume:
+            typeof formData.volume === "string"
+              ? parseFloat(formData.volume) || 0
+              : formData.volume,
         }));
 
         // Create tasks sequentially to handle errors properly
@@ -555,10 +564,25 @@ export default function TaskManagement() {
         );
       } else {
         // Single task creation (for member or single mitra)
+        const taskData = {
+          ...formData,
+          assignee_user_id: formData.assignee_user_id || null,
+          assignee_mitra_id: formData.assignee_mitra_id || null,
+          satuan_id: formData.satuan_id || null,
+          rate_per_satuan:
+            typeof formData.rate_per_satuan === "string"
+              ? parseFloat(formData.rate_per_satuan) || 0
+              : formData.rate_per_satuan,
+          volume:
+            typeof formData.volume === "string"
+              ? parseFloat(formData.volume) || 0
+              : formData.volume,
+        };
+
         const response = await fetch("/api/ketua-tim/tasks", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
+          body: JSON.stringify(taskData),
         });
 
         const result = await response.json();
@@ -621,7 +645,15 @@ export default function TaskManagement() {
       formData.assignee_type === "mitra" &&
       formData.assignee_mitra_ids.length > 0
     ) {
-      const totalAmount = formData.rate_per_satuan * formData.volume;
+      const rate =
+        typeof formData.rate_per_satuan === "string"
+          ? parseFloat(formData.rate_per_satuan) || 0
+          : formData.rate_per_satuan;
+      const volume =
+        typeof formData.volume === "string"
+          ? parseFloat(formData.volume) || 0
+          : formData.volume;
+      const totalAmount = rate * volume;
 
       // Check each selected mitra for limit
       for (const mitraId of formData.assignee_mitra_ids) {
@@ -667,19 +699,32 @@ export default function TaskManagement() {
     }
 
     // Validate satuan system
-    if (!formData.satuan_id) {
-      toast.error("Pilih satuan untuk tugas ini");
-      return;
-    }
+    // Check if transport is required (if satuan is selected or rate/volume is filled)
+    const rate =
+      typeof formData.rate_per_satuan === "string"
+        ? parseFloat(formData.rate_per_satuan) || 0
+        : formData.rate_per_satuan;
+    const volume =
+      typeof formData.volume === "string"
+        ? parseFloat(formData.volume) || 0
+        : formData.volume;
+    const hasTransport = formData.satuan_id || rate > 0 || volume > 0;
 
-    if (formData.rate_per_satuan < 0) {
-      toast.error("Rate per satuan tidak boleh negatif");
-      return;
-    }
+    if (hasTransport) {
+      if (!formData.satuan_id) {
+        toast.error("Pilih satuan untuk tugas dengan transport");
+        return;
+      }
 
-    if (formData.volume < 1) {
-      toast.error("Volume harus minimal 1");
-      return;
+      if (rate < 0) {
+        toast.error("Rate per satuan tidak boleh negatif");
+        return;
+      }
+
+      if (volume < 1) {
+        toast.error("Volume harus minimal 1 untuk transport");
+        return;
+      }
     }
 
     const taskDuration =
@@ -705,11 +750,50 @@ export default function TaskManagement() {
     setIsViewDialogOpen(true);
   };
 
+  const handleCompleteTask = async (taskId: string) => {
+    try {
+      const response = await fetch(`/api/ketua-tim/tasks/${taskId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "completed" }),
+      });
+
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || "Failed to complete task");
+      }
+
+      toast.success("Task berhasil diselesaikan!");
+
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["ketua", "dashboard"] });
+    } catch (error) {
+      console.error("Complete task error:", error);
+      toast.error("Gagal menyelesaikan task");
+    }
+  };
+
   const handleEditTask = (task: TaskData) => {
     setSelectedTask(task);
 
     // Determine assignee_type based on existing data
     const assigneeType = task.assignee_mitra_id ? "mitra" : "member";
+
+    console.log("🔧 DEBUG: handleEditTask - task.volume:", task.volume);
+    console.log(
+      "🔧 DEBUG: handleEditTask - task.rate_per_satuan:",
+      task.rate_per_satuan,
+    );
+    console.log("🔧 DEBUG: handleEditTask - task.assignee_type:", assigneeType);
+    console.log(
+      "🔧 DEBUG: handleEditTask - task.assignee_mitra_id:",
+      task.assignee_mitra_id,
+    );
+    console.log(
+      "🔧 DEBUG: handleEditTask - task.assignee_user_id:",
+      task.assignee_user_id,
+    );
 
     setFormData({
       project_id: task.project_id,
@@ -726,11 +810,19 @@ export default function TaskManagement() {
       transport_days: task.transport_days || 0,
       has_transport: task.has_transport || false,
       honor_amount: task.honor_amount || 0,
-      // New fields for satuan system
+      // New fields for satuan system - use empty string if null or 0
       satuan_id: task.satuan_id || "",
-      rate_per_satuan: task.rate_per_satuan || 0,
-      volume: task.volume || 1,
+      rate_per_satuan:
+        task.rate_per_satuan && task.rate_per_satuan > 0
+          ? task.rate_per_satuan
+          : "",
+      volume: task.volume && task.volume > 0 ? task.volume : "",
     });
+
+    console.log(
+      "🔧 DEBUG: handleEditTask - formData.volume after set:",
+      formData.volume,
+    );
 
     // Check transport allocation status for pegawai
     if (assigneeType === "member") {
@@ -747,10 +839,26 @@ export default function TaskManagement() {
 
     setUpdating(true);
     try {
+      const taskData = {
+        ...formData,
+        // Remove empty string UUIDs to prevent UUID error
+        assignee_user_id: formData.assignee_user_id || null,
+        assignee_mitra_id: formData.assignee_mitra_id || null,
+        satuan_id: formData.satuan_id || null,
+        rate_per_satuan:
+          typeof formData.rate_per_satuan === "string"
+            ? parseFloat(formData.rate_per_satuan) || 0
+            : formData.rate_per_satuan,
+        volume:
+          typeof formData.volume === "string"
+            ? parseFloat(formData.volume) || 0
+            : formData.volume,
+      };
+
       const response = await fetch(`/api/ketua-tim/tasks/${selectedTask.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(taskData),
       });
 
       const result = await response.json();
@@ -787,9 +895,20 @@ export default function TaskManagement() {
     if (formData.assignee_type === "member" && transportAllocated) {
       // Check if transport fields are being changed
       const originalTask = selectedTask;
+      const originalRate = originalTask.rate_per_satuan || 0;
+      const originalVolume = originalTask.volume || 0;
+      const currentRate =
+        typeof formData.rate_per_satuan === "string"
+          ? parseFloat(formData.rate_per_satuan) || 0
+          : formData.rate_per_satuan;
+      const currentVolume =
+        typeof formData.volume === "string"
+          ? parseFloat(formData.volume) || 0
+          : formData.volume;
+
       const hasTransportChanges =
-        formData.rate_per_satuan !== (originalTask.rate_per_satuan || 0) ||
-        formData.volume !== (originalTask.volume || 1) ||
+        currentRate !== originalRate ||
+        currentVolume !== originalVolume ||
         formData.satuan_id !== (originalTask.satuan_id || "");
 
       if (hasTransportChanges) {
@@ -801,9 +920,19 @@ export default function TaskManagement() {
     // Check mitra limit for mitra assignments if honor amount changed
     if (formData.assignee_type === "mitra" && formData.assignee_mitra_id) {
       const originalTask = selectedTask;
-      const originalAmount =
-        (originalTask.rate_per_satuan || 0) * (originalTask.volume || 1);
-      const newAmount = formData.rate_per_satuan * formData.volume;
+      const originalRate = originalTask.rate_per_satuan || 0;
+      const originalVolume = originalTask.volume || 0;
+      const currentRate =
+        typeof formData.rate_per_satuan === "string"
+          ? parseFloat(formData.rate_per_satuan) || 0
+          : formData.rate_per_satuan;
+      const currentVolume =
+        typeof formData.volume === "string"
+          ? parseFloat(formData.volume) || 0
+          : formData.volume;
+
+      const originalAmount = originalRate * originalVolume;
+      const newAmount = currentRate * currentVolume;
 
       // Only check limit if amount increased
       if (newAmount > originalAmount) {
@@ -1493,11 +1622,10 @@ export default function TaskManagement() {
                             onChange={(e) =>
                               setFormData((prev) => ({
                                 ...prev,
-                                rate_per_satuan:
-                                  parseFloat(e.target.value) || 0,
+                                rate_per_satuan: e.target.value,
                               }))
                             }
-                            placeholder="150000"
+                            placeholder=""
                             className="text-center"
                           />
                         </div>
@@ -1520,15 +1648,15 @@ export default function TaskManagement() {
                           <Input
                             id="volume"
                             type="number"
-                            min="1"
+                            min="0"
                             value={formData.volume}
                             onChange={(e) =>
                               setFormData((prev) => ({
                                 ...prev,
-                                volume: parseInt(e.target.value) || 1,
+                                volume: e.target.value,
                               }))
                             }
-                            placeholder="1"
+                            placeholder=""
                             className="text-center"
                           />
                         </div>
@@ -1546,17 +1674,35 @@ export default function TaskManagement() {
                           Total Nilai
                         </div>
                         <div className="text-sm text-gray-500">
-                          {formatCurrency(formData.rate_per_satuan)} ×{" "}
-                          {formData.volume} ={" "}
-                          {formatCurrency(
-                            formData.rate_per_satuan * formData.volume,
-                          )}
+                          {(() => {
+                            const rate =
+                              typeof formData.rate_per_satuan === "string"
+                                ? parseFloat(formData.rate_per_satuan) || 0
+                                : formData.rate_per_satuan;
+                            const volume =
+                              typeof formData.volume === "string"
+                                ? parseFloat(formData.volume) || 0
+                                : formData.volume;
+                            const total = rate * volume;
+                            return total > 0
+                              ? `${formatCurrency(rate)} × ${volume} = ${formatCurrency(total)}`
+                              : "";
+                          })()}
                         </div>
                       </div>
                       <div className="text-lg font-bold text-purple-600">
-                        {formatCurrency(
-                          formData.rate_per_satuan * formData.volume,
-                        )}
+                        {(() => {
+                          const rate =
+                            typeof formData.rate_per_satuan === "string"
+                              ? parseFloat(formData.rate_per_satuan) || 0
+                              : formData.rate_per_satuan;
+                          const volume =
+                            typeof formData.volume === "string"
+                              ? parseFloat(formData.volume) || 0
+                              : formData.volume;
+                          const total = rate * volume;
+                          return total > 0 ? formatCurrency(total) : "";
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -1817,20 +1963,22 @@ export default function TaskManagement() {
                               </span>
                             </Badge>
 
-                            {hasActiveTransport && (
-                              <Badge className="bg-white text-gray-800 border-gray-200 flex items-center space-x-1">
-                                <DollarSign className="w-3 h-3" />
-                                <span>
-                                  Transport:{" "}
-                                  {formatCurrency(
-                                    calculateTransportAmount(task),
-                                  )}
-                                </span>
-                              </Badge>
-                            )}
+                            {hasActiveTransport &&
+                              calculateTransportAmount(task) > 0 && (
+                                <Badge className="bg-white text-gray-800 border-gray-200 flex items-center space-x-1">
+                                  <DollarSign className="w-3 h-3" />
+                                  <span>
+                                    Transport:{" "}
+                                    {formatCurrency(
+                                      calculateTransportAmount(task),
+                                    )}
+                                  </span>
+                                </Badge>
+                              )}
 
                             {task.assignee_type === "mitra" &&
-                              (task.honor_amount || task.total_amount) && (
+                              (task.honor_amount || task.total_amount) &&
+                              (task.total_amount || 0) > 0 && (
                                 <Badge className="bg-purple-100 text-purple-800 border-purple-200 flex items-center space-x-1">
                                   <Building2 className="w-3 h-3" />
                                   <span>
@@ -1903,7 +2051,8 @@ export default function TaskManagement() {
 
                           {/* Honor Amount for Mitra Tasks */}
                           {task.assignee_type === "mitra" &&
-                            (task.honor_amount || task.total_amount) && (
+                            (task.honor_amount || task.total_amount) &&
+                            (task.total_amount || 0) > 0 && (
                               <div className="mb-4 p-3 rounded-lg border border-gray-200">
                                 <div className="flex items-center justify-between">
                                   <div>
@@ -1927,40 +2076,41 @@ export default function TaskManagement() {
                             )}
 
                           {/* Transport Status */}
-                          {hasActiveTransport && (
-                            <div className="mt-4 p-3 rounded-lg border border-gray-200">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <div className="text-sm font-medium text-gray-900 flex items-center">
-                                    <MapPin className="w-4 h-4 mr-2" />
-                                    Alokasi Transport
+                          {hasActiveTransport &&
+                            calculateTransportAmount(task) > 0 && (
+                              <div className="mt-4 p-3 rounded-lg border border-gray-200">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <div className="text-sm font-medium text-gray-900 flex items-center">
+                                      <MapPin className="w-4 h-4 mr-2" />
+                                      Alokasi Transport
+                                    </div>
+                                    <div className="text-sm text-gray-700 mt-1">
+                                      {transportAllocation?.allocation_date
+                                        ? `Dialokasikan untuk: ${new Date(transportAllocation.allocation_date).toLocaleDateString("id-ID")}`
+                                        : "Menunggu pemilihan tanggal"}
+                                    </div>
                                   </div>
-                                  <div className="text-sm text-gray-700 mt-1">
-                                    {transportAllocation?.allocation_date
-                                      ? `Dialokasikan untuk: ${new Date(transportAllocation.allocation_date).toLocaleDateString("id-ID")}`
-                                      : "Menunggu pemilihan tanggal"}
+                                  <div className="flex items-center space-x-2">
+                                    <div className="text-sm font-semibold text-gray-800">
+                                      {formatCurrency(
+                                        calculateTransportAmount(task),
+                                      )}
+                                    </div>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() =>
+                                        handleCancelTransport(task.id)
+                                      }
+                                      className="border-red-200 text-red-600 hover:bg-red-50"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </Button>
                                   </div>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                  <div className="text-sm font-semibold text-gray-800">
-                                    {formatCurrency(
-                                      calculateTransportAmount(task),
-                                    )}
-                                  </div>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() =>
-                                      handleCancelTransport(task.id)
-                                    }
-                                    className="border-red-200 text-red-600 hover:bg-red-50"
-                                  >
-                                    <X className="w-3 h-3" />
-                                  </Button>
                                 </div>
                               </div>
-                            </div>
-                          )}
+                            )}
 
                           {task.response_pegawai && (
                             <div className="mt-4 p-3 bg-blue-50 rounded-lg">
@@ -1993,6 +2143,19 @@ export default function TaskManagement() {
                             <Edit className="w-4 h-4 mr-1" />
                             Ubah
                           </Button>
+                          {/* Tombol Selesai untuk task mitra */}
+                          {task.assignee_type === "mitra" &&
+                            task.status !== "completed" && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="border-emerald-200 text-emerald-600 hover:bg-emerald-50"
+                                onClick={() => handleCompleteTask(task.id)}
+                              >
+                                <CheckCircle2 className="w-4 h-4 mr-1" />
+                                Selesai
+                              </Button>
+                            )}
                           <Button
                             variant="outline"
                             size="sm"
@@ -2143,49 +2306,52 @@ export default function TaskManagement() {
                       selectedTask.rate_per_satuan &&
                       selectedTask.volume &&
                       selectedTask.rate_per_satuan > 0 &&
-                      selectedTask.volume > 0)) && (
-                    <div>
-                      <Label className="text-sm font-medium text-gray-500">
-                        Alokasi Transport
-                      </Label>
-                      <div className="mt-1 p-3 bg-green-50 rounded-lg border border-green-200">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="text-sm font-medium text-green-900">
-                              Jumlah:{" "}
-                              {formatCurrency(
-                                calculateTransportAmount(selectedTask),
-                              )}
+                      selectedTask.volume > 0)) &&
+                    calculateTransportAmount(selectedTask) > 0 && (
+                      <div>
+                        <Label className="text-sm font-medium text-gray-500">
+                          Alokasi Transport
+                        </Label>
+                        <div className="mt-1 p-3 bg-green-50 rounded-lg border border-green-200">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-sm font-medium text-green-900">
+                                Jumlah:{" "}
+                                {formatCurrency(
+                                  calculateTransportAmount(selectedTask),
+                                )}
+                              </div>
+                              {selectedTask.rate_per_satuan &&
+                                selectedTask.volume && (
+                                  <div className="text-sm text-green-700">
+                                    Perhitungan:{" "}
+                                    {formatCurrency(
+                                      selectedTask.rate_per_satuan,
+                                    )}{" "}
+                                    × {selectedTask.volume} ={" "}
+                                    {formatCurrency(
+                                      selectedTask.rate_per_satuan *
+                                        selectedTask.volume,
+                                    )}
+                                  </div>
+                                )}
+                              <div className="text-sm text-green-700">
+                                {selectedTask.task_transport_allocations?.[0]
+                                  ?.allocation_date
+                                  ? `Tanggal: ${new Date(selectedTask.task_transport_allocations[0].allocation_date).toLocaleDateString("id-ID")}`
+                                  : "Menunggu pemilihan tanggal"}
+                              </div>
                             </div>
-                            {selectedTask.rate_per_satuan &&
-                              selectedTask.volume && (
-                                <div className="text-sm text-green-700">
-                                  Perhitungan:{" "}
-                                  {formatCurrency(selectedTask.rate_per_satuan)}{" "}
-                                  × {selectedTask.volume} ={" "}
-                                  {formatCurrency(
-                                    selectedTask.rate_per_satuan *
-                                      selectedTask.volume,
-                                  )}
-                                </div>
-                              )}
-                            <div className="text-sm text-green-700">
+                            <Badge className="bg-green-100 text-green-800">
                               {selectedTask.task_transport_allocations?.[0]
-                                ?.allocation_date
-                                ? `Tanggal: ${new Date(selectedTask.task_transport_allocations[0].allocation_date).toLocaleDateString("id-ID")}`
-                                : "Menunggu pemilihan tanggal"}
-                            </div>
+                                ?.canceled_at
+                                ? "Dibatalkan"
+                                : "Aktif"}
+                            </Badge>
                           </div>
-                          <Badge className="bg-green-100 text-green-800">
-                            {selectedTask.task_transport_allocations?.[0]
-                              ?.canceled_at
-                              ? "Dibatalkan"
-                              : "Aktif"}
-                          </Badge>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
                   {selectedTask.response_pegawai && (
                     <div>
@@ -2533,10 +2699,10 @@ export default function TaskManagement() {
                         onChange={(e) =>
                           setFormData((prev) => ({
                             ...prev,
-                            rate_per_satuan: parseFloat(e.target.value) || 0,
+                            rate_per_satuan: e.target.value,
                           }))
                         }
-                        placeholder="150000"
+                        placeholder=""
                         className="text-center"
                         disabled={
                           formData.assignee_type === "member" &&
@@ -2598,15 +2764,15 @@ export default function TaskManagement() {
                       <Input
                         id="edit-volume"
                         type="number"
-                        min="1"
+                        min="0"
                         value={formData.volume}
                         onChange={(e) =>
                           setFormData((prev) => ({
                             ...prev,
-                            volume: parseInt(e.target.value) || 1,
+                            volume: e.target.value,
                           }))
                         }
-                        placeholder="1"
+                        placeholder=""
                         className="text-center"
                         disabled={
                           formData.assignee_type === "member" &&
@@ -2644,15 +2810,35 @@ export default function TaskManagement() {
                       Total Nilai
                     </div>
                     <div className="text-sm text-gray-500">
-                      {formatCurrency(formData.rate_per_satuan)} ×{" "}
-                      {formData.volume} ={" "}
-                      {formatCurrency(
-                        formData.rate_per_satuan * formData.volume,
-                      )}
+                      {(() => {
+                        const rate =
+                          typeof formData.rate_per_satuan === "string"
+                            ? parseFloat(formData.rate_per_satuan) || 0
+                            : formData.rate_per_satuan;
+                        const volume =
+                          typeof formData.volume === "string"
+                            ? parseFloat(formData.volume) || 0
+                            : formData.volume;
+                        const total = rate * volume;
+                        return total > 0
+                          ? `${formatCurrency(rate)} × ${volume} = ${formatCurrency(total)}`
+                          : "";
+                      })()}
                     </div>
                   </div>
                   <div className="text-lg font-bold text-purple-600">
-                    {formatCurrency(formData.rate_per_satuan * formData.volume)}
+                    {(() => {
+                      const rate =
+                        typeof formData.rate_per_satuan === "string"
+                          ? parseFloat(formData.rate_per_satuan) || 0
+                          : formData.rate_per_satuan;
+                      const volume =
+                        typeof formData.volume === "string"
+                          ? parseFloat(formData.volume) || 0
+                          : formData.volume;
+                      const total = rate * volume;
+                      return total > 0 ? formatCurrency(total) : "";
+                    })()}
                   </div>
                 </div>
               </div>

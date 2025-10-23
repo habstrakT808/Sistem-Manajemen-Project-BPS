@@ -62,6 +62,7 @@ interface ProfileData {
   nama_lengkap: string;
   no_telepon?: string;
   alamat?: string;
+  nip?: string;
   avatar_url?: string;
   bio?: string;
   skills?: string[];
@@ -112,6 +113,7 @@ function ProfilePageInner() {
     nama_lengkap: "",
     no_telepon: "",
     alamat: "",
+    nip: "",
     bio: "",
   });
 
@@ -184,6 +186,7 @@ function ProfilePageInner() {
         nama_lengkap: result.profile.nama_lengkap || "",
         no_telepon: result.profile.no_telepon || "",
         alamat: result.profile.alamat || "",
+        nip: result.profile.nip || "",
         bio: result.profile.bio || "",
       });
     } catch (error) {
@@ -596,6 +599,25 @@ function ProfilePageInner() {
                     />
                   </div>
                   <div>
+                    <Label htmlFor="nip">NIP (Nomor Induk Pegawai)</Label>
+                    <Input
+                      id="nip"
+                      value={profileForm.nip || ""}
+                      onChange={(e) =>
+                        setProfileForm((prev) => ({
+                          ...prev,
+                          nip: e.target.value,
+                        }))
+                      }
+                      disabled={!editingProfile}
+                      className="mt-2"
+                      placeholder="Masukkan NIP (opsional)"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
                     <Label htmlFor="email">Alamat Email</Label>
                     <Input
                       id="email"
@@ -688,6 +710,7 @@ function ProfilePageInner() {
                           nama_lengkap: profileData.nama_lengkap || "",
                           no_telepon: profileData.no_telepon || "",
                           alamat: profileData.alamat || "",
+                          nip: profileData.nip || "",
                           bio: profileData.bio || "",
                         });
                       }}

@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
       // New fields for satuan system
       satuan_id: body.satuan_id,
       rate_per_satuan: body.rate_per_satuan || 0,
-      volume: body.volume || 1,
+      volume: body.volume || 0,
     };
 
     // Extract title separately to avoid confusion
@@ -395,8 +395,18 @@ export async function GET(request: NextRequest) {
       // Determine assignee_type based on which ID is filled
       const assignee_type = t.assignee_mitra_id ? "mitra" : "member";
 
-      return {
+      // Clean up zero values for transport fields
+      const cleanedTask = {
         ...t,
+        volume: t.volume && t.volume > 0 ? t.volume : null,
+        rate_per_satuan:
+          t.rate_per_satuan && t.rate_per_satuan > 0 ? t.rate_per_satuan : null,
+        total_amount:
+          t.total_amount && t.total_amount > 0 ? t.total_amount : null,
+      };
+
+      return {
+        ...cleanedTask,
         assignee_type,
         projects: idToProject.get(t.project_id) || {
           id: t.project_id,

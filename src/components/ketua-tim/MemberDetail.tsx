@@ -41,6 +41,7 @@ interface MemberDetailData {
     email: string;
     no_telepon: string | null;
     alamat: string | null;
+    nip: string | null;
     is_active: boolean;
     created_at: string;
   };
@@ -423,7 +424,7 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
           </div>
         </div>
         <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
                 <Mail className="w-5 h-5 text-white" />
@@ -456,6 +457,18 @@ export default function MemberDetail({ memberId }: MemberDetailProps) {
                 <div className="text-sm font-medium text-gray-600">Alamat</div>
                 <div className="font-semibold text-gray-900">
                   {personal_info.alamat || "Tidak disediakan"}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
+                <User className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <div className="text-sm font-medium text-gray-600">NIP</div>
+                <div className="font-semibold text-gray-900">
+                  {personal_info.nip || "Tidak disediakan"}
                 </div>
               </div>
             </div>

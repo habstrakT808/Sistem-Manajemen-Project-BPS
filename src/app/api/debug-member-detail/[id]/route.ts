@@ -17,7 +17,7 @@ export async function GET(
     const { data: memberInfo, error: memberError } = await serviceClient
       .from("users")
       .select(
-        "id, nama_lengkap, email, no_telepon, alamat, is_active, created_at, role",
+        "id, nama_lengkap, email, no_telepon, alamat, nip, is_active, created_at, role",
       )
       .eq("id", memberId)
       .single();

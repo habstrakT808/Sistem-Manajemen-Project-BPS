@@ -17,6 +17,7 @@ export type Database = {
           nama_lengkap: string;
           no_telepon: string | null;
           alamat: string | null;
+          nip: string | null;
           is_active: boolean;
           created_at: string;
           updated_at: string;
@@ -28,6 +29,7 @@ export type Database = {
           nama_lengkap: string;
           no_telepon?: string | null;
           alamat?: string | null;
+          nip?: string | null;
           is_active?: boolean;
           created_at?: string;
           updated_at?: string;
@@ -39,6 +41,7 @@ export type Database = {
           nama_lengkap?: string;
           no_telepon?: string | null;
           alamat?: string | null;
+          nip?: string | null;
           is_active?: boolean;
           created_at?: string;
           updated_at?: string;

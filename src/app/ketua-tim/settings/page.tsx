@@ -57,6 +57,7 @@ interface ProfileData {
   nama_lengkap: string;
   no_telepon?: string;
   alamat?: string;
+  nip?: string;
   avatar_url?: string;
   bio?: string;
   joined_date: string;
@@ -115,6 +116,7 @@ export default function KetuaTimSettingsPage() {
     nama_lengkap: "",
     no_telepon: "",
     alamat: "",
+    nip: "",
     bio: "",
     position: "",
     department: "",
@@ -202,6 +204,7 @@ export default function KetuaTimSettingsPage() {
           nama_lengkap: profile.nama_lengkap || "",
           no_telepon: profile.no_telepon || "",
           alamat: profile.alamat || "",
+          nip: profile.nip || "",
           bio: profile.bio || "",
           position: (profile as any).position || "",
           department: (profile as any).department || "",
@@ -278,6 +281,7 @@ export default function KetuaTimSettingsPage() {
             nama_lengkap: profileForm.nama_lengkap,
             no_telepon: profileForm.no_telepon,
             alamat: profileForm.alamat,
+            nip: profileForm.nip,
           }) as any,
       );
       setEditingProfile(false);
@@ -731,6 +735,27 @@ export default function KetuaTimSettingsPage() {
                       className="border-gray-200 rounded-xl h-12 focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-300"
                     />
                   </div>
+                  <div className="space-y-3">
+                    <Label
+                      htmlFor="nip"
+                      className="text-sm font-semibold text-gray-700"
+                    >
+                      NIP (Nomor Induk Pegawai)
+                    </Label>
+                    <Input
+                      id="nip"
+                      value={profileForm.nip}
+                      onChange={(e) =>
+                        setProfileForm((prev) => ({
+                          ...prev,
+                          nip: e.target.value,
+                        }))
+                      }
+                      disabled={!editingProfile}
+                      placeholder="Masukkan NIP (opsional)"
+                      className="border-gray-200 rounded-xl h-12 focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-300"
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-3">
@@ -768,6 +793,7 @@ export default function KetuaTimSettingsPage() {
                             nama_lengkap: profileData?.nama_lengkap || "",
                             no_telepon: profileData?.no_telepon || "",
                             alamat: profileData?.alamat || "",
+                            nip: profileData?.nip || "",
                             bio: profileData?.bio || "",
                             position: profileData?.position || "",
                             department: profileData?.department || "",
