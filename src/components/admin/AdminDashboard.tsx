@@ -20,6 +20,7 @@ import {
   Activity,
   ArrowRight,
   Zap,
+  FileText,
 } from "lucide-react";
 import Link from "next/link";
 import { useAuthContext } from "@/components/auth/AuthProvider";
@@ -188,6 +189,13 @@ export default function AdminDashboard() {
       icon: Building2,
       href: "/admin/mitra",
       color: "from-purple-500 to-purple-600",
+    },
+    {
+      title: "Generate Surat",
+      description: "Buat surat SK dan dokumen lainnya",
+      icon: FileText,
+      href: "/admin/export",
+      color: "from-cyan-500 to-cyan-600",
     },
     {
       title: "Lihat Analitik",

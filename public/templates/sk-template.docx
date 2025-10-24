@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r>
+        <w:t>KEPUTUSAN</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:r>
+        <w:t>KEPALA BADAN PUSAT STATISTIK {kotaKabupaten}</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:r>
+        <w:t>NOMOR : {nomorSK}</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:r>
+        <w:t>TENTANG</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:r>
+        <w:t>TIM PELAKSANA PENDATAAN {projectName} TAHUN {projectYear}</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:r>
+        <w:t>BADAN PUSAT STATISTIK {kotaKabupaten}</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:r>
+        <w:t>TAHUN ANGGARAN {projectYear}</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:r>
+        <w:t>KEPALA BADAN PUSAT STATISTIK {kotaKabupaten}</w:t>
+      </w:r>
+    </w:p>
+  </w:body>
+</w:document>

@@ -8,3 +8,4 @@ export { default as SystemAnalytics } from "./SystemAnalytics";
 export { default as SystemSettings } from "./SystemSettings";
 export { default as TeamManagement } from "./TeamManagement";
 export { default as TransportAnalytics } from "./TransportAnalytics";
+export { ExportDashboard } from "./ExportDashboard";
