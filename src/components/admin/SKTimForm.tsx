@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -74,6 +75,7 @@ interface FormData {
   masaKerjaAkhir: string;
   namaKetua: string;
   teamMembers: TeamMember[];
+  mengingat6: string;
 }
 
 export function SKTimForm() {
@@ -93,6 +95,7 @@ export function SKTimForm() {
     masaKerjaAkhir: "",
     namaKetua: "",
     teamMembers: [],
+    mengingat6: "",
   });
 
   // Fetch initial data
@@ -255,6 +258,21 @@ export function SKTimForm() {
     setShowPreview(true);
   };
 
+  // Load draft to preview if set by dashboard
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("sk_draft_to_preview");
+      if (raw) {
+        const draft = JSON.parse(raw);
+        setFormData(draft);
+        setShowPreview(true);
+        localStorage.removeItem("sk_draft_to_preview");
+      }
+    } catch (_) {
+      // ignore
+    }
+  }, []);
+
   const handleExport = async (format: "docx") => {
     try {
       setLoading(true);
@@ -287,6 +305,26 @@ export function SKTimForm() {
     } catch (error) {
       console.error("Error exporting:", error);
       toast.error("Gagal export dokumen");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch("/api/admin/export/draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "sk-tim", data: formData }),
+      });
+      const result = await response.json();
+      if (!response.ok)
+        throw new Error(result.error || "Gagal menyimpan draft");
+      toast.success("Draft berhasil disimpan");
+    } catch (error) {
+      console.error("Error saving draft:", error);
+      toast.error("Gagal menyimpan draft");
     } finally {
       setLoading(false);
     }
@@ -463,6 +501,38 @@ export function SKTimForm() {
                         }
                         className="mt-1"
                       />
+                    </div>
+
+                    {/* Mengingat (Opsional) */}
+                    <div>
+                      <Label htmlFor="mengingat6">
+                        Poin &quot;Mengingat&quot; ke-6 (opsional)
+                      </Label>
+                      <Textarea
+                        id="mengingat6"
+                        placeholder="Tulis poin ke-6 jika diperlukan..."
+                        value={formData.mengingat6}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            mengingat6: e.target.value,
+                          })
+                        }
+                        className="mt-1"
+                        rows={3}
+                      />
+                      <div className="mt-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setFormData({ ...formData, mengingat6: "" })
+                          }
+                        >
+                          Hapus Poin 6
+                        </Button>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -742,6 +812,14 @@ export function SKTimForm() {
                       Tutup
                     </Button>
                     <Button
+                      variant="secondary"
+                      onClick={handleSaveDraft}
+                      disabled={loading}
+                      className="bg-white/90 text-blue-700 hover:bg-white"
+                    >
+                      Simpan Draft
+                    </Button>
+                    <Button
                       onClick={() => handleExport("docx")}
                       disabled={loading}
                       className="bg-white text-blue-600 hover:bg-blue-50"
@@ -809,9 +887,9 @@ export function SKTimForm() {
                           Bahwa untuk kelancaran kegiatan Pendataan{" "}
                           {projectName} pada Badan Pusat Statistik{" "}
                           {formData.kotaKabupaten}, perlu menetapkan Tim
-                          pelaksana Pendataan Pendataan {projectName} Tahun{" "}
-                          {projectYear} dengan Keputusan Kepala Badan Pusat
-                          Statistik {formData.kotaKabupaten};
+                          pelaksana Pendataan {projectName} Tahun {projectYear}{" "}
+                          dengan Keputusan Kepala Badan Pusat Statistik{" "}
+                          {formData.kotaKabupaten};
                         </p>
                       </div>
 
@@ -858,6 +936,14 @@ export function SKTimForm() {
                               Kabupaten/Kota;
                             </span>
                           </p>
+                          {formData.mengingat6?.trim() && (
+                            <p className="flex">
+                              <span className="w-6 flex-shrink-0">6.</span>
+                              <span className="flex-1">
+                                {formData.mengingat6}
+                              </span>
+                            </p>
+                          )}
                         </div>
                       </div>
 

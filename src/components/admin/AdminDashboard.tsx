@@ -211,6 +211,13 @@ export default function AdminDashboard() {
       href: "/admin/settings",
       color: "from-orange-500 to-orange-600",
     },
+    {
+      title: "Buat Jadwal Global",
+      description: "Atur tanggal terblokir untuk alokasi transport",
+      icon: Zap,
+      href: "/admin/schedule",
+      color: "from-emerald-500 to-emerald-600",
+    },
   ];
 
   const systemStatus = [

@@ -29,6 +29,7 @@ interface SKData {
   masaKerjaAkhir: string;
   namaKetua: string;
   teamMembers: TeamMember[];
+  mengingat6?: string;
 }
 
 // Function to get logo as base64
@@ -64,6 +65,7 @@ export async function generateSKDocument(data: SKData): Promise<Document> {
     masaKerjaAkhir,
     namaKetua,
     teamMembers,
+    mengingat6,
   } = data;
 
   const tanggalPenetapanFormatted = new Date(
@@ -318,7 +320,7 @@ export async function generateSKDocument(data: SKData): Promise<Document> {
             size: 22,
           }),
           new TextRun({
-            text: `Bahwa untuk kelancaran kegiatan Pendataan ${projectName} pada Badan Pusat Statistik ${kotaKabupaten}, perlu menetapkan Tim pelaksana Pendataan Pendataan ${projectName} Tahun ${projectYear} dengan Keputusan Kepala Badan Pusat Statistik ${kotaKabupaten};`,
+            text: `Bahwa untuk kelancaran kegiatan Pendataan ${projectName} pada Badan Pusat Statistik ${kotaKabupaten}, perlu menetapkan Tim pelaksana Pendataan ${projectName} Tahun ${projectYear} dengan Keputusan Kepala Badan Pusat Statistik ${kotaKabupaten};`,
             font: "Calibri",
             size: 22,
           }),
@@ -434,9 +436,36 @@ export async function generateSKDocument(data: SKData): Promise<Document> {
           left: 1800,
           hanging: 200,
         },
-        spacing: { after: 480, line: 360 },
+        spacing: { after: 120, line: 360 },
         alignment: AlignmentType.JUSTIFIED,
       }),
+
+      // Optional Mengingat 6
+      ...(mengingat6?.trim()
+        ? [
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `6. ${mengingat6}`,
+                  font: "Calibri",
+                  size: 22,
+                }),
+              ],
+              indent: {
+                left: 1800,
+                hanging: 200,
+              },
+              spacing: { after: 480, line: 360 },
+              alignment: AlignmentType.JUSTIFIED,
+            }),
+          ]
+        : [
+            // keep previous large spacing if no point 6 provided
+            new Paragraph({
+              text: "",
+              spacing: { after: 360 },
+            }),
+          ]),
 
       // Empty paragraphs untuk spacing
       new Paragraph({

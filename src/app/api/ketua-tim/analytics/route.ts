@@ -41,6 +41,8 @@ export async function GET(request: NextRequest) {
     );
     const { searchParams } = new URL(request.url);
     const period = searchParams.get("period") || "3_months";
+    const monthParam = searchParams.get("month");
+    const yearParam = searchParams.get("year");
 
     // Auth check
     const {
@@ -70,13 +72,27 @@ export async function GET(request: NextRequest) {
     const startDate = new Date();
     startDate.setMonth(startDate.getMonth() - monthsBack);
 
-    // Get ALL owned projects (no date filter) for core stats and membership
+    // Get ALL owned projects for core stats and membership
     let { data: ownedAllProjects } = await (svc as any)
       .from("projects")
       .select(
         `id, nama_project, status, tanggal_mulai, deadline, created_at, updated_at`,
       )
       .or(`ketua_tim_id.eq.${user.id},leader_user_id.eq.${user.id}`);
+
+    // Optional month/year filter: keep only projects whose tanggal_mulai falls within selected month
+    let monthStart: Date | null = null;
+    let monthEnd: Date | null = null;
+    if (monthParam && yearParam) {
+      const m = Number(monthParam);
+      const y = Number(yearParam);
+      monthStart = new Date(y, m - 1, 1);
+      monthEnd = new Date(y, m, 0);
+      ownedAllProjects = (ownedAllProjects || []).filter((p: any) => {
+        const start = new Date(p.tanggal_mulai);
+        return start.getFullYear() === y && start.getMonth() + 1 === m;
+      });
+    }
 
     // Fallback: if no direct ownership found, include projects where user is a member/assignee
     if (!ownedAllProjects || ownedAllProjects.length === 0) {
@@ -116,6 +132,15 @@ export async function GET(request: NextRequest) {
           )
           .in("id", Array.from(memberIds));
         ownedAllProjects = derivedProjects || [];
+        // Re-apply month filter after fallback
+        if (monthStart && monthEnd) {
+          const y = (monthStart as Date).getFullYear();
+          const m = (monthStart as Date).getMonth() + 1;
+          ownedAllProjects = (ownedAllProjects || []).filter((p: any) => {
+            const start = new Date(p.tanggal_mulai);
+            return start.getFullYear() === y && start.getMonth() + 1 === m;
+          });
+        }
       }
     }
 
@@ -174,7 +199,7 @@ export async function GET(request: NextRequest) {
         : 100;
 
     // Get current active projects for performance analysis (owned only)
-    const { data: activeProjects } = await (svc as any)
+    let { data: activeProjects } = await (svc as any)
       .from("projects")
       .select(
         `
@@ -192,6 +217,16 @@ export async function GET(request: NextRequest) {
           : ["00000000-0000-0000-0000-000000000000"],
       ) // guard empty
       .eq("status", "active");
+
+    // If month/year provided, restrict active projects by start month
+    if (monthStart && monthEnd) {
+      const y = (monthStart as Date).getFullYear();
+      const m = (monthStart as Date).getMonth() + 1;
+      activeProjects = (activeProjects || []).filter((p: any) => {
+        const start = new Date(p.tanggal_mulai);
+        return start.getFullYear() === y && start.getMonth() + 1 === m;
+      });
+    }
 
     // Calculate project performance
     // If no active projects, fallback to recently updated owned projects (up to 5)
@@ -219,7 +254,7 @@ export async function GET(request: NextRequest) {
           // Get tasks for this project
           const { data: projectTasks } = await (svc as any)
             .from("tasks")
-            .select("status")
+            .select("id, status")
             .eq("project_id", project.id);
 
           const totalTasks = (projectTasks || []).length;
@@ -266,12 +301,48 @@ export async function GET(request: NextRequest) {
             .select("id", { count: "exact", head: true })
             .eq("project_id", project.id);
 
+          // Calculate actual budget used (transport + honor) in rupiah
+          let budgetUsed = 0;
+
+          // Get transport allocations for this project
+          const { data: transportAllocations } = await (svc as any)
+            .from("task_transport_allocations")
+            .select("task_id, amount, total_amount")
+            .in(
+              "task_id",
+              (projectTasks || []).map((t: any) => t.id),
+            )
+            .is("canceled_at", null);
+
+          // Sum transport allocations
+          (transportAllocations || []).forEach((a: any) => {
+            budgetUsed += Number(a.total_amount || a.amount || 0);
+          });
+
+          // Get honor tasks for this project
+          const { data: honorTasks } = await (svc as any)
+            .from("tasks")
+            .select("total_amount, honor_amount, rate_per_satuan, volume")
+            .eq("project_id", project.id)
+            .not("assignee_mitra_id", "is", null);
+
+          // Sum honor amounts
+          (honorTasks || []).forEach((task: any) => {
+            if (task.total_amount) {
+              budgetUsed += Number(task.total_amount);
+            } else if (task.rate_per_satuan && task.volume) {
+              budgetUsed += Number(task.rate_per_satuan) * Number(task.volume);
+            } else if (task.honor_amount) {
+              budgetUsed += Number(task.honor_amount);
+            }
+          });
+
           return {
             project_name: project.nama_project,
             completion_percentage: completionPercentage,
             days_remaining: Math.max(0, daysRemaining),
             team_size: assignmentCount || 0,
-            budget_used: Math.min(100, Math.max(0, timelineProgress)), // Simplified budget calculation
+            budget_used: budgetUsed, // Actual budget used in rupiah
             status,
           };
         },

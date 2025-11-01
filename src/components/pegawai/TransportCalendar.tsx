@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   Calendar,
   ChevronLeft,
@@ -49,6 +50,7 @@ export default function TransportCalendar({
   onAllocationUpdate,
   projectId,
 }: TransportCalendarProps) {
+  const router = useRouter();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [allocations, setAllocations] = useState<TransportAllocation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,6 +59,12 @@ export default function TransportCalendar({
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [isEditMode, setIsEditMode] = useState(false);
   const [lockedDates, setLockedDates] = useState<Set<string>>(new Set());
+  const [activityNote, setActivityNote] = useState("");
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [adminSchedules, setAdminSchedules] = useState<any[]>([]);
+  const [scheduleDetailOpen, setScheduleDetailOpen] = useState(false);
+  const [selectedScheduleDate, setSelectedScheduleDate] = useState<string>("");
 
   // Get first day of current month
   const firstDayOfMonth = new Date(
@@ -100,6 +108,54 @@ export default function TransportCalendar({
         }
       }
 
+      // 1b) Load admin schedules for detail view
+      try {
+        const schRes = await fetch(`/api/admin/schedule`, {
+          cache: "no-store",
+        });
+        if (schRes.ok) {
+          const schJson = await schRes.json();
+          if (Array.isArray(schJson.schedules)) {
+            setAdminSchedules(schJson.schedules);
+            // Union locked dates with expanded schedule ranges (client-side)
+            const parseYmd = (ymd: string) => {
+              const [yy, mm, dd] = ymd.split("-").map((x: string) => Number(x));
+              return new Date(yy, (mm || 1) - 1, dd || 1);
+            };
+            const expandRangeToDates = (
+              start: string,
+              end: string,
+            ): string[] => {
+              const out: string[] = [];
+              const s = parseYmd(String(start));
+              const e = parseYmd(String(end));
+              const cur = new Date(s.getFullYear(), s.getMonth(), s.getDate());
+              while (cur.getTime() <= e.getTime()) {
+                const y = cur.getFullYear();
+                const m = String(cur.getMonth() + 1).padStart(2, "0");
+                const d = String(cur.getDate()).padStart(2, "0");
+                out.push(`${y}-${m}-${d}`);
+                cur.setDate(cur.getDate() + 1);
+              }
+              return out;
+            };
+            const scheduleDates = new Set<string>();
+            (schJson.schedules as any[]).forEach((s: any) => {
+              if (s?.start_date && s?.end_date) {
+                expandRangeToDates(s.start_date, s.end_date).forEach((ds) =>
+                  scheduleDates.add(ds),
+                );
+              }
+            });
+            setLockedDates((prev) => {
+              const merged = new Set(prev);
+              scheduleDates.forEach((d) => merged.add(d));
+              return merged;
+            });
+          }
+        }
+      } catch (_) {}
+
       // 2) Then load allocations for selected project (or all)
       const qs = projectId
         ? `?project_id=${encodeURIComponent(projectId)}`
@@ -136,6 +192,30 @@ export default function TransportCalendar({
     fetchAllocations();
   }, [projectId, fetchAllocations]);
 
+  // Always preload activity note when modal opens or selection changes
+  useEffect(() => {
+    if (showEditModal && selectedAllocation) {
+      fetch(
+        `/api/pegawai/transport-notes?allocation_id=${encodeURIComponent(selectedAllocation.id)}`,
+      )
+        .then((r) => r.json())
+        .then((j) => setActivityNote(j?.notes?.[0]?.note || ""))
+        .catch(() => {});
+    }
+  }, [showEditModal, selectedAllocation]);
+
+  // Keep detail panel in sync with latest stored note
+  useEffect(() => {
+    if (detailOpen && selectedAllocation) {
+      fetch(
+        `/api/pegawai/transport-notes?allocation_id=${encodeURIComponent(selectedAllocation.id)}`,
+      )
+        .then((r) => r.json())
+        .then((j) => setActivityNote(j?.notes?.[0]?.note || ""))
+        .catch(() => {});
+    }
+  }, [detailOpen, selectedAllocation]);
+
   const handleAllocateTransport = async () => {
     if (!selectedAllocation || !selectedDate) return;
 
@@ -158,8 +238,14 @@ export default function TransportCalendar({
       setSelectedAllocation(null);
       setSelectedDate("");
       setIsEditMode(false);
+      setShowEditModal(false);
       fetchAllocations();
       onAllocationUpdate?.();
+
+      // Navigate to transport page after successful allocation
+      setTimeout(() => {
+        router.push("/pegawai/transport");
+      }, 500);
     } catch (error) {
       console.error("Error allocating transport:", error);
       toast.error(
@@ -190,8 +276,14 @@ export default function TransportCalendar({
       setSelectedAllocation(null);
       setSelectedDate("");
       setIsEditMode(false);
+      setShowEditModal(false);
       fetchAllocations();
       onAllocationUpdate?.();
+
+      // Navigate to transport page after successful update
+      setTimeout(() => {
+        router.push("/pegawai/transport");
+      }, 500);
     } catch (error) {
       console.error("Error updating transport allocation:", error);
       toast.error(
@@ -402,7 +494,22 @@ export default function TransportCalendar({
                     {taskGroup.allocations.map((allocation, index) => (
                       <Button
                         key={allocation.id}
-                        onClick={() => setSelectedAllocation(allocation)}
+                        onClick={() => {
+                          setSelectedAllocation(allocation);
+                          setSelectedDate("");
+                          setIsEditMode(false);
+                          setDetailOpen(true);
+                          setShowEditModal(true);
+                          // Preload existing note if any
+                          fetch(
+                            `/api/pegawai/transport-notes?allocation_id=${encodeURIComponent(allocation.id)}`,
+                          )
+                            .then((r) => r.json())
+                            .then((j) =>
+                              setActivityNote(j?.notes?.[0]?.note || ""),
+                            )
+                            .catch(() => setActivityNote(""));
+                        }}
                         size="sm"
                         className="bg-emerald-600 hover:bg-emerald-700"
                       >
@@ -504,6 +611,25 @@ export default function TransportCalendar({
                       setSelectedAllocation(allocationForDate);
                       setSelectedDate(allocationForDate.allocation_date!);
                       setIsEditMode(true);
+                      // Load note for detail only
+                      fetch(
+                        `/api/pegawai/transport-notes?allocation_id=${encodeURIComponent(allocationForDate.id)}`,
+                      )
+                        .then((r) => r.json())
+                        .then((j) => setActivityNote(j?.notes?.[0]?.note || ""))
+                        .catch(() => setActivityNote(""));
+                      setDetailOpen(true);
+                      setShowEditModal(false);
+                    } else if (locked && !isAllocatedDay) {
+                      const y = currentDate.getFullYear();
+                      const m = String(currentDate.getMonth() + 1).padStart(
+                        2,
+                        "0",
+                      );
+                      const d = String(day).padStart(2, "0");
+                      const ds = `${y}-${m}-${d}`;
+                      setSelectedScheduleDate(ds);
+                      setScheduleDetailOpen(true);
                     }
                   }}
                 >
@@ -522,7 +648,7 @@ export default function TransportCalendar({
       </Card>
 
       {/* Date Selection Modal */}
-      {selectedAllocation && (
+      {showEditModal && selectedAllocation && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <Card className="w-full max-w-md mx-4">
             <CardHeader>
@@ -606,12 +732,24 @@ export default function TransportCalendar({
                 </p>
               </div>
 
+              <div>
+                <label className="block text-sm font-medium mb-2 text-emerald-800">
+                  Kegiatan pada tanggal ini
+                </label>
+                <textarea
+                  value={activityNote}
+                  onChange={(e) => setActivityNote(e.target.value)}
+                  rows={3}
+                  placeholder="Contoh: Survey lapangan, koordinasi tim, input data, dll."
+                  className="w-full p-2 border border-green-200 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                />
+              </div>
+
               <div className="flex space-x-3">
                 <Button
                   variant="outline"
                   onClick={() => {
-                    setSelectedAllocation(null);
-                    setSelectedDate("");
+                    setShowEditModal(false);
                     setIsEditMode(false);
                   }}
                   className="flex-1 border-green-200 hover:bg-emerald-50"
@@ -619,9 +757,47 @@ export default function TransportCalendar({
                   Cancel
                 </Button>
                 <Button
-                  onClick={
-                    isEditMode ? handleUpdateTransport : handleAllocateTransport
-                  }
+                  onClick={async () => {
+                    const current = selectedAllocation;
+                    const savedDate = selectedDate; // persist before any state resets
+                    const noteToSave = activityNote.trim();
+
+                    try {
+                      // Save activity note first if provided
+                      if (current && noteToSave) {
+                        try {
+                          await fetch(`/api/pegawai/transport-notes`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              allocation_id: current.id,
+                              date: savedDate,
+                              project_id: undefined,
+                              task_id: current.task_id,
+                              note: noteToSave,
+                            }),
+                          });
+                        } catch (noteError) {
+                          // Note save is not critical, continue anyway
+                          console.warn(
+                            "Failed to save activity note:",
+                            noteError,
+                          );
+                        }
+                      }
+
+                      // Then allocate/update transport - this will redirect to /pegawai/transport
+                      if (isEditMode) {
+                        await handleUpdateTransport();
+                      } else {
+                        await handleAllocateTransport();
+                      }
+                      // Note: Don't set detail panel or reopen modal - we're redirecting
+                    } catch (error) {
+                      // Error already handled in handleUpdateTransport/handleAllocateTransport
+                      console.error("Error in transport allocation:", error);
+                    }
+                  }}
                   disabled={!selectedDate}
                   className={`flex-1 ${isEditMode ? "bg-emerald-600 hover:bg-emerald-700" : "bg-emerald-600 hover:bg-emerald-700"}`}
                 >
@@ -630,6 +806,148 @@ export default function TransportCalendar({
               </div>
             </CardContent>
           </Card>
+        </div>
+      )}
+
+      {/* Sidebar Detail */}
+      {detailOpen && selectedAllocation && (
+        <div className="fixed right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl border-l z-40 p-6 overflow-y-auto">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-emerald-800">
+              Detail Transport
+            </h3>
+            <div className="space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-green-200"
+                onClick={() => setDetailOpen(false)}
+              >
+                Tutup
+              </Button>
+              <Button
+                size="sm"
+                className="bg-emerald-600 hover:bg-emerald-700"
+                onClick={() => {
+                  setShowEditModal(true);
+                  setIsEditMode(true);
+                }}
+              >
+                Edit Form
+              </Button>
+            </div>
+          </div>
+          <div className="space-y-3 text-sm">
+            <div>
+              <span className="text-gray-500">Tanggal: </span>
+              <span className="font-medium">
+                {selectedDate
+                  ? new Date(selectedDate).toLocaleDateString("id-ID")
+                  : "-"}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-500">Proyek: </span>
+              <span className="font-medium">
+                {selectedAllocation.task.project_name}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-500">Tugas: </span>
+              <span className="font-medium">
+                {selectedAllocation.task.title}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-500">Periode Tugas: </span>
+              <span className="font-medium">
+                {new Date(
+                  selectedAllocation.task.start_date,
+                ).toLocaleDateString("id-ID")}{" "}
+                -{" "}
+                {new Date(selectedAllocation.task.end_date).toLocaleDateString(
+                  "id-ID",
+                )}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-500">Nominal: </span>
+              <span className="font-medium">
+                Rp {selectedAllocation.amount.toLocaleString()}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-500">Kegiatan: </span>
+              <div className="mt-1 p-3 bg-emerald-50 border border-emerald-100 rounded">
+                {activityNote || "-"}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sidebar Detail Jadwal (Admin Schedule) */}
+      {scheduleDetailOpen && selectedScheduleDate && (
+        <div className="fixed right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl border-l z-40 p-6 overflow-y-auto">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-emerald-800">
+              Detail Jadwal
+            </h3>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-green-200"
+              onClick={() => setScheduleDetailOpen(false)}
+            >
+              Tutup
+            </Button>
+          </div>
+          <div className="space-y-4 text-sm">
+            <div>
+              <span className="text-gray-500">Tanggal: </span>
+              <span className="font-medium">
+                {new Date(selectedScheduleDate).toLocaleDateString("id-ID")}
+              </span>
+            </div>
+            {(() => {
+              const list = adminSchedules.filter((s) => {
+                const sd = new Date(s.start_date);
+                const ed = new Date(s.end_date);
+                const cur = new Date(selectedScheduleDate);
+                return cur >= sd && cur <= ed;
+              });
+              if (list.length === 0) {
+                return (
+                  <div className="text-gray-600">
+                    Tidak ada jadwal aktif di tanggal ini.
+                  </div>
+                );
+              }
+              return (
+                <div className="space-y-3">
+                  {list.map((s: any) => (
+                    <div key={s.id} className="p-3 border rounded-lg">
+                      <div className="font-medium text-gray-900">{s.title}</div>
+                      <div className="text-gray-600 text-xs mt-1">
+                        Periode:{" "}
+                        {new Date(s.start_date).toLocaleDateString("id-ID")} -{" "}
+                        {new Date(s.end_date).toLocaleDateString("id-ID")}
+                      </div>
+                      {s.description && (
+                        <div className="text-gray-700 text-sm mt-2">
+                          {s.description}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-blue-800 text-xs">
+              Pegawai tidak dapat mengalokasikan transport pada tanggal dalam
+              jadwal global.
+            </div>
+          </div>
         </div>
       )}
     </div>

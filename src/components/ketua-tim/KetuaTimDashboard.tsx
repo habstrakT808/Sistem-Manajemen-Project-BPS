@@ -61,13 +61,48 @@ interface DashboardData {
   stats: DashboardStats;
   recent_projects: ProjectSummary[];
   pending_tasks: TaskSummary[];
-  period_days: number;
+  month: number;
+  year: number;
 }
 
-async function fetchKetuaDashboard(period: string): Promise<DashboardData> {
-  const response = await fetch(`/api/ketua-tim/dashboard?period=${period}`, {
-    cache: "no-store",
-  });
+const MONTH_NAMES = [
+  "Januari",
+  "Februari",
+  "Maret",
+  "April",
+  "Mei",
+  "Juni",
+  "Juli",
+  "Agustus",
+  "September",
+  "Oktober",
+  "November",
+  "Desember",
+];
+
+// Generate list of years for dropdown (5 years back from current)
+function generateYearOptions(): number[] {
+  const years: number[] = [];
+  const now = new Date();
+  const currentYear = now.getFullYear();
+
+  for (let i = 0; i < 5; i++) {
+    years.push(currentYear - i);
+  }
+
+  return years;
+}
+
+async function fetchKetuaDashboard(
+  month: number,
+  year: number,
+): Promise<DashboardData> {
+  const response = await fetch(
+    `/api/ketua-tim/dashboard?month=${month}&year=${year}`,
+    {
+      cache: "no-store",
+    },
+  );
   const result = await response.json();
   if (!response.ok) {
     throw new Error(result.error || "Failed to fetch dashboard data");
@@ -77,7 +112,13 @@ async function fetchKetuaDashboard(period: string): Promise<DashboardData> {
 
 export default function KetuaTimDashboard() {
   const router = useRouter();
-  const [period, setPeriod] = useState("30");
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+
+  const [selectedMonth, setSelectedMonth] = useState<number>(currentMonth);
+  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+  const yearOptions = generateYearOptions();
 
   const {
     data: dashboardData,
@@ -86,8 +127,12 @@ export default function KetuaTimDashboard() {
     refetch,
     isFetching,
   } = useQuery<DashboardData, Error>({
-    queryKey: ["ketua", "dashboard", { period }],
-    queryFn: () => fetchKetuaDashboard(period),
+    queryKey: [
+      "ketua",
+      "dashboard",
+      { month: selectedMonth, year: selectedYear },
+    ],
+    queryFn: () => fetchKetuaDashboard(selectedMonth, selectedYear),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -97,8 +142,12 @@ export default function KetuaTimDashboard() {
     else toast.success("Data dashboard berhasil diperbarui");
   };
 
-  const handlePeriodChange = (newPeriod: string) => {
-    setPeriod(newPeriod);
+  const handleMonthChange = (newMonth: string) => {
+    setSelectedMonth(parseInt(newMonth));
+  };
+
+  const handleYearChange = (newYear: string) => {
+    setSelectedYear(parseInt(newYear));
   };
 
   useEffect(() => {
@@ -168,6 +217,7 @@ export default function KetuaTimDashboard() {
   if (!dashboardData) return null;
 
   const { stats, recent_projects, pending_tasks } = dashboardData;
+  const selectedMonthName = MONTH_NAMES[selectedMonth - 1];
 
   const statsCards = [
     {
@@ -195,7 +245,7 @@ export default function KetuaTimDashboard() {
     {
       title: "Tugas Tertunda",
       value: stats.pending_tasks,
-      description: "Tugas menunggu penyelesaian",
+      description: `Tugas yang dimulai di ${selectedMonthName} ${selectedYear}`,
       icon: ClipboardList,
       color: "from-orange-500 to-orange-600",
       bgColor: "from-orange-50 to-orange-100",
@@ -206,12 +256,12 @@ export default function KetuaTimDashboard() {
     {
       title: "Anggaran Bulanan",
       value: formatCurrency(stats.monthly_budget),
-      description: "Alokasi bulan ini",
+      description: `Alokasi ${selectedMonthName} ${selectedYear}`,
       icon: DollarSign,
       color: "from-purple-500 to-purple-600",
       bgColor: "from-purple-50 to-purple-100",
       href: "/ketua-tim/financial",
-      change: "Bulan ini",
+      change: `${selectedMonthName} ${selectedYear}`,
       changeType: "positive" as const,
     },
   ];
@@ -231,16 +281,39 @@ export default function KetuaTimDashboard() {
         </div>
 
         <div className="flex items-center space-x-4">
-          <Select value={period} onValueChange={handlePeriodChange}>
-            <SelectTrigger className="w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7">7 hari</SelectItem>
-              <SelectItem value="30">30 hari</SelectItem>
-              <SelectItem value="90">90 hari</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center space-x-2">
+            <Select
+              value={selectedMonth.toString()}
+              onValueChange={handleMonthChange}
+            >
+              <SelectTrigger className="w-36">
+                <SelectValue placeholder="Pilih Bulan" />
+              </SelectTrigger>
+              <SelectContent>
+                {MONTH_NAMES.map((monthName, index) => (
+                  <SelectItem key={index + 1} value={(index + 1).toString()}>
+                    {monthName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={selectedYear.toString()}
+              onValueChange={handleYearChange}
+            >
+              <SelectTrigger className="w-28">
+                <SelectValue placeholder="Pilih Tahun" />
+              </SelectTrigger>
+              <SelectContent>
+                {yearOptions.map((year) => (
+                  <SelectItem key={year} value={year.toString()}>
+                    {year}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
           <Button
             onClick={handleRefresh}
@@ -450,7 +523,7 @@ export default function KetuaTimDashboard() {
               </Badge>
             </div>
             <div className="text-orange-100 mt-2 text-sm">
-              Tugas jatuh tempo dalam 7 hari
+              Tugas yang dimulai di {selectedMonthName} {selectedYear}
             </div>
           </div>
           <div className="p-6 space-y-4">

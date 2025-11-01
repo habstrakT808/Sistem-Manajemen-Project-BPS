@@ -3,10 +3,129 @@ import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { Packer } from "docx";
 import { generateSKDocument } from "@/lib/utils/documentGenerator";
 import { generateSKDocumentWithTemplate } from "@/lib/utils/docxtemplaterGenerator";
+import { generateSPKDocument } from "@/lib/utils/spkGenerator";
 
 interface ProjectData {
   nama_project: string;
   created_at: string;
+}
+
+/**
+ * Handle SPK document generation
+ */
+async function handleSPKGeneration(data: any, format: string) {
+  try {
+    const svc = await createServiceRoleClient();
+
+    // Fetch mitra details
+    const { data: mitraData, error: mitraError } = await (svc as any)
+      .from("mitra")
+      .select(
+        `
+        id,
+        nama_mitra,
+        alamat,
+        kontak,
+        pekerjaan_id,
+        mitra_occupations:pekerjaan_id (
+          name
+        )
+      `,
+      )
+      .eq("id", data.mitraId)
+      .single();
+
+    if (mitraError || !mitraData) {
+      console.error("Mitra fetch error:", mitraError);
+      return NextResponse.json({ error: "Mitra not found" }, { status: 404 });
+    }
+
+    // Fetch tasks for this mitra in the specified month
+    const monthNum = parseInt(data.month);
+    const yearNum = parseInt(data.year);
+    const startDate = new Date(yearNum, monthNum - 1, 1);
+    const endDate = new Date(yearNum, monthNum, 0);
+    const startDateStr = startDate.toISOString().split("T")[0];
+    const endDateStr = endDate.toISOString().split("T")[0];
+
+    const { data: tasks, error: tasksError } = await (svc as any)
+      .from("tasks")
+      .select(
+        `
+        id,
+        title,
+        start_date,
+        end_date,
+        honor_amount,
+        satuan_id,
+        rate_per_satuan,
+        volume,
+        satuan:satuan_id ( nama_satuan )
+      `,
+      )
+      .eq("project_id", data.projectId)
+      .eq("assignee_mitra_id", data.mitraId)
+      .lte("start_date", endDateStr)
+      .gte("end_date", startDateStr)
+      .order("start_date", { ascending: true });
+
+    if (tasksError) {
+      console.error("Tasks fetch error:", tasksError);
+      return NextResponse.json(
+        { error: "Failed to fetch tasks" },
+        { status: 500 },
+      );
+    }
+
+    if (!tasks || tasks.length === 0) {
+      return NextResponse.json(
+        { error: "No tasks found for this mitra in the selected month" },
+        { status: 404 },
+      );
+    }
+
+    // Prepare SPK data
+    const spkData = {
+      nomorSPK: data.nomorSPK,
+      projectId: data.projectId,
+      month: data.month,
+      year: data.year,
+      mitraId: data.mitraId,
+      tanggalPenandatanganan: data.tanggalPenandatanganan,
+      namaPejabat: data.namaPejabat,
+      mitraData: {
+        nama_mitra: mitraData.nama_mitra,
+        alamat: mitraData.alamat || "",
+        pekerjaan: mitraData.mitra_occupations?.name || "",
+      },
+      tasks: tasks || [],
+    };
+
+    if (format === "docx") {
+      // Generate SPK document
+      const doc = await generateSPKDocument(spkData);
+      const buffer = await Packer.toBuffer(doc);
+
+      return new NextResponse(buffer as unknown as BodyInit, {
+        headers: {
+          "Content-Type":
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "Content-Disposition": `attachment; filename="SPK-${data.nomorSPK}.docx"`,
+        },
+      });
+    } else {
+      return NextResponse.json(
+        { error: "Format tidak didukung. Gunakan format 'docx'." },
+        { status: 400 },
+      );
+    }
+  } catch (error) {
+    console.error("Error generating SPK:", error);
+    return NextResponse.json(
+      { error: "Failed to generate SPK document" },
+      { status: 500 },
+    );
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -39,13 +158,20 @@ export async function POST(request: NextRequest) {
 
     console.log("Export request body:", { type, format, data });
 
-    if (type !== "sk-tim") {
+    if (type !== "sk-tim" && type !== "spk") {
       return NextResponse.json(
         { error: "Document type not supported yet" },
         { status: 400 },
       );
     }
 
+    // Handle different document types
+    if (type === "spk") {
+      // SPK specific handling
+      return await handleSPKGeneration(data, format);
+    }
+
+    // SK-TIM handling (original code)
     // Get project details using service role to bypass RLS
     console.log("Looking for project with ID:", data.projectId);
     const svc = await createServiceRoleClient();
@@ -78,6 +204,7 @@ export async function POST(request: NextRequest) {
       masaKerjaAkhir: data.masaKerjaAkhir,
       namaKetua: data.namaKetua,
       teamMembers: data.teamMembers,
+      mengingat6: data.mengingat6,
     };
 
     if (format === "docx") {

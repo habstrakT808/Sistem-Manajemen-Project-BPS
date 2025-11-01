@@ -108,6 +108,11 @@ export default function ProjectListView() {
     null,
   );
   const [showRoleDialog, setShowRoleDialog] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Invalidate and refetch data when teamId changes
   useEffect(() => {
@@ -126,6 +131,11 @@ export default function ProjectListView() {
     }
   }, [teamId, queryClient]);
 
+  const projectsKey = React.useMemo(
+    () => ["pegawai", "projects", { teamId }],
+    [teamId],
+  );
+
   const {
     data: projects = [],
     isLoading,
@@ -133,11 +143,14 @@ export default function ProjectListView() {
     error,
     refetch,
   } = useQuery<ProjectData[], Error>({
-    queryKey: ["pegawai", "projects", { teamId }],
+    queryKey: projectsKey as any,
     queryFn: () => fetchProjectsRequest(teamId),
-    staleTime: 0, // Always fresh data to prevent caching issues
-    refetchOnWindowFocus: true,
-    refetchOnMount: true,
+    enabled: isClient,
+    retry: false,
+    throwOnError: false,
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
 
   // Debug logging for projects data

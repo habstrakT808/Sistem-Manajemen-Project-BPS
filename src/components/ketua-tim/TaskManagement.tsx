@@ -146,6 +146,7 @@ interface TaskFormData {
   assignee_user_id: string;
   assignee_mitra_id: string;
   assignee_mitra_ids: string[]; // New field for multiple mitra selection
+  assignee_user_ids: string[]; // New field for multiple member selection
   assignee_type: "member" | "mitra";
   title: string;
   description: string;
@@ -165,6 +166,7 @@ const initialFormData: TaskFormData = {
   assignee_user_id: "",
   assignee_mitra_id: "",
   assignee_mitra_ids: [], // Initialize as empty array
+  assignee_user_ids: [],
   assignee_type: "member",
   title: "",
   description: "",
@@ -278,6 +280,7 @@ export default function TaskManagement() {
   const [formData, setFormData] = useState<TaskFormData>(initialFormData);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
+  const [isClient, setIsClient] = useState(false);
   const [selectedProject, setSelectedProject] = useState<string>("all");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -295,6 +298,7 @@ export default function TaskManagement() {
     honorAmount: number;
   } | null>(null);
   const [mitraSearchTerm, setMitraSearchTerm] = useState("");
+  const [memberSearchTerm, setMemberSearchTerm] = useState("");
 
   // Reset transport allocation state when create dialog opens
   useEffect(() => {
@@ -456,11 +460,16 @@ export default function TaskManagement() {
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 
-  const { data: projects, refetch: refetchProjects } = useQuery({
+  const { data: projects, refetch: refetchProjects } = useQuery<
+    ProjectOption[]
+  >({
     queryKey: ["ketua", "projects", "forTasks"],
     queryFn: fetchProjectsRequest,
     staleTime: 0, // Always consider data stale to ensure fresh data
     refetchOnWindowFocus: true, // Refetch when window regains focus
+    retry: false,
+    throwOnError: false,
+    enabled: isClient,
   });
 
   const { data: projectMembers, isLoading: loadingMembers } = useQuery({
@@ -501,6 +510,7 @@ export default function TaskManagement() {
   });
 
   useEffect(() => {
+    setIsClient(true);
     router.prefetch("/ketua-tim/tasks");
     router.prefetch("/ketua-tim/projects");
   }, [router]);
@@ -521,6 +531,47 @@ export default function TaskManagement() {
     setCreating(true);
     try {
       if (
+        formData.assignee_type === "member" &&
+        formData.assignee_user_ids.length > 0
+      ) {
+        // Create multiple tasks for multiple team members
+        const tasksToCreate = formData.assignee_user_ids.map((userId) => ({
+          ...formData,
+          assignee_user_id: userId,
+          assignee_mitra_id: null, // Clear mitra for member tasks
+          satuan_id: formData.satuan_id || null,
+          rate_per_satuan:
+            typeof formData.rate_per_satuan === "string"
+              ? parseFloat(formData.rate_per_satuan) || 0
+              : formData.rate_per_satuan,
+          volume:
+            typeof formData.volume === "string"
+              ? parseFloat(formData.volume) || 0
+              : formData.volume,
+        }));
+
+        const results = [];
+        for (const taskData of tasksToCreate) {
+          const response = await fetch("/api/ketua-tim/tasks", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(taskData),
+          });
+
+          const result = await response.json();
+          if (!response.ok) {
+            throw new Error(
+              result.error ||
+                `Failed to create task for user ${taskData.assignee_user_id}`,
+            );
+          }
+          results.push(result);
+        }
+
+        toast.success(
+          `${results.length} tasks created successfully for ${formData.assignee_user_ids.length} members!`,
+        );
+      } else if (
         formData.assignee_type === "mitra" &&
         formData.assignee_mitra_ids.length > 0
       ) {
@@ -627,8 +678,11 @@ export default function TaskManagement() {
     }
 
     // Validate assignee based on type
-    if (formData.assignee_type === "member" && !formData.assignee_user_id) {
-      toast.error("Please select a team member");
+    if (
+      formData.assignee_type === "member" &&
+      formData.assignee_user_ids.length === 0
+    ) {
+      toast.error("Please select at least one team member");
       return;
     }
 
@@ -798,6 +852,7 @@ export default function TaskManagement() {
     setFormData({
       project_id: task.project_id,
       assignee_user_id: task.assignee_user_id || "",
+      assignee_user_ids: task.assignee_user_id ? [task.assignee_user_id] : [],
       assignee_mitra_id: task.assignee_mitra_id || "",
       assignee_mitra_ids: task.assignee_mitra_id
         ? [task.assignee_mitra_id]
@@ -1247,46 +1302,175 @@ export default function TaskManagement() {
                   </div>
                 </div>
 
-                {/* Team Member Selection */}
+                {/* Team Member Selection - Multi Select (Checklist) */}
                 {formData.assignee_type === "member" && (
                   <div className="space-y-2">
-                    <Label htmlFor="assignee">Anggota Tim *</Label>
-                    <Select
-                      value={formData.assignee_user_id}
-                      onValueChange={(value) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          assignee_user_id: value,
-                        }))
-                      }
-                      disabled={!formData.project_id || loadingMembers}
-                    >
-                      <SelectTrigger>
-                        <SelectValue
-                          placeholder={
-                            loadingMembers
-                              ? "Memuat anggota tim..."
-                              : !formData.project_id
-                                ? "Pilih proyek terlebih dahulu"
-                                : (projectMembers?.length || 0) === 0
-                                  ? "Tidak ada anggota tim"
-                                  : "Pilih anggota tim"
-                          }
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(projectMembers || []).map((member) => (
-                          <SelectItem key={member.id} value={member.id}>
-                            <div className="flex items-center justify-between w-full">
-                              <span>{member.nama_lengkap}</span>
-                              <span className="text-xs text-gray-500 ml-2">
-                                {member.email}
-                              </span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="member">Anggota Tim *</Label>
+
+                    {/* Search Input */}
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                      <Input
+                        placeholder="Cari anggota..."
+                        value={memberSearchTerm}
+                        onChange={(e) => setMemberSearchTerm(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+
+                    <div className="border rounded-lg p-3 max-h-[300px] overflow-y-auto bg-gray-50">
+                      {!formData.project_id ? (
+                        <div className="text-sm text-gray-500 text-center py-4">
+                          Pilih proyek terlebih dahulu
+                        </div>
+                      ) : loadingMembers ? (
+                        <div className="text-sm text-gray-500 text-center py-4">
+                          Memuat anggota tim...
+                        </div>
+                      ) : (projectMembers?.length || 0) === 0 ? (
+                        <div className="text-sm text-gray-500 text-center py-4">
+                          Tidak ada anggota tim pada proyek ini
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {/* Actions */}
+                          {(() => {
+                            const filteredMembers = (
+                              projectMembers || []
+                            ).filter((m) => {
+                              if (!memberSearchTerm) return true;
+                              const term = memberSearchTerm.toLowerCase();
+                              return (
+                                m.nama_lengkap.toLowerCase().includes(term) ||
+                                m.email.toLowerCase().includes(term)
+                              );
+                            });
+                            const allSelected =
+                              filteredMembers.length > 0 &&
+                              filteredMembers.every((m) =>
+                                formData.assignee_user_ids.includes(m.id),
+                              );
+                            return (
+                              <div className="flex items-center justify-between">
+                                <div className="text-xs text-gray-600">
+                                  {filteredMembers.length} dari{" "}
+                                  {projectMembers?.length || 0} anggota
+                                </div>
+                                <div className="space-x-2">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={filteredMembers.length === 0}
+                                    onClick={() => {
+                                      setFormData((prev) => ({
+                                        ...prev,
+                                        assignee_user_ids: allSelected
+                                          ? prev.assignee_user_ids.filter(
+                                              (id) =>
+                                                !filteredMembers.some(
+                                                  (m) => m.id === id,
+                                                ),
+                                            )
+                                          : Array.from(
+                                              new Set([
+                                                ...prev.assignee_user_ids,
+                                                ...filteredMembers.map(
+                                                  (m) => m.id,
+                                                ),
+                                              ]),
+                                            ),
+                                      }));
+                                    }}
+                                  >
+                                    {allSelected ? "Uncheck All" : "Check All"}
+                                  </Button>
+                                </div>
+                              </div>
+                            );
+                          })()}
+
+                          {/* Header */}
+                          <div className="grid grid-cols-12 gap-2 text-xs font-semibold text-gray-600 border-b pb-2">
+                            <div className="col-span-1 text-center">✓</div>
+                            <div className="col-span-11">Nama</div>
+                          </div>
+
+                          {/* Member List */}
+                          {(() => {
+                            const filteredMembers = (
+                              projectMembers || []
+                            ).filter((m) => {
+                              if (!memberSearchTerm) return true;
+                              const term = memberSearchTerm.toLowerCase();
+                              return (
+                                m.nama_lengkap.toLowerCase().includes(term) ||
+                                m.email.toLowerCase().includes(term)
+                              );
+                            });
+
+                            if (
+                              filteredMembers.length === 0 &&
+                              memberSearchTerm
+                            ) {
+                              return (
+                                <div className="text-sm text-gray-500 text-center py-4">
+                                  Tidak ada anggota yang cocok dengan &quot;
+                                  {memberSearchTerm}&quot;
+                                </div>
+                              );
+                            }
+
+                            return filteredMembers.map((member) => {
+                              const isSelected =
+                                formData.assignee_user_ids.includes(member.id);
+
+                              return (
+                                <div
+                                  key={member.id}
+                                  className="grid grid-cols-12 gap-2 items-center py-2 hover:bg-white rounded px-2 transition-colors"
+                                >
+                                  {/* Checkbox */}
+                                  <div className="col-span-1 flex justify-center">
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setFormData((prev) => ({
+                                            ...prev,
+                                            assignee_user_ids: [
+                                              ...prev.assignee_user_ids,
+                                              member.id,
+                                            ],
+                                          }));
+                                        } else {
+                                          setFormData((prev) => ({
+                                            ...prev,
+                                            assignee_user_ids:
+                                              prev.assignee_user_ids.filter(
+                                                (id) => id !== member.id,
+                                              ),
+                                          }));
+                                        }
+                                      }}
+                                    />
+                                  </div>
+
+                                  {/* Member Name */}
+                                  <div className="col-span-11 flex items-center justify-between">
+                                    <span>{member.nama_lengkap}</span>
+                                    <span className="text-xs text-gray-500 ml-2">
+                                      {member.email}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            });
+                          })()}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -1321,6 +1505,61 @@ export default function TaskManagement() {
                         </div>
                       ) : (
                         <div className="space-y-2">
+                          {/* Actions */}
+                          {(() => {
+                            const filteredMitra = (mitraOptions || []).filter(
+                              (mitra) => {
+                                if (!mitraSearchTerm) return true;
+                                return mitra.nama_mitra
+                                  .toLowerCase()
+                                  .includes(mitraSearchTerm.toLowerCase());
+                              },
+                            );
+                            const allSelected =
+                              filteredMitra.length > 0 &&
+                              filteredMitra.every((m) =>
+                                formData.assignee_mitra_ids.includes(m.id),
+                              );
+                            return (
+                              <div className="flex items-center justify-between">
+                                <div className="text-xs text-gray-600">
+                                  {filteredMitra.length} dari{" "}
+                                  {mitraOptions?.length || 0} mitra
+                                </div>
+                                <div className="space-x-2">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={filteredMitra.length === 0}
+                                    onClick={() => {
+                                      setFormData((prev) => ({
+                                        ...prev,
+                                        assignee_mitra_ids: allSelected
+                                          ? prev.assignee_mitra_ids.filter(
+                                              (id) =>
+                                                !filteredMitra.some(
+                                                  (m) => m.id === id,
+                                                ),
+                                            )
+                                          : Array.from(
+                                              new Set([
+                                                ...prev.assignee_mitra_ids,
+                                                ...filteredMitra.map(
+                                                  (m) => m.id,
+                                                ),
+                                              ]),
+                                            ),
+                                      }));
+                                    }}
+                                  >
+                                    {allSelected ? "Uncheck All" : "Check All"}
+                                  </Button>
+                                </div>
+                              </div>
+                            );
+                          })()}
+
                           {/* Header */}
                           <div className="grid grid-cols-12 gap-2 text-xs font-semibold text-gray-600 border-b pb-2">
                             <div className="col-span-1 text-center">✓</div>

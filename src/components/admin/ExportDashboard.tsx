@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,11 @@ import Link from "next/link";
 export function ExportDashboard() {
   const router = useRouter();
   const [_selectedType, setSelectedType] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<
+    Array<{ id: string; type: string; data: any; created_at: string }>
+  >([]);
+  const [filterType, setFilterType] = useState<string>("all");
+  const [loadingDrafts, setLoadingDrafts] = useState(false);
 
   const documentTypes = [
     {
@@ -30,13 +35,14 @@ export function ExportDashboard() {
       available: true,
     },
     {
-      id: "surat-tugas",
-      title: "Surat Tugas",
-      description: "Surat Tugas untuk Pegawai atau Mitra",
+      id: "spk",
+      title: "Surat Perjanjian Kerja (SPK)",
+      description:
+        "Surat Perjanjian Kerja Petugas Kegiatan Survei/Sensus Bulanan untuk Mitra",
       icon: FilePlus,
       color: "from-green-500 to-green-600",
       bgColor: "from-green-50 to-green-100",
-      available: false,
+      available: true,
     },
     {
       id: "reimbursement",
@@ -48,6 +54,107 @@ export function ExportDashboard() {
       available: false,
     },
   ];
+
+  const fetchDrafts = async (type?: string) => {
+    try {
+      setLoadingDrafts(true);
+      const qs =
+        type && type !== "all" ? `?type=${encodeURIComponent(type)}` : "";
+      const res = await fetch(`/api/admin/export/draft${qs}`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Gagal memuat draft");
+      setDrafts(json.drafts || []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingDrafts(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDrafts(filterType);
+  }, [filterType]);
+
+  const getTypeTitle = (type: string) => {
+    switch (type) {
+      case "sk-tim":
+        return "SK Tim Pelaksana";
+      case "spk":
+        return "Surat Perjanjian Kerja (SPK)";
+      default:
+        return type;
+    }
+  };
+
+  const getDraftNumber = (draft: { type: string; data?: any }) => {
+    if (draft.type === "spk") {
+      return draft.data?.nomorSPK || "-";
+    }
+    return draft.data?.nomorSK || "-";
+  };
+
+  const handlePreviewDraft = (draft: any) => {
+    try {
+      if (draft.type === "sk-tim") {
+        localStorage.setItem("sk_draft_to_preview", JSON.stringify(draft.data));
+        router.push("/admin/export/sk-tim");
+      } else if (draft.type === "spk") {
+        localStorage.setItem(
+          "spk_draft_to_preview",
+          JSON.stringify(draft.data),
+        );
+        router.push("/admin/export/spk");
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDownloadDraft = async (draft: any) => {
+    try {
+      const response = await fetch("/api/admin/export/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: draft.type,
+          format: "docx",
+          data: draft.data,
+        }),
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Gagal export");
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+
+      const fileName =
+        getDraftNumber(draft) !== "-" ? getDraftNumber(draft) : draft.id;
+      a.download = `Draft-${draft.type}-${fileName}.docx`;
+
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDeleteDraft = async (id: string) => {
+    try {
+      const res = await fetch(
+        `/api/admin/export/draft?id=${encodeURIComponent(id)}`,
+        { method: "DELETE" },
+      );
+      await res.json();
+      fetchDrafts(filterType);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50">
@@ -101,6 +208,11 @@ export function ExportDashboard() {
               <p className="text-lg text-gray-600">
                 Pilih jenis dokumen yang ingin Anda buat
               </p>
+              {drafts.length > 0 && (
+                <div className="mt-2 text-lg font-semibold text-gray-900">
+                  {getTypeTitle(drafts[0].type)} - {getDraftNumber(drafts[0])}
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {documentTypes.map((type) => {
@@ -153,6 +265,82 @@ export function ExportDashboard() {
                 );
               })}
             </div>
+          </div>
+        </div>
+        {/* Saved Drafts - moved below */}
+        <div className="mt-16">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-semibold text-gray-900">
+              Draft Tersimpan
+            </h3>
+            <div className="flex items-center space-x-2">
+              <select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+                className="border rounded-md px-3 py-2 text-sm"
+              >
+                <option value="all">Semua Jenis</option>
+                <option value="sk-tim">SK Tim Pelaksana</option>
+                <option value="spk">Surat Perjanjian Kerja (SPK)</option>
+              </select>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fetchDrafts(filterType)}
+              >
+                Refresh
+              </Button>
+            </div>
+          </div>
+          <div className="bg-white border rounded-xl p-4">
+            {loadingDrafts ? (
+              <div className="text-sm text-gray-500">Memuat draft...</div>
+            ) : drafts.length === 0 ? (
+              <div className="text-sm text-gray-500">
+                Belum ada draft tersimpan
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {drafts.map((d) => (
+                  <div
+                    key={d.id}
+                    className="flex items-center justify-between border rounded-lg p-3"
+                  >
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">
+                        {getTypeTitle(d.type)} - {getDraftNumber(d)}
+                      </div>
+                      <div className="text-xs text-gray-600">
+                        Dibuat: {new Date(d.created_at).toLocaleString("id-ID")}
+                      </div>
+                    </div>
+                    <div className="space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePreviewDraft(d)}
+                      >
+                        Preview
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDownloadDraft(d)}
+                      >
+                        Download DOCX
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleDeleteDraft(d.id)}
+                      >
+                        Hapus
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

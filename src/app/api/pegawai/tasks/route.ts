@@ -235,6 +235,7 @@ export async function GET(request: Request) {
     }
 
     // Remove known testing/dummy tasks & projects from results
+    // Only filter out specific dummy patterns, not generic "testing" keywords
     const cleanedTasks = scopedTasks.filter((t) => {
       const title = (t.title || "").toLowerCase();
       const desc = (t.deskripsi_tugas || "").toLowerCase();
@@ -243,9 +244,16 @@ export async function GET(request: Request) {
       ).toLowerCase();
       const isDummyTitle =
         title.includes("task with allocated transport") ||
-        title.includes("task with pending transport");
-      const isDummyProject = projectName.includes("test project for transport");
-      const isDummyDesc = desc.includes("dummy") || desc.includes("testing");
+        title.includes("task with pending transport") ||
+        title.includes("dummy task") ||
+        (title.includes("test task") && title.includes("dummy"));
+      const isDummyProject =
+        projectName.includes("test project for transport") ||
+        projectName.includes("dummy project");
+      const isDummyDesc =
+        desc.includes("this is a dummy") ||
+        desc.includes("test dummy") ||
+        (desc.includes("dummy") && desc.includes("for testing"));
       return !(isDummyTitle || isDummyProject || isDummyDesc);
     });
 

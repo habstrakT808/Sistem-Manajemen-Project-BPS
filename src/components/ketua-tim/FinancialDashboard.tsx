@@ -79,9 +79,11 @@ interface FinancialData {
 
 async function fetchFinancialData(
   selectedPeriod: string,
+  month?: number,
+  year?: number,
 ): Promise<FinancialData> {
   const response = await fetch(
-    `/api/ketua-tim/financial?period=${selectedPeriod}`,
+    `/api/ketua-tim/financial?period=${selectedPeriod}${month ? `&month=${month}` : ""}${year ? `&year=${year}` : ""}`,
     { cache: "no-store" },
   );
   if (!response.ok) {
@@ -126,8 +128,37 @@ async function fetchDailyDetails(ymd: string) {
       amount: number;
       project_id: string;
       project_name: string | null;
+      task_title: string;
     }>;
   };
+}
+
+const MONTH_NAMES = [
+  "Januari",
+  "Februari",
+  "Maret",
+  "April",
+  "Mei",
+  "Juni",
+  "Juli",
+  "Agustus",
+  "September",
+  "Oktober",
+  "November",
+  "Desember",
+];
+
+// Generate list of years for dropdown (5 years back from current)
+function generateYearOptions(): number[] {
+  const years: number[] = [];
+  const now = new Date();
+  const currentYear = now.getFullYear();
+
+  for (let i = 0; i < 5; i++) {
+    years.push(currentYear - i);
+  }
+
+  return years;
 }
 
 export default function FinancialDashboard() {
@@ -136,7 +167,20 @@ export default function FinancialDashboard() {
   const [activeTab, setActiveTab] = useState<
     "overview" | "spending" | "transport"
   >("overview");
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+
+  const [selectedMonth, setSelectedMonth] = useState<number>(currentMonth);
+  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+  const yearOptions = generateYearOptions();
+
+  // selectedDate tetap digunakan untuk calendar tab
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+
+  // Use selectedMonth and selectedYear for financial queries
+  const month = selectedMonth;
+  const year = selectedYear;
 
   const {
     data: financialData,
@@ -144,19 +188,29 @@ export default function FinancialDashboard() {
     isFetching,
     refetch,
   } = useQuery<FinancialData, Error>({
-    queryKey: ["ketua", "financial", { selectedPeriod }],
-    queryFn: () => fetchFinancialData(selectedPeriod),
+    queryKey: ["ketua", "financial", { selectedPeriod, month, year }],
+    queryFn: () => fetchFinancialData(selectedPeriod, month, year),
     staleTime: 5 * 60 * 1000,
   });
 
-  const month = selectedDate.getMonth() + 1;
-  const year = selectedDate.getFullYear();
   const ymd = format(selectedDate, "yyyy-MM-dd");
 
-  const { data: daily } = useQuery({
-    queryKey: ["ketua", "financial", "daily", { month, year }],
-    queryFn: () => fetchDaily(month, year),
-    enabled: activeTab === "spending",
+  // Use selectedDate month/year for spending calendar (not filter month/year)
+  const spendingCalendarMonth = selectedDate.getMonth() + 1;
+  const spendingCalendarYear = selectedDate.getFullYear();
+
+  const { data: daily, isLoading: loadingDaily } = useQuery({
+    queryKey: [
+      "ketua",
+      "financial",
+      "daily",
+      { month: spendingCalendarMonth, year: spendingCalendarYear },
+    ],
+    queryFn: () => fetchDaily(spendingCalendarMonth, spendingCalendarYear),
+    enabled:
+      activeTab === "spending" &&
+      !!spendingCalendarMonth &&
+      !!spendingCalendarYear,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -204,14 +258,26 @@ export default function FinancialDashboard() {
         project_name: string;
         task_title: string;
         task_description: string;
+        amount: number;
+        volume: number;
+        activity_note: string;
       }>;
     };
   }
 
-  const { data: transportDaily } = useQuery({
-    queryKey: ["ketua", "financial", "transport", { month, year }],
-    queryFn: () => fetchTransportDaily(month, year),
-    enabled: activeTab === "transport",
+  // Use selectedDate month/year for transport calendar (not filter month/year)
+  const calendarMonth = selectedDate.getMonth() + 1;
+  const calendarYear = selectedDate.getFullYear();
+
+  const { data: transportDaily, isLoading: loadingTransportDaily } = useQuery({
+    queryKey: [
+      "ketua",
+      "financial",
+      "transport",
+      { month: calendarMonth, year: calendarYear },
+    ],
+    queryFn: () => fetchTransportDaily(calendarMonth, calendarYear),
+    enabled: activeTab === "transport" && !!calendarMonth && !!calendarYear,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -268,12 +334,13 @@ export default function FinancialDashboard() {
   if (!financialData) return null;
 
   const { stats, project_budgets, top_spenders } = financialData;
+  const selectedMonthName = MONTH_NAMES[selectedMonth - 1];
 
   const statsCards = [
     {
       title: "Pengeluaran Bulanan",
       value: formatCurrency(stats.total_monthly_spending),
-      description: "Total bulan ini",
+      description: `Total ${selectedMonthName} ${selectedYear}`,
       icon: DollarSign,
       color: "from-purple-500 to-purple-600",
       bgColor: "from-purple-50 to-purple-100",
@@ -283,7 +350,7 @@ export default function FinancialDashboard() {
     {
       title: "Anggaran Transport",
       value: formatCurrency(stats.transport_spending),
-      description: "Uang transport pegawai",
+      description: `Uang transport ${selectedMonthName} ${selectedYear}`,
       icon: Users,
       color: "from-blue-500 to-blue-600",
       bgColor: "from-blue-50 to-blue-100",
@@ -293,7 +360,7 @@ export default function FinancialDashboard() {
     {
       title: "Honor Mitra",
       value: formatCurrency(stats.honor_spending),
-      description: "Pembayaran untuk mitra",
+      description: `Pembayaran untuk mitra ${selectedMonthName} ${selectedYear}`,
       icon: TrendingUp,
       color: "from-green-500 to-green-600",
       bgColor: "from-green-50 to-green-100",
@@ -337,18 +404,6 @@ export default function FinancialDashboard() {
               Alokasi Transport
             </button>
           </div>
-          <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="current_month">Bulan Ini</SelectItem>
-              <SelectItem value="last_month">Bulan Lalu</SelectItem>
-              <SelectItem value="quarter">Kuartal Ini</SelectItem>
-              <SelectItem value="year">Tahun Ini</SelectItem>
-            </SelectContent>
-          </Select>
-
           <Button
             onClick={handleRefresh}
             disabled={isFetching}
@@ -438,7 +493,8 @@ export default function FinancialDashboard() {
                   </Badge>
                 </div>
                 <div className="text-purple-100 mt-2 text-sm">
-                  Alokasi anggaran per proyek
+                  Proyek dengan tugas yang dimulai di {selectedMonthName}{" "}
+                  {selectedYear}
                 </div>
               </div>
               <div className="p-6 space-y-4">
@@ -483,15 +539,52 @@ export default function FinancialDashboard() {
               </div>
             </div>
 
-            {/* Top Spenders */}
+            {/* Monthly Spending */}
             <div className="border-0 shadow-xl rounded-xl overflow-hidden">
               <div className="bg-gradient-to-r from-orange-600 to-red-600 p-6">
-                <div className="flex items-center text-white text-xl font-semibold">
-                  <BarChart3 className="w-6 h-6 mr-3" />
-                  Pengeluaran Tertinggi
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center text-white text-xl font-semibold">
+                    <BarChart3 className="w-6 h-6 mr-3" />
+                    Pengeluaran Per Bulan
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Select
+                      value={selectedMonth.toString()}
+                      onValueChange={(v) => setSelectedMonth(parseInt(v))}
+                    >
+                      <SelectTrigger className="w-[160px] bg-white/10 text-white border-white/30">
+                        <SelectValue placeholder="Bulan" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {MONTH_NAMES.map((monthName, index) => (
+                          <SelectItem
+                            key={index + 1}
+                            value={(index + 1).toString()}
+                          >
+                            {monthName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={selectedYear.toString()}
+                      onValueChange={(v) => setSelectedYear(parseInt(v))}
+                    >
+                      <SelectTrigger className="w-[140px] bg-white/10 text-white border-white/30">
+                        <SelectValue placeholder="Tahun" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {yearOptions.map((y) => (
+                          <SelectItem key={y} value={y.toString()}>
+                            {y}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <div className="text-orange-100 mt-2 text-sm">
-                  Alokasi anggaran tertinggi
+                  Total pengeluaran per penerima pada bulan terpilih
                 </div>
               </div>
               <div className="p-6 space-y-6">
@@ -657,27 +750,30 @@ export default function FinancialDashboard() {
                 className="!w-full"
                 modifiers={{
                   lowWorkload: (date) => {
+                    if (!daily?.days || loadingDaily) return false;
                     const y = format(date, "yyyy-MM-dd");
-                    const rec = daily?.days.find((d) => d.date === y);
+                    const rec = daily.days.find((d) => d.date === y);
                     return !!rec && rec.total > 0 && rec.total < 1_000_000;
                   },
                   mediumWorkload: (date) => {
+                    if (!daily?.days || loadingDaily) return false;
                     const y = format(date, "yyyy-MM-dd");
-                    const rec = daily?.days.find((d) => d.date === y);
+                    const rec = daily.days.find((d) => d.date === y);
                     return (
                       !!rec && rec.total >= 1_000_000 && rec.total <= 3_000_000
                     );
                   },
                   highWorkload: (date) => {
+                    if (!daily?.days || loadingDaily) return false;
                     const y = format(date, "yyyy-MM-dd");
-                    const rec = daily?.days.find((d) => d.date === y);
+                    const rec = daily.days.find((d) => d.date === y);
                     return !!rec && rec.total > 3_000_000;
                   },
                   hasEvents: (date) => {
+                    if (!daily?.days || loadingDaily) return false;
                     const y = format(date, "yyyy-MM-dd");
-                    return !!daily?.days.find(
-                      (d) => d.date === y && d.total > 0,
-                    );
+                    const rec = daily.days.find((d) => d.date === y);
+                    return !!(rec && rec.total > 0);
                   },
                 }}
               />
@@ -722,7 +818,7 @@ export default function FinancialDashboard() {
                     key={i}
                     className="py-3 flex items-center justify-between"
                   >
-                    <div>
+                    <div className="flex-1">
                       <div className="font-medium text-gray-900">
                         {d.recipient_name}
                       </div>
@@ -730,8 +826,13 @@ export default function FinancialDashboard() {
                         {d.recipient_type.toUpperCase()} •{" "}
                         {d.project_name || d.project_id}
                       </div>
+                      {d.task_title && (
+                        <div className="text-xs text-gray-400 mt-1">
+                          {d.task_title}
+                        </div>
+                      )}
                     </div>
-                    <div className="font-semibold text-gray-900">
+                    <div className="font-semibold text-gray-900 ml-4">
                       {formatCurrency(d.amount)}
                     </div>
                   </div>
@@ -771,11 +872,14 @@ export default function FinancialDashboard() {
                 onSelect={(d) => d && setSelectedDate(d)}
                 className="!w-full"
                 modifiers={{
-                  // Reuse built-in styling used by Spending tab
                   hasEvents: (date) => {
-                    const y = format(date, "yyyy-MM-dd");
-                    const rec = transportDaily?.days?.find((d) => d.date === y);
-                    return !!rec && rec.count > 0;
+                    if (!transportDaily?.days || loadingTransportDaily)
+                      return false;
+                    const dateStr = format(date, "yyyy-MM-dd");
+                    const dayData = transportDaily.days.find(
+                      (d) => d.date === dateStr,
+                    );
+                    return !!(dayData && dayData.count > 0);
                   },
                 }}
               />
@@ -810,7 +914,7 @@ export default function FinancialDashboard() {
               </Button>
               <div className="divide-y">
                 {(transportDetails?.details || []).map((d, i) => (
-                  <div key={i} className="py-3">
+                  <div key={i} className="py-3 space-y-1">
                     <div className="font-medium text-gray-900">
                       {d.employee_name}
                     </div>
@@ -819,6 +923,24 @@ export default function FinancialDashboard() {
                     </div>
                     <div className="text-xs text-gray-500">
                       {d.task_title || d.task_description}
+                    </div>
+                    <div className="mt-2 pt-2 border-t border-gray-100">
+                      <div className="text-xs">
+                        <span className="font-semibold text-gray-700">
+                          Nilai:
+                        </span>{" "}
+                        <span className="text-green-600 font-medium">
+                          {formatCurrency(d.amount || 0)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-xs mt-1">
+                      <span className="font-semibold text-gray-700">
+                        Kegiatan:
+                      </span>{" "}
+                      <span className="text-gray-600">
+                        {d.activity_note || "-"}
+                      </span>
                     </div>
                   </div>
                 ))}

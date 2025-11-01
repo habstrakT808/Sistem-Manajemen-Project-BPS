@@ -350,9 +350,8 @@ export default function ProjectWizard() {
         queryKey: ["project-mitra", result.project.id],
       });
 
-      const detailHref = `/ketua-tim/projects/${result.project.id}`;
-      router.prefetch(detailHref);
-      router.push(detailHref);
+      router.prefetch("/ketua-tim/projects");
+      router.push("/ketua-tim/projects");
     } catch (error) {
       console.error("Error creating project:", error);
       toast.error(

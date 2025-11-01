@@ -26,6 +26,7 @@ import {
   Activity,
 } from "lucide-react";
 import { toast } from "sonner";
+import { formatCurrency } from "@/lib/utils";
 
 interface AnalyticsStats {
   total_projects: number;
@@ -68,9 +69,11 @@ interface AnalyticsData {
 
 async function fetchAnalyticsData(
   selectedPeriod: string,
+  month?: number,
+  year?: number,
 ): Promise<AnalyticsData> {
   const response = await fetch(
-    `/api/ketua-tim/analytics?period=${selectedPeriod}`,
+    `/api/ketua-tim/analytics?period=${selectedPeriod}${month ? `&month=${month}` : ""}${year ? `&year=${year}` : ""}`,
     { cache: "no-store" },
   );
   if (!response.ok) {
@@ -84,6 +87,9 @@ async function fetchAnalyticsData(
 export default function AnalyticsDashboard() {
   const router = useRouter();
   const [selectedPeriod, setSelectedPeriod] = useState("3_months");
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const month = selectedDate.getMonth() + 1;
+  const year = selectedDate.getFullYear();
 
   const {
     data: analyticsData,
@@ -92,8 +98,8 @@ export default function AnalyticsDashboard() {
     error,
     refetch,
   } = useQuery<AnalyticsData, Error>({
-    queryKey: ["ketua", "analytics", { selectedPeriod }],
-    queryFn: () => fetchAnalyticsData(selectedPeriod),
+    queryKey: ["ketua", "analytics", { selectedPeriod, month, year }],
+    queryFn: () => fetchAnalyticsData(selectedPeriod, month, year),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -243,15 +249,50 @@ export default function AnalyticsDashboard() {
         </div>
 
         <div className="flex items-center space-x-4">
-          <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+          {/* Pilih Bulan */}
+          <Select
+            value={String(month)}
+            onValueChange={(v) => {
+              const d = new Date(selectedDate);
+              d.setMonth(Number(v) - 1);
+              setSelectedDate(d);
+            }}
+          >
             <SelectTrigger className="w-44 rounded-xl border-2">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="1_month">Bulan Lalu</SelectItem>
-              <SelectItem value="3_months">3 Bulan Terakhir</SelectItem>
-              <SelectItem value="6_months">6 Bulan Terakhir</SelectItem>
-              <SelectItem value="1_year">Tahun Lalu</SelectItem>
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((m) => (
+                <SelectItem key={m} value={String(m)}>
+                  {new Date(2000, m - 1, 1).toLocaleDateString("id-ID", {
+                    month: "long",
+                  })}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Pilih Tahun */}
+          <Select
+            value={String(year)}
+            onValueChange={(v) => {
+              const d = new Date(selectedDate);
+              d.setFullYear(Number(v));
+              setSelectedDate(d);
+            }}
+          >
+            <SelectTrigger className="w-36 rounded-xl border-2">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Array.from({ length: 6 }).map((_, i) => {
+                const y = new Date().getFullYear() - i;
+                return (
+                  <SelectItem key={y} value={String(y)}>
+                    {y}
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
 
@@ -364,7 +405,9 @@ export default function AnalyticsDashboard() {
                   </div>
                   <div>
                     <div className="text-gray-500">Anggaran Terpakai</div>
-                    <div className="font-semibold">{project.budget_used}%</div>
+                    <div className="font-semibold">
+                      {formatCurrency(project.budget_used)}
+                    </div>
                   </div>
                 </div>
 

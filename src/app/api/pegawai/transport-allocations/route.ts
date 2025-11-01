@@ -22,6 +22,34 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Ensure allocations are released if they collide with admin schedules
+    try {
+      const { data: settingsRow } = await serviceClient
+        .from("system_settings")
+        .select("id, config")
+        .eq("id", 1)
+        .single();
+      const rawCfg = (settingsRow as any)?.config;
+      const cfg =
+        rawCfg && typeof rawCfg === "string"
+          ? JSON.parse(rawCfg)
+          : rawCfg || {};
+      const schedules: any[] = cfg?.admin_schedules ?? [];
+      if (schedules.length > 0) {
+        for (const s of schedules) {
+          if (s?.start_date && s?.end_date) {
+            await (serviceClient as any)
+              .from("task_transport_allocations")
+              .update({ allocation_date: null, allocated_at: null })
+              .eq("user_id", user.id)
+              .gte("allocation_date", s.start_date)
+              .lte("allocation_date", s.end_date)
+              .is("canceled_at", null);
+          }
+        }
+      }
+    } catch (_) {}
+
     // Get transport allocations for the user (without joins to avoid FK errors)
     const { data: allocations, error: allocationsError } = await serviceClient
       .from("task_transport_allocations")
@@ -176,25 +204,62 @@ export async function GET(request: Request) {
         }) || [];
 
     // Build global locked dates across all projects for this user, excluding dummy/test data
-    const lockedDates = Array.from(
-      new Set(
-        (allocations || [])
-          .filter((a: any) => a.allocation_date && !a.canceled_at)
-          .filter((a: any) => {
-            const task = taskDetails[a.task_id];
-            if (!task) return false;
-            const project = projectDetails[task.project_id];
-            const isDummyTitle = String(task.title || "")
-              .toLowerCase()
-              .includes("task with ");
-            const isDummyProject = String(project?.nama_project || "")
-              .toLowerCase()
-              .includes("test project for transport");
-            return !(isDummyTitle || isDummyProject);
-          })
-          .map((a: any) => String(a.allocation_date).slice(0, 10)),
-      ),
+    const allocationLocked = new Set(
+      (allocations || [])
+        .filter((a: any) => a.allocation_date && !a.canceled_at)
+        .filter((a: any) => {
+          const task = taskDetails[a.task_id];
+          if (!task) return false;
+          const project = projectDetails[task.project_id];
+          const isDummyTitle = String(task.title || "")
+            .toLowerCase()
+            .includes("task with ");
+          const isDummyProject = String(project?.nama_project || "")
+            .toLowerCase()
+            .includes("test project for transport");
+          return !(isDummyTitle || isDummyProject);
+        })
+        .map((a: any) => String(a.allocation_date).slice(0, 10)),
     );
+
+    // Include admin global schedules (system_settings.config.admin_schedules)
+    const parseYmd = (ymd: string) => {
+      const [yy, mm, dd] = ymd.split("-").map((x) => Number(x));
+      return new Date(yy, (mm || 1) - 1, dd || 1);
+    };
+    const expandRangeToDates = (start: string, end: string): string[] => {
+      const out: string[] = [];
+      const s = parseYmd(start);
+      const e = parseYmd(end);
+      const cur = new Date(s.getFullYear(), s.getMonth(), s.getDate());
+      while (cur.getTime() <= e.getTime()) {
+        const y = cur.getFullYear();
+        const m = String(cur.getMonth() + 1).padStart(2, "0");
+        const d = String(cur.getDate()).padStart(2, "0");
+        out.push(`${y}-${m}-${d}`);
+        cur.setDate(cur.getDate() + 1);
+      }
+      return out;
+    };
+
+    try {
+      const { data: settingsRow } = await serviceClient
+        .from("system_settings")
+        .select("id, config")
+        .eq("id", 1)
+        .single();
+      const schedules: any[] =
+        (settingsRow as any)?.config?.admin_schedules ?? [];
+      schedules.forEach((s: any) => {
+        if (s?.start_date && s?.end_date) {
+          expandRangeToDates(s.start_date, s.end_date).forEach((ds) =>
+            allocationLocked.add(ds),
+          );
+        }
+      });
+    } catch (_) {}
+
+    const lockedDates = Array.from(allocationLocked);
 
     return NextResponse.json({
       allocations: transformedAllocations,

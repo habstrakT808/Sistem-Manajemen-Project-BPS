@@ -36,7 +36,20 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = (await createClient()) as any;
     const { searchParams } = new URL(request.url);
-    const period = searchParams.get("period") || "30"; // days
+    const monthParam = searchParams.get("month");
+    const yearParam = searchParams.get("year");
+
+    // Default to current month if not provided
+    const now = new Date();
+    const month = monthParam ? parseInt(monthParam) : now.getMonth() + 1;
+    const year = yearParam ? parseInt(yearParam) : now.getFullYear();
+
+    // Calculate start and end of selected month
+    const pad2 = (n: number) => (n < 10 ? `0${n}` : String(n));
+    const monthStart = `${year}-${pad2(month)}-01`;
+    const nextMonth = month === 12 ? 1 : month + 1;
+    const nextYear = month === 12 ? year + 1 : year;
+    const monthEndExclusive = `${nextYear}-${pad2(nextMonth)}-01`;
 
     // Auth check
     const {
@@ -84,35 +97,8 @@ export async function GET(request: NextRequest) {
       (memberRows || []).map((m: any) => m.user_id),
     );
 
-    // Pending tasks within next 7 days for user's projects
-    const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .split("T")[0];
-    const { count: pendingTasksCount } = await (svc as any)
-      .from("tasks")
-      .select("id", { count: "exact", head: true })
-      .in(
-        "project_id",
-        (
-          await (svc as any)
-            .from("projects")
-            .select("id")
-            .eq("ketua_tim_id", user.id)
-        ).data?.map((p: { id: string }) => p.id) || [],
-      )
-      .eq("status", "pending")
-      .lte("tanggal_tugas", sevenDaysFromNow);
-
-    // Monthly budget: transport (earnings_ledger via allocation source) + mitra honor (financial_records)
-    const now = new Date();
-    const pad2 = (n: number) => (n < 10 ? `0${n}` : String(n));
-    const ymStart = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-01`;
-    const nextMonth = now.getMonth() === 11 ? 1 : now.getMonth() + 2;
-    const nextYear =
-      now.getMonth() === 11 ? now.getFullYear() + 1 : now.getFullYear();
-    const ymEndExclusive = `${nextYear}-${pad2(nextMonth)}-01`;
-
-    // Owned project ids (reuse computed above)
+    // Pending tasks that start in the selected month for user's projects
+    // Filter by start_date being within the selected month
     const ownedProjectIds =
       (
         await (svc as any)
@@ -120,6 +106,23 @@ export async function GET(request: NextRequest) {
           .select("id")
           .eq("ketua_tim_id", user.id)
       ).data?.map((p: { id: string }) => p.id) || [];
+
+    const { count: pendingTasksCount } = ownedProjectIds.length
+      ? await (svc as any)
+          .from("tasks")
+          .select("id", { count: "exact", head: true })
+          .in("project_id", ownedProjectIds)
+          .eq("status", "pending")
+          .gte("start_date", monthStart)
+          .lt("start_date", monthEndExclusive)
+      : { count: 0 };
+
+    // Monthly budget: transport (earnings_ledger via allocation source) + mitra honor (financial_records)
+    // Use selected month instead of current month
+    const ymStart = monthStart;
+    const ymEndExclusive = monthEndExclusive;
+
+    // Owned project ids already computed above
 
     // Tasks in owned projects
     const { data: ownedTasks } = await (svc as any)
@@ -155,16 +158,14 @@ export async function GET(request: NextRequest) {
       0,
     );
 
-    // Sum mitra honor from financial_records for owned projects and current month
-    const currentMonth = now.getMonth() + 1;
-    const currentYear = now.getFullYear();
+    // Sum mitra honor from financial_records for owned projects and selected month
     const { data: mitraRows } = ownedProjectIds.length
       ? await (svc as any)
           .from("financial_records")
           .select("amount, project_id, bulan, tahun, type")
           .in("project_id", ownedProjectIds)
-          .eq("bulan", currentMonth)
-          .eq("tahun", currentYear)
+          .eq("bulan", month)
+          .eq("tahun", year)
           .eq("type", "mitra_honor")
       : { data: [] };
     const mitraTotal = (mitraRows || []).reduce(
@@ -189,6 +190,7 @@ export async function GET(request: NextRequest) {
     );
 
     // Calculate budget from tasks using new "Satuan" system
+    // Filter tasks that start in the selected month
     const { data: satuanTasks, error: _satuanTasksError } =
       ownedProjectIds.length
         ? await (svc as any)
@@ -196,6 +198,8 @@ export async function GET(request: NextRequest) {
             .select("rate_per_satuan, volume, total_amount")
             .in("project_id", ownedProjectIds)
             .not("satuan_id", "is", null)
+            .gte("start_date", monthStart)
+            .lt("start_date", monthEndExclusive)
         : { data: [], error: null };
 
     const satuanBudget = (satuanTasks || []).reduce(
@@ -248,23 +252,27 @@ export async function GET(request: NextRequest) {
       .order("created_at", { ascending: false })
       .limit(5);
 
-    const { data: pendingTasks } = await (svc as any)
-      .from("tasks")
-      .select(
-        `
-        id,
-        deskripsi_tugas,
-        tanggal_tugas,
-        status,
-        users:users!inner (nama_lengkap),
-        projects:projects!inner (nama_project, ketua_tim_id)
-      `,
-      )
-      .eq("projects.ketua_tim_id", user.id)
-      .eq("status", "pending")
-      .lte("tanggal_tugas", sevenDaysFromNow)
-      .order("tanggal_tugas", { ascending: true })
-      .limit(10);
+    const { data: pendingTasks } = ownedProjectIds.length
+      ? await (svc as any)
+          .from("tasks")
+          .select(
+            `
+            id,
+            deskripsi_tugas,
+            start_date,
+            tanggal_tugas,
+            status,
+            users:users!inner (nama_lengkap),
+            projects:projects!inner (nama_project, ketua_tim_id)
+          `,
+          )
+          .eq("projects.ketua_tim_id", user.id)
+          .eq("status", "pending")
+          .gte("start_date", monthStart)
+          .lt("start_date", monthEndExclusive)
+          .order("start_date", { ascending: true })
+          .limit(10)
+      : { data: [] };
 
     // Enrich projects with team size and progress
     const enrichedProjects = await Promise.all(
@@ -350,7 +358,8 @@ export async function GET(request: NextRequest) {
       stats,
       recent_projects: enrichedProjects,
       pending_tasks: formattedTasks,
-      period_days: parseInt(period),
+      month,
+      year,
     });
   } catch (error) {
     console.error("Dashboard API Error:", error);

@@ -41,6 +41,8 @@ export async function GET(request: NextRequest) {
     );
     const { searchParams } = new URL(request.url);
     const period = searchParams.get("period") || "current_month";
+    const monthParam = searchParams.get("month");
+    const yearParam = searchParams.get("year");
 
     // Auth check
     const {
@@ -53,28 +55,35 @@ export async function GET(request: NextRequest) {
 
     // Do not hard block by global role here; we enforce ownership below
 
-    // Calculate date range based on period
+    // Calculate date range based on explicit month/year or period
     let startDate: Date;
     let endDate: Date;
     const now = new Date();
 
-    switch (period) {
-      case "last_month":
-        startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        endDate = new Date(now.getFullYear(), now.getMonth(), 0); // Last day of last month
-        break;
-      case "quarter":
-        const quarterStart = Math.floor(now.getMonth() / 3) * 3;
-        startDate = new Date(now.getFullYear(), quarterStart, 1);
-        endDate = new Date(now.getFullYear(), quarterStart + 3, 0); // Last day of quarter
-        break;
-      case "year":
-        startDate = new Date(now.getFullYear(), 0, 1);
-        endDate = new Date(now.getFullYear(), 11, 31); // Last day of year
-        break;
-      default: // current_month
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Last day of current month
+    if (monthParam && yearParam) {
+      const m = Number(monthParam);
+      const y = Number(yearParam);
+      startDate = new Date(y, m - 1, 1);
+      endDate = new Date(y, m, 0);
+    } else {
+      switch (period) {
+        case "last_month":
+          startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          endDate = new Date(now.getFullYear(), now.getMonth(), 0);
+          break;
+        case "quarter":
+          const quarterStart = Math.floor(now.getMonth() / 3) * 3;
+          startDate = new Date(now.getFullYear(), quarterStart, 1);
+          endDate = new Date(now.getFullYear(), quarterStart + 3, 0);
+          break;
+        case "year":
+          startDate = new Date(now.getFullYear(), 0, 1);
+          endDate = new Date(now.getFullYear(), 11, 31);
+          break;
+        default:
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      }
     }
 
     const _currentMonth = startDate.getMonth() + 1;
@@ -111,39 +120,109 @@ export async function GET(request: NextRequest) {
 
     const ownedTaskIds = (ownedTasks || []).map((t: any) => t.id);
 
-    // Get ALL tasks with their transport/honor amounts (not just allocated ones)
-    const { data: allTasksWithAmounts, error: _tasksError } =
+    // Build month/year filtered aggregates
+    const startStr = startDate.toISOString().split("T")[0];
+    const endStr = endDate.toISOString().split("T")[0];
+
+    // Calculate month boundaries for task filtering
+    const pad2Month = (n: number) => (n < 10 ? `0${n}` : String(n));
+    const selectedMonthNum = monthParam
+      ? Number(monthParam)
+      : now.getMonth() + 1;
+    const selectedYearNum = yearParam ? Number(yearParam) : now.getFullYear();
+    const monthStartStr = `${selectedYearNum}-${pad2Month(selectedMonthNum)}-01`;
+    const nextMonth = selectedMonthNum === 12 ? 1 : selectedMonthNum + 1;
+    const nextYear =
+      selectedMonthNum === 12 ? selectedYearNum + 1 : selectedYearNum;
+    const monthEndExclusiveStr = `${nextYear}-${pad2Month(nextMonth)}-01`;
+
+    // Map task_id -> pegawai_id for allocations aggregation
+    // Only include tasks that start in the selected month
+    const { data: taskAssignees } =
       ownedTaskIds.length > 0
         ? await (svc as any)
             .from("tasks")
             .select(
-              "id, title, pegawai_id, assignee_mitra_id, rate_per_satuan, volume, total_amount, honor_amount, transport_days",
+              "id, pegawai_id, assignee_mitra_id, project_id, start_date, honor_amount, total_amount",
             )
             .in("id", ownedTaskIds)
-        : { data: [], error: null };
+            .gte("start_date", monthStartStr)
+            .lt("start_date", monthEndExclusiveStr)
+        : { data: [] };
+    const taskToPegawai: Record<string, string> = {};
+    (taskAssignees || []).forEach((t: any) => {
+      if (t.pegawai_id) taskToPegawai[t.id] = t.pegawai_id;
+    });
 
-    // Calculate transport spending from tasks (both allocated and unallocated)
-    const transportSpending = (allTasksWithAmounts || []).reduce(
-      (sum: number, task: any) => {
-        // For pegawai tasks (has pegawai_id), use total_amount (new system) or transport_days * 150000 (old system)
-        if (task.pegawai_id) {
-          const amount = task.total_amount || task.transport_days * 150000 || 0;
-          return sum + amount;
+    // Get task IDs that start in selected month for transport allocations
+    const filteredTaskIds = (taskAssignees || []).map((t: any) => t.id);
+
+    // Transport spending this month from allocations
+    // Only include allocations for tasks that start in selected month
+    const { data: monthAlloc } =
+      filteredTaskIds.length > 0
+        ? await (svc as any)
+            .from("task_transport_allocations")
+            .select("task_id, amount, allocation_date")
+            .in("task_id", filteredTaskIds)
+            .not("allocation_date", "is", null)
+        : { data: [] };
+
+    const pegawaiTotalsMonth: Record<
+      string,
+      { name: string; amount: number; projects: Set<string> }
+    > = {};
+    const transportSpending = (monthAlloc || []).reduce(
+      (sum: number, a: any) => {
+        const userId = taskToPegawai[a.task_id];
+        if (userId) {
+          if (!pegawaiTotalsMonth[userId])
+            pegawaiTotalsMonth[userId] = {
+              name: userId,
+              amount: 0,
+              projects: new Set(),
+            };
+          pegawaiTotalsMonth[userId].amount += Number(a.amount || 0);
         }
-        return sum;
+        return sum + Number(a.amount || 0);
       },
       0,
     );
 
-    // Calculate honor spending from tasks (both allocated and unallocated)
-    const honorSpending = (allTasksWithAmounts || []).reduce(
-      (sum: number, task: any) => {
-        // For mitra tasks (has assignee_mitra_id), use total_amount (new system) or honor_amount (old system)
-        if (task.assignee_mitra_id) {
-          const amount = task.total_amount || task.honor_amount || 0;
-          return sum + amount;
+    // Honor spending this month from tasks that start in selected month
+    const { data: monthMitraTasks } =
+      ownedIdArray.length > 0
+        ? await (svc as any)
+            .from("tasks")
+            .select(
+              "id, project_id, assignee_mitra_id, start_date, end_date, honor_amount, total_amount",
+            )
+            .in("project_id", ownedIdArray)
+            .not("assignee_mitra_id", "is", null)
+            // Only tasks that start in the selected month
+            .gte("start_date", monthStartStr)
+            .lt("start_date", monthEndExclusiveStr)
+        : { data: [] };
+
+    const mitraTotalsMonth: Record<
+      string,
+      { name: string; amount: number; projects: Set<string> }
+    > = {};
+    const honorSpending = (monthMitraTasks || []).reduce(
+      (sum: number, t: any) => {
+        const amount = Number(t.total_amount || t.honor_amount || 0);
+        if (t.assignee_mitra_id) {
+          const mitraId = t.assignee_mitra_id as string;
+          if (!mitraTotalsMonth[mitraId])
+            mitraTotalsMonth[mitraId] = {
+              name: mitraId,
+              amount: 0,
+              projects: new Set(),
+            };
+          mitraTotalsMonth[mitraId].amount += amount;
+          mitraTotalsMonth[mitraId].projects.add(t.project_id);
         }
-        return sum;
+        return sum + amount;
       },
       0,
     );
@@ -165,6 +244,7 @@ export async function GET(request: NextRequest) {
     const totalSpending = transportSpending + honorSpending;
 
     // Build project budgets from tasks instead of project_assignments
+    // Only include projects that have tasks starting in the selected month
     const { data: projectRows } =
       ownedIdArray.length > 0
         ? await (svc as any)
@@ -178,20 +258,25 @@ export async function GET(request: NextRequest) {
       { transport: number; honor: number }
     >();
 
+    // Use month boundaries already calculated above
     if (ownedIdArray.length > 0) {
-      // Get transport budget from tasks with transport
+      // Get transport budget from tasks with transport that start in selected month
       const { data: transportTasks } = await (svc as any)
         .from("tasks")
         .select("project_id, transport_days")
         .in("project_id", ownedIdArray)
-        .eq("has_transport", true);
+        .eq("has_transport", true)
+        .gte("start_date", monthStartStr)
+        .lt("start_date", monthEndExclusiveStr);
 
-      // Get honor budget from tasks with mitra assignments
+      // Get honor budget from tasks with mitra assignments that start in selected month
       const { data: honorTasks } = await (svc as any)
         .from("tasks")
         .select("project_id, honor_amount")
         .in("project_id", ownedIdArray)
-        .not("assignee_mitra_id", "is", null);
+        .not("assignee_mitra_id", "is", null)
+        .gte("start_date", monthStartStr)
+        .lt("start_date", monthEndExclusiveStr);
 
       // Calculate transport budget (150,000 per transport day)
       for (const task of transportTasks || []) {
@@ -302,75 +387,9 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Get top spenders from tasks data (using the same data we already fetched)
-
-    // Aggregate transport spending by user from tasks
-    const pegawaiTotals = (allTasksWithAmounts || []).reduce(
-      (
-        acc: {
-          [key: string]: {
-            name: string;
-            amount: number;
-            projects: Set<string>;
-          };
-        },
-        task: any,
-      ) => {
-        // Only process tasks for pegawai (has pegawai_id)
-        if (!task.pegawai_id) {
-          return acc;
-        }
-
-        const userId = task.pegawai_id;
-        const amount = task.total_amount || task.transport_days * 150000 || 0;
-
-        if (!acc[userId]) {
-          acc[userId] = {
-            name: userId, // temporary, will be replaced with fetched name below
-            amount: 0,
-            projects: new Set(),
-          };
-        }
-        acc[userId].amount += amount;
-        acc[userId].projects.add(task.project_id);
-        return acc;
-      },
-      {},
-    );
-
-    // Aggregate honor spending by mitra from tasks
-    const mitraTotals = (allTasksWithAmounts || []).reduce(
-      (
-        acc: {
-          [key: string]: {
-            name: string;
-            amount: number;
-            projects: Set<string>;
-          };
-        },
-        task: any,
-      ) => {
-        // Only process tasks for mitra (has assignee_mitra_id)
-        if (!task.assignee_mitra_id) {
-          return acc;
-        }
-
-        const mitraId = task.assignee_mitra_id;
-        const amount = task.total_amount || task.honor_amount || 0;
-
-        if (!acc[mitraId]) {
-          acc[mitraId] = {
-            name: mitraId, // temporary, will be replaced with fetched name below
-            amount: 0,
-            projects: new Set(),
-          };
-        }
-        acc[mitraId].amount += amount;
-        acc[mitraId].projects.add(task.project_id);
-        return acc;
-      },
-      {},
-    );
+    // Build top spenders from month-filtered aggregates
+    const pegawaiTotals = pegawaiTotalsMonth;
+    const mitraTotals = mitraTotalsMonth;
 
     // Try to resolve pegawai names in batch; fallback to masked id if RLS blocks
     const pegawaiIds = Object.keys(pegawaiTotals);

@@ -42,16 +42,14 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // If specific day: compute details from tasks (both allocated and unallocated)
+    // If specific day: compute details strictly for that date
     if (dayParam) {
       const day = dayParam;
 
-      // Get all tasks in owned projects with their amounts
+      // Get basic tasks mapping (for project lookup on allocations)
       const { data: allTasks } = await (svc as any)
         .from("tasks")
-        .select(
-          "id, title, pegawai_id, assignee_mitra_id, rate_per_satuan, volume, total_amount, honor_amount, transport_days, project_id",
-        )
+        .select("id, project_id, pegawai_id")
         .in("project_id", ownedIds);
 
       // Get transport allocations for this day
@@ -60,6 +58,20 @@ export async function GET(request: NextRequest) {
         .select("task_id, amount, user_id")
         .eq("allocation_date", day)
         .is("canceled_at", null);
+
+      // Get task titles for allocations
+      const allocationTaskIds = Array.from(
+        new Set((allocations || []).map((a: any) => a.task_id).filter(Boolean)),
+      );
+      const { data: allocationTasks } = allocationTaskIds.length
+        ? await (svc as any)
+            .from("tasks")
+            .select("id, title")
+            .in("id", allocationTaskIds)
+        : { data: [] };
+      const taskTitleById = new Map<string, string>(
+        (allocationTasks || []).map((t: any) => [t.id, t.title || ""]),
+      );
 
       // Get user and project info
       const userIds = Array.from(
@@ -85,12 +97,8 @@ export async function GET(request: NextRequest) {
                 .select("id, nama_lengkap")
                 .in("id", userIds)
             : { data: [] },
-          mitraIds.length
-            ? (svc as any)
-                .from("mitra")
-                .select("id, nama_mitra")
-                .in("id", mitraIds)
-            : { data: [] },
+          // mitra names will be needed for honor details (fetched below after we know overlapping tasks)
+          { data: [] },
           projectIds.length
             ? (svc as any)
                 .from("projects")
@@ -102,7 +110,8 @@ export async function GET(request: NextRequest) {
       const userNameById = new Map<string, string>(
         (userRows || []).map((u: any) => [u.id, u.nama_lengkap]),
       );
-      const mitraNameById = new Map<string, string>(
+      // Mitra names will be resolved later specifically for overlapping tasks on this day
+      const _mitraNameById = new Map<string, string>(
         (mitraRows || []).map((m: any) => [m.id, m.nama_mitra]),
       );
       const projectNameById = new Map<string, string>(
@@ -114,52 +123,68 @@ export async function GET(request: NextRequest) {
         taskIdToProject.set(task.id, task.project_id);
       });
 
-      const allocationIdToProjectId = new Map<string, string>();
-      (allocations || []).forEach((a: any) => {
-        const pid = taskIdToProject.get(a.task_id);
-        if (pid) allocationIdToProjectId.set(a.id, pid);
-      });
-
-      // mitraIds and mitraNameById are already calculated above
-
-      // Calculate details from tasks
+      // Calculate details for the day
       const details: any[] = [];
 
-      // Process transport details (from tasks with pegawai_id)
-      (allTasks || []).forEach((task: any) => {
-        if (task.pegawai_id) {
-          const amount = task.total_amount || task.transport_days * 150000 || 0;
-          if (amount > 0) {
-            details.push({
-              recipient_type: "pegawai",
-              recipient_id: task.pegawai_id,
-              recipient_name:
-                userNameById.get(task.pegawai_id) ||
-                `Pegawai ${task.pegawai_id.slice(0, 6)}`,
-              amount: amount,
-              project_id: task.project_id,
-              project_name: projectNameById.get(task.project_id) || null,
-            });
-          }
-        }
+      // Transport details come from allocations exactly on this date
+      (allocations || []).forEach((a: any) => {
+        const userId = a.user_id;
+        const pid = taskIdToProject.get(a.task_id) || null;
+        const taskTitle = taskTitleById.get(a.task_id) || "";
+        details.push({
+          recipient_type: "pegawai",
+          recipient_id: userId,
+          recipient_name:
+            (userId && userNameById.get(userId)) ||
+            (userId ? `Pegawai ${String(userId).slice(0, 6)}` : "Pegawai"),
+          amount: Number(a.amount || 0),
+          project_id: pid,
+          project_name: pid ? projectNameById.get(pid) || null : null,
+          task_title: taskTitle,
+        });
       });
 
-      // Process honor details (from tasks with assignee_mitra_id)
-      (allTasks || []).forEach((task: any) => {
-        if (task.assignee_mitra_id) {
-          const amount = task.total_amount || task.honor_amount || 0;
-          if (amount > 0) {
-            details.push({
-              recipient_type: "mitra",
-              recipient_id: task.assignee_mitra_id,
-              recipient_name:
-                mitraNameById.get(task.assignee_mitra_id) ||
-                `Mitra ${task.assignee_mitra_id.slice(0, 6)}`,
-              amount: amount,
-              project_id: task.project_id,
-              project_name: projectNameById.get(task.project_id) || null,
-            });
-          }
+      // Honor details: only tasks created on the selected day (start_date == day)
+      const { data: overlappingMitraTasks } = await (svc as any)
+        .from("tasks")
+        .select(
+          "id, project_id, assignee_mitra_id, start_date, end_date, honor_amount, total_amount, title",
+        )
+        .in("project_id", ownedIds)
+        .not("assignee_mitra_id", "is", null)
+        .eq("start_date", day);
+
+      const mitraIdsForDay = Array.from(
+        new Set(
+          (overlappingMitraTasks || [])
+            .map((t: any) => t.assignee_mitra_id)
+            .filter(Boolean),
+        ),
+      );
+      const { data: mitraNameRows } = mitraIdsForDay.length
+        ? await (svc as any)
+            .from("mitra")
+            .select("id, nama_mitra")
+            .in("id", mitraIdsForDay)
+        : { data: [] };
+      const mitraNameById = new Map<string, string>(
+        (mitraNameRows || []).map((m: any) => [m.id, m.nama_mitra]),
+      );
+
+      (overlappingMitraTasks || []).forEach((task: any) => {
+        const amount = Number(task.total_amount || task.honor_amount || 0);
+        if (amount > 0) {
+          details.push({
+            recipient_type: "mitra",
+            recipient_id: task.assignee_mitra_id,
+            recipient_name:
+              mitraNameById.get(task.assignee_mitra_id) ||
+              `Mitra ${String(task.assignee_mitra_id).slice(0, 6)}`,
+            amount,
+            project_id: task.project_id,
+            project_name: projectNameById.get(task.project_id) || null,
+            task_title: task.title || "",
+          });
         }
       });
 

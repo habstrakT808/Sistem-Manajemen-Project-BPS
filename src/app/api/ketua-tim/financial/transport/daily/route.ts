@@ -31,16 +31,17 @@ export async function GET(request: NextRequest) {
       .or(`ketua_tim_id.eq.${user.id},leader_user_id.eq.${user.id}`);
     if (ownedErr) throw ownedErr;
     const ownedIds: string[] = (ownedProjects || []).map((p: any) => p.id);
-    if (ownedIds.length === 0)
-      return NextResponse.json({
-        data: day
-          ? { date: day, details: [] }
-          : {
-              month: Number(monthParam) || 0,
-              year: Number(yearParam) || 0,
-              days: [],
-            },
-      });
+    if (ownedIds.length === 0) {
+      if (day) {
+        return NextResponse.json({ date: day, details: [] });
+      } else {
+        return NextResponse.json({
+          month: Number(monthParam) || 0,
+          year: Number(yearParam) || 0,
+          days: [],
+        });
+      }
+    }
 
     // All tasks in owned projects
     const { data: taskRows, error: taskErr } = await (svc as any)
@@ -56,9 +57,12 @@ export async function GET(request: NextRequest) {
       // Details for a specific day
       const { data: allocations, error: allocErr } = await (svc as any)
         .from("task_transport_allocations")
-        .select("id, task_id, allocation_date, allocated_at, canceled_at")
+        .select(
+          "id, task_id, allocation_date, allocated_at, canceled_at, amount, total_amount, volume, rate_per_satuan, created_at",
+        )
         .eq("allocation_date", day)
-        .is("canceled_at", null);
+        .is("canceled_at", null)
+        .order("created_at", { ascending: true });
       if (allocErr) throw allocErr;
 
       const filtered = (allocations || []).filter((a: any) =>
@@ -96,6 +100,37 @@ export async function GET(request: NextRequest) {
         ),
       );
 
+      // Get transport notes from system_settings (where they are actually stored)
+      const { data: settingsData } = await (svc as any)
+        .from("system_settings")
+        .select("config")
+        .limit(1)
+        .maybeSingle();
+
+      const cfg = (settingsData as any)?.config
+        ? typeof (settingsData as any).config === "string"
+          ? JSON.parse((settingsData as any).config as string)
+          : (settingsData as any).config
+        : {};
+
+      const allNotes: Array<{ allocation_id?: string; note: string }> =
+        Array.isArray(cfg.saved_transport_notes)
+          ? cfg.saved_transport_notes
+          : [];
+
+      // Filter notes for the allocations we have
+      const allocationIds = filtered.map((a: any) => a.id);
+      const relevantNotes = allNotes.filter(
+        (n: any) => n.allocation_id && allocationIds.includes(n.allocation_id),
+      );
+
+      const notesMap = new Map<string, string>();
+      relevantNotes.forEach((n: any) => {
+        if (n.allocation_id && n.note && n.note.trim() !== "") {
+          notesMap.set(n.allocation_id, n.note);
+        }
+      });
+
       const [{ data: users }, { data: projects }] = await Promise.all([
         (svc as any).from("users").select("id, nama_lengkap").in("id", userIds),
         (svc as any)
@@ -110,11 +145,17 @@ export async function GET(request: NextRequest) {
         (projects || []).map((p: any) => [p.id, p]),
       );
 
+      // Build details for each allocation
       const details = filtered.map((a: any) => {
         const t = taskMap.get(a.task_id) || {};
         const userId = t.pegawai_id || t.assignee_user_id;
         const u = userId ? userMap.get(userId) : null;
         const p = t.project_id ? projectMap.get(t.project_id) : null;
+
+        // Get amount (prefer total_amount if available, fallback to amount)
+        const allocatedAmount = a.total_amount || a.amount || 0;
+        const volume = a.volume || 1;
+
         return {
           allocation_id: a.id,
           allocation_date: a.allocation_date,
@@ -122,6 +163,9 @@ export async function GET(request: NextRequest) {
           project_name: p?.nama_project || String(t.project_id || ""),
           task_title: t.title || "",
           task_description: t.deskripsi_tugas || "",
+          amount: allocatedAmount,
+          volume: volume,
+          activity_note: notesMap.has(a.id) ? notesMap.get(a.id)! : "-",
         };
       });
 
