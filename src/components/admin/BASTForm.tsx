@@ -355,6 +355,59 @@ export function BASTForm() {
 
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
 
+  // Helpers to convert between input type="date" (yyyy-MM-dd)
+  // and formats used elsewhere (dd/mm/yyyy for penandatanganan, and '17 Juni 2025' for SK)
+  const toDdMmYyyy = (iso: string) => {
+    if (!iso) return "";
+    const [y, m, d] = iso.split("-");
+    if (!y || !m || !d) return "";
+    return `${d.padStart(2, "0")}/${m.padStart(2, "0")}/${y}`;
+  };
+
+  const fromDdMmYyyyToIso = (src: string) => {
+    if (!src) return "";
+    const parts = src.split("/");
+    if (parts.length !== 3) return "";
+    const [dd, mm, yyyy] = parts;
+    return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
+  };
+
+  const MONTH_NAMES_ID = [
+    "Januari",
+    "Februari",
+    "Maret",
+    "April",
+    "Mei",
+    "Juni",
+    "Juli",
+    "Agustus",
+    "September",
+    "Oktober",
+    "November",
+    "Desember",
+  ];
+
+  const toIdLongDate = (iso: string) => {
+    if (!iso) return "";
+    const [y, m, d] = iso.split("-").map((s) => Number(s));
+    if (!y || !m || !d) return "";
+    return `${String(d)} ${MONTH_NAMES_ID[m - 1]} ${String(y)}`;
+  };
+
+  const fromIdLongToIso = (src: string) => {
+    if (!src) return "";
+    const parts = src.trim().split(/\s+/);
+    if (parts.length < 3) return "";
+    const [ddRaw, monthName, yyyy] = [parts[0], parts[1], parts[2]];
+    const monthIndex = MONTH_NAMES_ID.findIndex(
+      (n) => n.toLowerCase() === monthName.toLowerCase(),
+    );
+    if (monthIndex < 0) return "";
+    const dd = String(Number(ddRaw)).padStart(2, "0");
+    const mm = String(monthIndex + 1).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
   const renderPreview = () => {
     const selectedProject = getSelectedProject();
     const selectedMitras = getSelectedMitras();
@@ -730,21 +783,24 @@ export function BASTForm() {
                   className="flex items-center mb-2"
                 >
                   <Calendar className="w-4 h-4 mr-2" />
-                  Tanggal Penandatanganan (dd/mm/yyyy)
+                  Tanggal Penandatanganan
                 </Label>
                 <Input
                   id="tanggalPenandatanganan"
-                  value={formData.tanggalPenandatanganan}
+                  type="date"
+                  value={fromDdMmYyyyToIso(formData.tanggalPenandatanganan)}
                   onChange={(e) =>
-                    handleInputChange("tanggalPenandatanganan", e.target.value)
+                    handleInputChange(
+                      "tanggalPenandatanganan",
+                      toDdMmYyyy(e.target.value),
+                    )
                   }
-                  placeholder="31/07/2025"
                   className="border-purple-200 focus:border-purple-400"
                 />
                 {formData.tanggalPenandatanganan && (
                   <p className="text-xs text-gray-600 mt-1">
-                    Preview:{" "}
-                    {dateToIndonesianText(formData.tanggalPenandatanganan)}
+                    {dateToIndonesianText(formData.tanggalPenandatanganan)} (
+                    {formData.tanggalPenandatanganan})
                   </p>
                 )}
               </div>
@@ -772,13 +828,18 @@ export function BASTForm() {
                 </Label>
                 <Input
                   id="tanggalSK"
-                  value={formData.tanggalSK}
+                  type="date"
+                  value={fromIdLongToIso(formData.tanggalSK)}
                   onChange={(e) =>
-                    handleInputChange("tanggalSK", e.target.value)
+                    handleInputChange("tanggalSK", toIdLongDate(e.target.value))
                   }
-                  placeholder="Contoh: 17 Juni 2025"
                   className="border-purple-200 focus:border-purple-400"
                 />
+                {formData.tanggalSK && (
+                  <p className="text-xs text-gray-600 mt-1">
+                    {formData.tanggalSK}
+                  </p>
+                )}
               </div>
 
               {/* Action Buttons */}

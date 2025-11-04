@@ -293,6 +293,7 @@ export function ExportDashboard() {
                 <option value="all">Semua Jenis</option>
                 <option value="sk-tim">SK Tim Pelaksana</option>
                 <option value="spk">Surat Perjanjian Kerja (SPK)</option>
+                <option value="bast">Berita Acara Serah Terima (BAST)</option>
               </select>
               <Button
                 variant="outline"
