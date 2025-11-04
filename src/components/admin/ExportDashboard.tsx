@@ -45,13 +45,14 @@ export function ExportDashboard() {
       available: true,
     },
     {
-      id: "reimbursement",
-      title: "Form Reimbursement",
-      description: "Formulir Pengajuan Reimbursement",
+      id: "bast",
+      title: "Berita Acara Serah Terima (BAST)",
+      description:
+        "Berita Acara Serah Terima Hasil Pekerjaan untuk Mitra per Proyek",
       icon: FileText,
       color: "from-purple-500 to-purple-600",
       bgColor: "from-purple-50 to-purple-100",
-      available: false,
+      available: true,
     },
   ];
 
@@ -81,6 +82,8 @@ export function ExportDashboard() {
         return "SK Tim Pelaksana";
       case "spk":
         return "Surat Perjanjian Kerja (SPK)";
+      case "bast":
+        return "Berita Acara Serah Terima (BAST)";
       default:
         return type;
     }
@@ -89,6 +92,8 @@ export function ExportDashboard() {
   const getDraftNumber = (draft: { type: string; data?: any }) => {
     if (draft.type === "spk") {
       return draft.data?.nomorSPK || "-";
+    } else if (draft.type === "bast") {
+      return draft.data?.nomorBAST || "-";
     }
     return draft.data?.nomorSK || "-";
   };
@@ -104,6 +109,12 @@ export function ExportDashboard() {
           JSON.stringify(draft.data),
         );
         router.push("/admin/export/spk");
+      } else if (draft.type === "bast") {
+        localStorage.setItem(
+          "bast_draft_to_preview",
+          JSON.stringify(draft.data),
+        );
+        router.push("/admin/export/bast");
       }
     } catch (e) {
       console.error(e);

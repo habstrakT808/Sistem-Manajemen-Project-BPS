@@ -4,10 +4,164 @@ import { Packer } from "docx";
 import { generateSKDocument } from "@/lib/utils/documentGenerator";
 import { generateSKDocumentWithTemplate } from "@/lib/utils/docxtemplaterGenerator";
 import { generateSPKDocument } from "@/lib/utils/spkGenerator";
+import { generateBASTDocument } from "@/lib/utils/bastGenerator";
+import { generateMultiBASTDocument } from "@/lib/utils/bastGeneratorMulti";
 
 interface ProjectData {
   nama_project: string;
   created_at: string;
+}
+
+/**
+ * Handle BAST document generation (supports multiple mitra)
+ */
+async function handleBASTGeneration(data: any, format: string) {
+  try {
+    const svc = await createServiceRoleClient();
+
+    // Support both single mitraId and multiple mitraIds
+    const mitraIds = data.mitraIds || (data.mitraId ? [data.mitraId] : []);
+
+    if (mitraIds.length === 0) {
+      return NextResponse.json(
+        { error: "At least one mitra ID is required" },
+        { status: 400 },
+      );
+    }
+
+    // Fetch project details
+    const { data: projectData, error: projectError } = await (svc as any)
+      .from("projects")
+      .select(
+        `
+        id,
+        nama_project,
+        leader_user_id,
+        users:leader_user_id (
+          nama_lengkap
+        )
+      `,
+      )
+      .eq("id", data.projectId)
+      .single();
+
+    if (projectError || !projectData) {
+      console.error("Project fetch error:", projectError);
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+
+    // Generate BAST for each mitra
+    const bastDataArray: any[] = [];
+
+    for (const mitraId of mitraIds) {
+      // Fetch mitra details
+      const { data: mitraData, error: mitraError } = await (svc as any)
+        .from("mitra")
+        .select("id, nama_mitra, alamat")
+        .eq("id", mitraId)
+        .single();
+
+      if (mitraError || !mitraData) {
+        console.error("Mitra fetch error for", mitraId, mitraError);
+        continue; // Skip this mitra if not found
+      }
+
+      // Fetch tasks for volume calculation
+      const { data: tasks, error: tasksError } = await (svc as any)
+        .from("tasks")
+        .select(
+          `
+          id,
+          volume,
+          satuan_id,
+          satuan:satuan_id ( nama_satuan )
+        `,
+        )
+        .eq("project_id", data.projectId)
+        .eq("assignee_mitra_id", mitraId);
+
+      if (tasksError) {
+        console.error("Tasks fetch error for mitra", mitraId, tasksError);
+        continue; // Skip this mitra if tasks fetch fails
+      }
+
+      // Calculate volume by satuan
+      const satuanMap = new Map<
+        string,
+        { nama_satuan: string; total: number }
+      >();
+
+      (tasks || []).forEach((task: any) => {
+        const vol = parseFloat(task.volume || 0);
+        if (vol > 0 && task.satuan) {
+          const satuanName = task.satuan.nama_satuan;
+          if (satuanMap.has(satuanName)) {
+            satuanMap.get(satuanName)!.total += vol;
+          } else {
+            satuanMap.set(satuanName, { nama_satuan: satuanName, total: vol });
+          }
+        }
+      });
+
+      const volumeBySatuan = Array.from(satuanMap.values());
+
+      // Prepare BAST data for this mitra
+      bastDataArray.push({
+        nomorBAST: data.nomorBAST,
+        projectId: data.projectId,
+        projectName: projectData.nama_project,
+        month: data.month,
+        year: data.year,
+        mitraId: mitraId,
+        mitraData: {
+          nama_mitra: mitraData.nama_mitra,
+          alamat: mitraData.alamat || "",
+        },
+        ketuaTimName: projectData.users?.nama_lengkap || "",
+        tanggalPenandatanganan: data.tanggalPenandatanganan,
+        nomorSK: data.nomorSK,
+        tanggalSK: data.tanggalSK,
+        volumeBySatuan,
+      });
+    }
+
+    if (bastDataArray.length === 0) {
+      return NextResponse.json(
+        { error: "No valid BAST data could be generated" },
+        { status: 404 },
+      );
+    }
+
+    if (format === "docx") {
+      // Generate multi-mitra BAST with page breaks
+      const doc = await generateMultiBASTDocument(bastDataArray);
+      const buffer = await Packer.toBuffer(doc);
+
+      const filename =
+        bastDataArray.length === 1
+          ? `BAST-${data.nomorBAST}-${bastDataArray[0].mitraData.nama_mitra}.docx`
+          : `BAST-${data.nomorBAST}-${bastDataArray.length}Mitra.docx`;
+
+      return new NextResponse(buffer as unknown as BodyInit, {
+        headers: {
+          "Content-Type":
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "Content-Disposition": `attachment; filename="${filename}"`,
+        },
+      });
+    } else {
+      return NextResponse.json(
+        { error: "Format tidak didukung. Gunakan format 'docx'." },
+        { status: 400 },
+      );
+    }
+  } catch (error) {
+    console.error("Error generating BAST:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
+  }
 }
 
 /**
@@ -158,7 +312,7 @@ export async function POST(request: NextRequest) {
 
     console.log("Export request body:", { type, format, data });
 
-    if (type !== "sk-tim" && type !== "spk") {
+    if (type !== "sk-tim" && type !== "spk" && type !== "bast") {
       return NextResponse.json(
         { error: "Document type not supported yet" },
         { status: 400 },
@@ -169,6 +323,11 @@ export async function POST(request: NextRequest) {
     if (type === "spk") {
       // SPK specific handling
       return await handleSPKGeneration(data, format);
+    }
+
+    if (type === "bast") {
+      // BAST specific handling
+      return await handleBASTGeneration(data, format);
     }
 
     // SK-TIM handling (original code)
