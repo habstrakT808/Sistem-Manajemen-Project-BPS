@@ -69,6 +69,7 @@ interface FinancialData {
   top_spenders: {
     pegawai: Array<{ name: string; amount: number; projects: number }>;
     mitra: Array<{
+      id: string;
       name: string;
       amount: number;
       projects: number;
@@ -188,7 +189,8 @@ export default function FinancialDashboard() {
     isFetching,
     refetch,
   } = useQuery<FinancialData, Error>({
-    queryKey: ["ketua", "financial", { selectedPeriod, month, year }],
+    // bump version to refresh cached shape after API change (adds mitra.id)
+    queryKey: ["ketua", "financial", { selectedPeriod, month, year, v: 2 }],
     queryFn: () => fetchFinancialData(selectedPeriod, month, year),
     staleTime: 5 * 60 * 1000,
   });
@@ -497,12 +499,13 @@ export default function FinancialDashboard() {
                   {selectedYear}
                 </div>
               </div>
-              <div className="p-6 space-y-4">
+              <div className="p-6 space-y-6">
                 {project_budgets.map((project, index) => (
                   <Link
                     key={index}
                     href={`/ketua-tim/projects/${project.id}`}
                     prefetch
+                    className="block"
                     onMouseEnter={() =>
                       router.prefetch(`/ketua-tim/projects/${project.id}`)
                     }
@@ -593,7 +596,7 @@ export default function FinancialDashboard() {
                   <h4 className="font-semibold text-gray-900 mb-3">
                     Anggota Tim
                   </h4>
-                  <div className="space-y-2">
+                  <div className="space-y-5">
                     {top_spenders.pegawai.map((pegawai, index) => (
                       <div
                         key={index}
@@ -620,41 +623,78 @@ export default function FinancialDashboard() {
                 {/* Top Mitra */}
                 <div>
                   <h4 className="font-semibold text-gray-900 mb-3">Mitra</h4>
-                  <div className="space-y-2">
-                    {top_spenders.mitra.map((mitra, index) => (
-                      <div
-                        key={index}
-                        className={`flex items-center justify-between p-3 rounded-lg border ${mitra.remaining_limit < 0 ? "bg-red-50 border-red-200" : "bg-green-50 border-green-100"}`}
-                      >
-                        <div>
-                          <div className="font-medium text-gray-900">
-                            {mitra.name}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {mitra.projects} proyek
-                          </div>
-                          {mitra.remaining_limit < 0 && (
-                            <div className="text-xs text-red-600 flex items-center mt-1">
-                              <AlertCircle className="w-3 h-3 mr-1" />
-                              Melebihi batas sebesar{" "}
-                              {formatCurrency(Math.abs(mitra.remaining_limit))}
-                            </div>
-                          )}
-                        </div>
-                        <div className="text-right">
+                  <div className="space-y-5">
+                    {top_spenders.mitra.map((mitra, index) =>
+                      mitra.id ? (
+                        <Link
+                          key={index}
+                          href={`/ketua-tim/financial/mitra/${mitra.id}?month=${selectedMonth}&year=${selectedYear}`}
+                          prefetch
+                          className="block"
+                          onMouseEnter={() =>
+                            router.prefetch(
+                              `/ketua-tim/financial/mitra/${mitra.id}?month=${selectedMonth}&year=${selectedYear}`,
+                            )
+                          }
+                        >
                           <div
-                            className={`font-semibold ${mitra.remaining_limit < 0 ? "text-red-600" : "text-green-600"}`}
+                            className={`flex items-center justify-between p-3 rounded-lg border transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer ${mitra.remaining_limit < 0 ? "bg-red-50 border-red-200" : "bg-green-50 border-green-100"}`}
                           >
-                            {formatCurrency(mitra.amount)}
+                            <div>
+                              <div className="font-medium text-gray-900">
+                                {mitra.name}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                {mitra.projects} proyek
+                              </div>
+                              {mitra.remaining_limit < 0 && (
+                                <div className="text-xs text-red-600 flex items-center mt-1">
+                                  <AlertCircle className="w-3 h-3 mr-1" />
+                                  Melebihi batas sebesar{" "}
+                                  {formatCurrency(
+                                    Math.abs(mitra.remaining_limit),
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <div
+                                className={`font-semibold ${mitra.remaining_limit < 0 ? "text-red-600" : "text-green-600"}`}
+                              >
+                                {formatCurrency(mitra.amount)}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {mitra.remaining_limit >= 0
+                                  ? `${formatCurrency(mitra.remaining_limit)} tersisa`
+                                  : "Melebihi batas"}
+                              </div>
+                            </div>
                           </div>
-                          <div className="text-xs text-gray-500">
-                            {mitra.remaining_limit >= 0
-                              ? `${formatCurrency(mitra.remaining_limit)} tersisa`
-                              : "Melebihi batas"}
+                        </Link>
+                      ) : (
+                        <div
+                          key={index}
+                          className={`flex items-center justify-between p-3 rounded-lg border ${mitra.remaining_limit < 0 ? "bg-red-50 border-red-200" : "bg-green-50 border-green-100"} opacity-70`}
+                          title="Data belum lengkap, muat ulang untuk melihat detail"
+                        >
+                          <div>
+                            <div className="font-medium text-gray-900">
+                              {mitra.name}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {mitra.projects} proyek
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div
+                              className={`font-semibold ${mitra.remaining_limit < 0 ? "text-red-600" : "text-green-600"}`}
+                            >
+                              {formatCurrency(mitra.amount)}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ),
+                    )}
                   </div>
                 </div>
               </div>

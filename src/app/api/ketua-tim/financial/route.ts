@@ -299,30 +299,42 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const projectBudgets: ProjectBudget[] = (projectRows || []).map(
-      (p: {
+    // Only include projects that have any budget in the selected month
+    const projectInfoById = new Map<
+      string,
+      {
         id: string;
         nama_project: string;
         status: string;
         deadline: string;
-      }) => {
-        const b = budgetByProject.get(p.id) || { transport: 0, honor: 0 };
-        const totalBudget = b.transport + b.honor;
+      }
+    >();
+    for (const p of projectRows || []) {
+      projectInfoById.set((p as any).id, p as any);
+    }
+
+    const projectBudgets: ProjectBudget[] = Array.from(
+      budgetByProject.entries(),
+    )
+      .map(([projectId, b]) => {
+        const info = projectInfoById.get(projectId);
+        if (!info) return null as any;
+        const totalBudget = (b.transport || 0) + (b.honor || 0);
         return {
-          id: p.id,
-          nama_project: p.nama_project,
+          id: info.id,
+          nama_project: info.nama_project,
           total_budget: totalBudget,
-          transport_budget: b.transport,
-          honor_budget: b.honor,
-          status: p.status as "upcoming" | "active" | "completed",
-          deadline: p.deadline,
+          transport_budget: b.transport || 0,
+          honor_budget: b.honor || 0,
+          status: info.status as "upcoming" | "active" | "completed",
+          deadline: info.deadline,
           budget_percentage:
             totalSpending > 0
               ? Math.round((totalBudget / totalSpending) * 100)
               : 0,
-        };
-      },
-    );
+        } as ProjectBudget;
+      })
+      .filter((p) => p && p.total_budget > 0);
 
     const totalActiveBudget = projectBudgets.reduce(
       (sum: number, project: ProjectBudget) => sum + project.total_budget,
@@ -463,14 +475,15 @@ export async function GET(request: NextRequest) {
       else r.name = `Mitra ${id.slice(0, 6)}`;
     }
 
-    const topMitra = Object.values(mitraTotals)
-      .map((m) => {
+    const topMitra = Object.entries(mitraTotals)
+      .map(([id, m]) => {
         const mitra = m as {
           name: string;
           amount: number;
           projects: Set<string>;
         };
         return {
+          id,
           name: mitra.name,
           amount: mitra.amount,
           projects: mitra.projects.size,
@@ -479,8 +492,7 @@ export async function GET(request: NextRequest) {
       })
       .sort(
         (a: { amount: number }, b: { amount: number }) => b.amount - a.amount,
-      )
-      .slice(0, 5);
+      );
 
     const stats: FinancialStats = {
       total_monthly_spending: totalSpending,

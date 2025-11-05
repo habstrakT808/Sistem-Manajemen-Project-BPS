@@ -3,8 +3,8 @@ import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 
 /**
  * GET /api/admin/export/spk/mitra
- * Fetch mitra yang memiliki task di bulan tertentu pada project tertentu
- * Query params: projectId, month (1-12), year
+ * Fetch mitra yang memiliki task di bulan tertentu (dari semua project)
+ * Query params: month (1-12), year
  */
 export async function GET(request: NextRequest) {
   try {
@@ -33,13 +33,12 @@ export async function GET(request: NextRequest) {
 
     // Get query params
     const searchParams = request.nextUrl.searchParams;
-    const projectId = searchParams.get("projectId");
     const month = searchParams.get("month");
     const year = searchParams.get("year");
 
-    if (!projectId || !month || !year) {
+    if (!month || !year) {
       return NextResponse.json(
-        { error: "projectId, month, and year are required" },
+        { error: "month and year are required" },
         { status: 400 },
       );
     }
@@ -57,15 +56,14 @@ export async function GET(request: NextRequest) {
     // Use service client to bypass RLS
     const svc = await createServiceRoleClient();
 
-    // Calculate date range for the month
-    const startDate = new Date(yearNum, monthNum - 1, 1);
-    const endDate = new Date(yearNum, monthNum, 0); // Last day of month
+    // Calculate date range for the month (manual format to avoid timezone issues)
+    const monthStr = monthNum.toString().padStart(2, "0");
+    const startDateStr = `${yearNum}-${monthStr}-01`;
+    const lastDay = new Date(yearNum, monthNum, 0).getDate();
+    const endDateStr = `${yearNum}-${monthStr}-${lastDay.toString().padStart(2, "0")}`;
 
-    const startDateStr = startDate.toISOString().split("T")[0];
-    const endDateStr = endDate.toISOString().split("T")[0];
-
-    // Fetch tasks with mitra in the specified month
-    const { data: tasks, error: tasksError } = await (svc as any)
+    // Fetch tasks with mitra in the specified month (from all projects)
+    let { data: tasks, error: tasksError } = await (svc as any)
       .from("tasks")
       .select(
         `
@@ -73,6 +71,7 @@ export async function GET(request: NextRequest) {
         title,
         start_date,
         end_date,
+        tanggal_tugas,
         honor_amount,
         satuan_id,
         rate_per_satuan,
@@ -90,10 +89,46 @@ export async function GET(request: NextRequest) {
         )
       `,
       )
-      .eq("project_id", projectId)
       .not("assignee_mitra_id", "is", null)
-      .lte("start_date", endDateStr)
-      .gte("end_date", startDateStr);
+      .gte("start_date", startDateStr)
+      .lte("start_date", endDateStr);
+
+    // Fallback: some legacy records may only have tanggal_tugas
+    if ((!tasks || tasks.length === 0) && !tasksError) {
+      const { data: legacyTasks, error: legacyError } = await (svc as any)
+        .from("tasks")
+        .select(
+          `
+        id,
+        title,
+        start_date,
+        end_date,
+        tanggal_tugas,
+        honor_amount,
+        satuan_id,
+        rate_per_satuan,
+        volume,
+        assignee_mitra_id,
+        mitra:assignee_mitra_id (
+          id,
+          nama_mitra,
+          alamat,
+          kontak,
+          pekerjaan_id,
+          mitra_occupations:pekerjaan_id (
+            name
+          )
+        )
+      `,
+        )
+        .not("assignee_mitra_id", "is", null)
+        .gte("tanggal_tugas", startDateStr)
+        .lte("tanggal_tugas", endDateStr);
+
+      if (!legacyError && legacyTasks && legacyTasks.length > 0) {
+        tasks = legacyTasks;
+      }
+    }
 
     if (tasksError) {
       console.error("Error fetching tasks:", tasksError);

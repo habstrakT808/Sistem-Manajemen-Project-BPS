@@ -61,11 +61,12 @@ export async function POST(request: NextRequest) {
     if (!user)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { title, description, start_date, end_date } = body as {
+    const { title, description, start_date, end_date, employee_ids } = body as {
       title: string;
       description?: string;
       start_date: string;
       end_date: string;
+      employee_ids?: string[] | null;
     };
 
     if (!title || !start_date || !end_date) {
@@ -80,6 +81,8 @@ export async function POST(request: NextRequest) {
       end_date,
       created_by: user.id,
       created_at: new Date().toISOString(),
+      employee_ids:
+        employee_ids && employee_ids.length > 0 ? employee_ids : null,
     };
 
     const svc = getService();
@@ -124,13 +127,45 @@ export async function POST(request: NextRequest) {
     }
 
     // Auto-clear existing allocations that now fall into the scheduled (blocked) dates
+    // Only clear for selected employees (or all if employee_ids is null)
     try {
-      await (svc as any)
+      let query = (svc as any)
         .from("task_transport_allocations")
         .update({ allocation_date: null, allocated_at: null })
         .gte("allocation_date", start_date)
         .lte("allocation_date", end_date)
         .is("canceled_at", null);
+
+      // If employee_ids is specified, only clear for those employees
+      if (employee_ids && employee_ids.length > 0) {
+        // Get user IDs from task_transport_allocations by joining with tasks
+        // We need to filter by employee_id (user_id) in the allocations
+        // Since we can't easily join, we'll filter after fetching
+        const { data: allocations } = await (svc as any)
+          .from("task_transport_allocations")
+          .select("id, employee_id")
+          .gte("allocation_date", start_date)
+          .lte("allocation_date", end_date)
+          .is("canceled_at", null);
+
+        if (allocations && allocations.length > 0) {
+          const allocationIdsToClear = allocations
+            .filter(
+              (a: any) => a.employee_id && employee_ids.includes(a.employee_id),
+            )
+            .map((a: any) => a.id);
+
+          if (allocationIdsToClear.length > 0) {
+            await (svc as any)
+              .from("task_transport_allocations")
+              .update({ allocation_date: null, allocated_at: null })
+              .in("id", allocationIdsToClear);
+          }
+        }
+      } else {
+        // Clear all (backward compatibility)
+        await query;
+      }
     } catch (_) {}
 
     return NextResponse.json({ schedule: newItem });

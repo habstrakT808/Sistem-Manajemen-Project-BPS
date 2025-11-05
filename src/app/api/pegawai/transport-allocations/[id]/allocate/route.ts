@@ -89,6 +89,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     }
 
     // Block if date falls into an admin global schedule
+    // Only block if the current user is in the schedule's employee_ids (or if employee_ids is null/empty)
     try {
       const { data: settings, error: setErr } = await (serviceClient as any)
         .from("system_settings")
@@ -106,12 +107,29 @@ export async function POST(request: Request, { params }: RouteParams) {
             return new Date(yy, (mm || 1) - 1, dd || 1);
           };
           const alloc = parseYmd(String(allocation_date).slice(0, 10));
+
+          // Get current user's ID
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+          const currentUserId = user?.id;
+
           const blocked = schedules.some((s) => {
             const sd = parseYmd(String(s.start_date));
             const ed = parseYmd(String(s.end_date));
-            return (
-              alloc.getTime() >= sd.getTime() && alloc.getTime() <= ed.getTime()
-            );
+            const dateInRange =
+              alloc.getTime() >= sd.getTime() &&
+              alloc.getTime() <= ed.getTime();
+
+            if (!dateInRange) return false;
+
+            // If employee_ids is null or empty, block all employees (backward compatibility)
+            if (!s.employee_ids || s.employee_ids.length === 0) {
+              return true;
+            }
+
+            // Only block if current user is in the employee_ids list
+            return currentUserId && s.employee_ids.includes(currentUserId);
           });
           if (blocked) {
             return NextResponse.json(

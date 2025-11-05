@@ -325,14 +325,40 @@ export default function TransportAnalytics() {
 
   const handleExport = async () => {
     try {
+      // Build query parameters with date filters and other filters
+      const params = new URLSearchParams({
+        year: dateFilters.year,
+        month: dateFilters.month,
+        day: dateFilters.day,
+        pegawaiId: filters.pegawaiId || "",
+        mitraId: filters.mitraId || "",
+        projectId: filters.projectId || "",
+        teamId: filters.teamId || "",
+        type: filters.type || "all",
+      });
+
       const response = await fetch(
-        `/api/admin/analytics/transport/export?period=${selectedPeriod}`,
+        `/api/admin/analytics/transport/export?${params.toString()}`,
       );
+
+      if (!response.ok) {
+        throw new Error("Gagal mengekspor data");
+      }
+
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `transport_analytics_${selectedPeriod}.csv`;
+
+      // Generate filename with date filter info
+      const dateStr =
+        dateFilters.day !== "all"
+          ? `${dateFilters.year}-${dateFilters.month.padStart(2, "0")}-${dateFilters.day.padStart(2, "0")}`
+          : dateFilters.month !== "all"
+            ? `${dateFilters.year}-${dateFilters.month.padStart(2, "0")}`
+            : `${dateFilters.year}`;
+
+      a.download = `transport_analytics_${dateStr}.xlsx`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);

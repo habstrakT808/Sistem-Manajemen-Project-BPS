@@ -284,13 +284,25 @@ export async function GET(request: NextRequest) {
           deadline: string;
           created_at: string;
         }): Promise<ProjectSummary> => {
-          // Get team size from project_members
-          const { data: members } = await (svc as any)
-            .from("project_members")
-            .select("id")
-            .eq("project_id", project.id);
+          // Get team size from project_members (pegawai) + mitra from project_assignments
+          const [{ data: members }, { data: mitraAssignments }] =
+            await Promise.all([
+              (svc as any)
+                .from("project_members")
+                .select("id")
+                .eq("project_id", project.id),
+              (svc as any)
+                .from("project_assignments")
+                .select("assignee_id")
+                .eq("project_id", project.id)
+                .eq("assignee_type", "mitra"),
+            ]);
 
-          const team_size = (members || []).length;
+          const pegawaiCount = (members || []).length;
+          const mitraCount = new Set(
+            (mitraAssignments || []).map((m: any) => m.assignee_id),
+          ).size;
+          const team_size = pegawaiCount + mitraCount;
 
           // Calculate progress based on completed tasks vs total tasks
           const { data: allTasks } = await (svc as any)

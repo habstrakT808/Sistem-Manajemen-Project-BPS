@@ -3,8 +3,8 @@ import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 
 /**
  * GET /api/admin/export/bast/mitra
- * Fetch mitra yang memiliki task di project tertentu untuk bulan tertentu
- * Query params: projectId, month (1-12), year
+ * Fetch daftar mitra yang memiliki task di project tertentu (tanpa filter bulan/tahun)
+ * Query params: projectId
  */
 export async function GET(request: NextRequest) {
   try {
@@ -34,22 +34,9 @@ export async function GET(request: NextRequest) {
     // Get query params
     const searchParams = request.nextUrl.searchParams;
     const projectId = searchParams.get("projectId");
-    const month = searchParams.get("month");
-    const year = searchParams.get("year");
-
-    if (!projectId || !month || !year) {
+    if (!projectId) {
       return NextResponse.json(
-        { error: "projectId, month, and year are required" },
-        { status: 400 },
-      );
-    }
-
-    const monthNum = parseInt(month);
-    const yearNum = parseInt(year);
-
-    if (monthNum < 1 || monthNum > 12) {
-      return NextResponse.json(
-        { error: "Invalid month (must be 1-12)" },
+        { error: "projectId is required" },
         { status: 400 },
       );
     }
@@ -57,14 +44,7 @@ export async function GET(request: NextRequest) {
     // Use service client to bypass RLS
     const svc = await createServiceRoleClient();
 
-    // Calculate date range for the month
-    const startDate = new Date(yearNum, monthNum - 1, 1);
-    const endDate = new Date(yearNum, monthNum, 0); // Last day of month
-
-    const startDateStr = startDate.toISOString().split("T")[0];
-    const endDateStr = endDate.toISOString().split("T")[0];
-
-    // Fetch tasks with mitra in the specified month
+    // Fetch tasks with mitra for the project (any date range)
     const { data: tasks, error: tasksError } = await (svc as any)
       .from("tasks")
       .select(
@@ -87,9 +67,7 @@ export async function GET(request: NextRequest) {
       `,
       )
       .eq("project_id", projectId)
-      .not("assignee_mitra_id", "is", null)
-      .lte("start_date", endDateStr)
-      .gte("end_date", startDateStr);
+      .not("assignee_mitra_id", "is", null);
 
     if (tasksError) {
       console.error("Error fetching tasks:", tasksError);

@@ -94,1157 +94,1162 @@ export async function generateSPKDocument(data: SPKData): Promise<Document> {
 
   // Margins: Top 1cm, Bottom 2.5cm, Left 2cm, Right 2cm
   // 1cm = 0.3937 inch
-  const doc = new Document({
-    styles: {
-      paragraphStyles: [
-        {
-          id: "Normal",
-          name: "Normal",
-          basedOn: "Normal",
-          next: "Normal",
-          quickFormat: true,
-          paragraph: {
-            spacing: { line: 300, lineRule: "auto" },
-          },
-        },
-      ],
-    },
-    sections: [
-      {
-        footers: {
-          default: new Footer({
-            children: [
-              new Paragraph({
-                alignment: AlignmentType.CENTER,
-                children: [
-                  new TextRun({ text: "[" }),
-                  new TextRun({ children: [PageNumber.CURRENT] }),
-                  new TextRun({ text: "]" }),
-                ],
-              }),
-            ],
-          }),
-        },
-        properties: {
-          page: {
-            margin: {
-              top: convertInchesToTwip(0.3937), // 1cm
-              right: convertInchesToTwip(0.7874), // 2cm
-              bottom: convertInchesToTwip(0.9843), // 2.5cm
-              left: convertInchesToTwip(0.7874), // 2cm
-            },
-            size: {
-              width: convertInchesToTwip(8.27), // A4 width: 21cm
-              height: convertInchesToTwip(11.69), // A4 height: 29.7cm
+  let doc: Document;
+  try {
+    doc = new Document({
+      styles: {
+        paragraphStyles: [
+          {
+            id: "Normal",
+            name: "Normal",
+            basedOn: "Normal",
+            next: "Normal",
+            quickFormat: true,
+            paragraph: {
+              spacing: { line: 300, lineRule: "auto" },
             },
           },
-        },
-        children: [
-          // HEADER - PERJANJIAN KERJA
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "PERJANJIAN KERJA",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 0 },
-          }),
-
-          // PETUGAS KEGIATAN SURVEI / SENSUS BULAN ... TAHUN ...
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: `PETUGAS KEGIATAN SURVEI / SENSUS BULAN ${monthName.toUpperCase()} TAHUN ${year}`,
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 0 },
-          }),
-
-          // PADA BADAN PUSAT STATISTIK KOTA BATU
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "PADA BADAN PUSAT STATISTIK KOTA BATU",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 0 },
-          }),
-
-          // NOMOR
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "NOMOR: ",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: nomorSPK,
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-                color: "FF0000",
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 0 },
-          }),
-
-          // extra blank line after NOMOR
-          new Paragraph({ children: [], spacing: { after: 0 } }),
-
-          // Tanggal penandatanganan
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: `Pada hari ini ${tanggalText}, bertempat di Kota Batu, yang bertanda tangan di bawah ini:`,
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-            ],
-            alignment: AlignmentType.JUSTIFIED,
-            spacing: { after: 0 },
-          }),
-
-          // extra blank line after opening sentence
-          new Paragraph({ children: [], spacing: { after: 0 } }),
-
-          // Para Pihak Table
-          createParaPihakTable(namaPejabat, mitraData),
-
-          // Spacer line before opening paragraph so it doesn't stick to the table above
-          new Paragraph({
-            children: [],
-            spacing: { after: 0 },
-          }),
-
-          // Paragraf pembuka perjanjian
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "bahwa ",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "PIHAK PERTAMA",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: " dan ",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "PIHAK KEDUA",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: " yang secara bersama-sama disebut ",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "PARA PIHAK",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: `, sepakat untuk mengikatkan diri dalam Perjanjian Kerja Petugas Kegiatan Survei/Sensus Bulan ${monthName} Tahun ${year} di Badan Pusat Statistik Kota Batu, yang selanjutnya disebut Perjanjian, dengan ketentuan-ketentuan sebagai berikut:`,
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-            ],
-            alignment: AlignmentType.JUSTIFIED,
-            spacing: { after: 0 },
-          }),
-
-          // PASAL 1
-          new Paragraph({ children: [], spacing: { after: 0 } }),
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "Pasal 1",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 0 },
-          }),
-
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "PIHAK PERTAMA",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: " memberikan pekerjaan kepada ",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "PIHAK KEDUA",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: " dan ",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "PIHAK KEDUA",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: " menerima pekerjaan dari ",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "PIHAK PERTAMA",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: ` sebagai Petugas Kegiatan Survei / Sensus Bulan ${monthName} Tahun ${year}, dengan lingkup pekerjaan yang ditetapkan oleh `,
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "PIHAK PERTAMA",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: ".",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-            ],
-            alignment: AlignmentType.JUSTIFIED,
-            spacing: { after: 0 },
-          }),
-
-          // PASAL 2
-          new Paragraph({ children: [], spacing: { after: 0 } }),
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "Pasal 2",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 0 },
-          }),
-
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: `Ruang lingkup pekerjaan dalam Perjanjian ini mengacu pada wilayah kerja dan beban kerja sebagaimana tertuang dalam lampiran Perjanjian serta pedoman Petugas Kegiatan Survei / Sensus Bulan ${monthName} Tahun ${year} pada Badan Pusat Statistik Kota Batu, dan ketentuan-ketentuan yang ditetapkan oleh `,
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "PIHAK PERTAMA",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: ".",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-            ],
-            alignment: AlignmentType.JUSTIFIED,
-            spacing: { after: 0 },
-          }),
-
-          // PASAL 3
-          new Paragraph({ children: [], spacing: { after: 0 } }),
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "Pasal 3",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 0 },
-          }),
-
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: `Jangka Waktu Perjanjian terhitung sejak tanggal ${monthRange.startText} sampai dengan tanggal ${monthRange.endText}.`,
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-            ],
-            alignment: AlignmentType.JUSTIFIED,
-            spacing: { after: 0 },
-          }),
-
-          // PASAL 4
-          new Paragraph({ children: [], spacing: { after: 0 } }),
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "Pasal 4",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 0 },
-          }),
-
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "PIHAK KEDUA",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: " berkewajiban melaksanakan seluruh pekerjaan yang diberikan oleh ",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "PIHAK PERTAMA",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: " sampai selesai, sesuai ruang lingkup pekerjaan sebagaimana dimaksud dalam Pasal 2.",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-            ],
-            alignment: AlignmentType.JUSTIFIED,
-            spacing: { after: 0 },
-          }),
-
-          // PASAL 5
-          new Paragraph({ children: [], spacing: { after: 0 } }),
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "Pasal 5",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 0 },
-          }),
-
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "(1)\t",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "PIHAK KEDUA",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: ` berhak untuk mendapatkan honorarium Petugas Kegiatan Survei / Sensus Bulan ${monthName} Tahun ${year} dari `,
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "PIHAK PERTAMA",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: " sebesar (",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "terlampir",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                italics: true,
-              }),
-              new TextRun({
-                text: ") untuk pekerjaan sebagaimana dimaksud dalam Pasal 2, sudah termasuk biaya pajak, bea materai, transport, dan jasa pelayanan keuangan.",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-            ],
-            alignment: AlignmentType.JUSTIFIED,
-            indent: {
-              left: convertInchesToTwip(0.5),
-              hanging: convertInchesToTwip(0.5),
-            },
-            tabStops: [
-              { type: TabStopType.LEFT, position: convertInchesToTwip(0.5) },
-            ],
-            spacing: { after: 0 },
-          }),
-
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "(2)\t",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "PIHAK KEDUA",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: " tidak diberikan honorarium tambahan apabila melakukan kunjungan di luar jadwal pelaksanaan pekerjaan lapangan.",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-            ],
-            alignment: AlignmentType.JUSTIFIED,
-            indent: {
-              left: convertInchesToTwip(0.5),
-              hanging: convertInchesToTwip(0.5),
-            },
-            tabStops: [
-              { type: TabStopType.LEFT, position: convertInchesToTwip(0.5) },
-            ],
-            spacing: { after: 0 },
-          }),
-
-          // Continue with remaining Pasal sections...
-          // PASAL 6
-          new Paragraph({ children: [], spacing: { after: 0 } }),
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "Pasal 6",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 0 },
-          }),
-
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "(1)\tPembayaran honorarium sebagaimana dimaksud dalam Pasal 5 dilakukan setelah ",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "PIHAK KEDUA",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: " menyelesaikan dan menyerahkan seluruh hasil pekerjaan sebagaimana dimaksud dalam Pasal 2 kepada ",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "PIHAK PERTAMA",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: ".",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-            ],
-            alignment: AlignmentType.JUSTIFIED,
-            indent: {
-              left: convertInchesToTwip(0.5),
-              hanging: convertInchesToTwip(0.5),
-            },
-            tabStops: [
-              { type: TabStopType.LEFT, position: convertInchesToTwip(0.5) },
-            ],
-            spacing: { after: 0 },
-          }),
-
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "(2)\tPembayaran sebagaimana dimaksud pada ayat (1) dilakukan oleh ",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "PIHAK PERTAMA",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: " kepada ",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "PIHAK KEDUA",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: " sesuai dengan ketentuan peraturan perundang-undangan.",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-            ],
-            alignment: AlignmentType.JUSTIFIED,
-            indent: {
-              left: convertInchesToTwip(0.5),
-              hanging: convertInchesToTwip(0.5),
-            },
-            tabStops: [
-              { type: TabStopType.LEFT, position: convertInchesToTwip(0.5) },
-            ],
-            spacing: { after: 0 },
-          }),
-
-          // PASAL 7
-          new Paragraph({ children: [], spacing: { after: 0 } }),
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "Pasal 7",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 0 },
-          }),
-
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: `Penyerahan hasil pekerjaan lapangan sebagaimana dimaksud dalam Pasal 2 dilakukan secara bertahap dan selambat-lambatnya seluruh hasil pekerjaan lapangan diserahkan pada tanggal ${monthRange.endText} yang dinyatakan dalam Berita Acara Serah Terima Hasil Pekerjaan yang ditandatangani oleh `,
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "PARA PIHAK",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: ".",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-            ],
-            alignment: AlignmentType.JUSTIFIED,
-            spacing: { after: 240 },
-          }),
-
-          // PASAL 8
-          new Paragraph({ children: [], spacing: { after: 0 } }),
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "Pasal 8",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 0 },
-          }),
-
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "PIHAK PERTAMA",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: " dapat memutuskan Perjanjian ini secara sepihak sewaktu-waktu dalam hal ",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "PIHAK KEDUA",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: " tidak dapat melaksanakan kewajibannya sebagaimana dimaksud dalam Pasal 4, dengan menerbitkan Surat Pemutusan Perjanjian Kerja.",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-            ],
-            alignment: AlignmentType.JUSTIFIED,
-            spacing: { after: 240 },
-          }),
-
-          // PASAL 9
-          new Paragraph({ children: [], spacing: { after: 0 } }),
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "Pasal 9",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 0 },
-          }),
-
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "(1)\tApabila ",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "PIHAK KEDUA",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: " mengundurkan diri pada saat/setelah pelaksanaan pekerjaan lapangan dengan tidak menyelesaikan pekerjaan yang menjadi tanggung jawabnya, maka wajib membayar ganti rugi kepada ",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "PIHAK PERTAMA",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: " sebesar nilai perjanjian yang menjadi beban kerjanya",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-            ],
-            alignment: AlignmentType.JUSTIFIED,
-            indent: {
-              left: convertInchesToTwip(0.5),
-              hanging: convertInchesToTwip(0.5),
-            },
-            tabStops: [
-              { type: TabStopType.LEFT, position: convertInchesToTwip(0.5) },
-            ],
-            spacing: { after: 120 },
-          }),
-
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "(2)\tDikecualikan tidak membayar ganti rugi sebagaimana dimaksud pada ayat (1) kepada ",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "PIHAK PERTAMA",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: ", apabila ",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "PIHAK KEDUA",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: " meninggal dunia, mengundurkan diri karena sakit dengan keterangan rawat inap, kecelakaan dengan keterangan kepolisian, dan/atau telah diberikan Surat Pemutusan Perjanjian Kerja dari ",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "PIHAK PERTAMA",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: ".",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-            ],
-            alignment: AlignmentType.JUSTIFIED,
-            indent: {
-              left: convertInchesToTwip(0.5),
-              hanging: convertInchesToTwip(0.5),
-            },
-            tabStops: [
-              { type: TabStopType.LEFT, position: convertInchesToTwip(0.5) },
-            ],
-            spacing: { after: 120 },
-          }),
-
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "(3)\tDalam hal terjadi peristiwa sebagaimana dimaksud pada ayat (2), ",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "PIHAK PERTAMA",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: " membayarkan honorarium kepada ",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "PIHAK KEDUA",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: " secara proporsional sesuai pekerjaan yang telah dilaksanakan.",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-            ],
-            alignment: AlignmentType.JUSTIFIED,
-            indent: {
-              left: convertInchesToTwip(0.5),
-              hanging: convertInchesToTwip(0.5),
-            },
-            tabStops: [
-              { type: TabStopType.LEFT, position: convertInchesToTwip(0.5) },
-            ],
-            spacing: { after: 0 },
-          }),
-
-          // PASAL 10
-          new Paragraph({ children: [], spacing: { after: 0 } }),
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "Pasal 10",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 120 },
-          }),
-
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "(1)\tApabila terjadi Keadaan Kahar, yang meliputi bencana alam dan bencana sosial, ",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "PIHAK KEDUA",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: " memberitahukan kepada ",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "PIHAK PERTAMA",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: " dalam waktu paling lambat 7 (tujuh) hari sejak mengetahui atas kejadian Keadaan Kahar dengan menyertakan bukti.",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-            ],
-            alignment: AlignmentType.JUSTIFIED,
-            indent: {
-              left: convertInchesToTwip(0.5),
-              hanging: convertInchesToTwip(0.5),
-            },
-            tabStops: [
-              { type: TabStopType.LEFT, position: convertInchesToTwip(0.5) },
-            ],
-            spacing: { after: 120 },
-          }),
-
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "(2)\tPada saat terjadi Keadaan Kahar, pelaksanaan pekerjaan oleh ",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "PIHAK KEDUA",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: " dihentikan sementara dan dilanjutkan kembali setelah Keadaan Kahar berakhir, namun apabila akibat Keadaan Kahar tidak memungkinkan dilanjutkan/diselesaikannya pelaksanaan pekerjaan, ",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "PIHAK KEDUA",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: " berhak menerima honorarium secara proporsional sesuai pekerjaan yang telah dilaksanakan.",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-            ],
-            alignment: AlignmentType.JUSTIFIED,
-            indent: {
-              left: convertInchesToTwip(0.5),
-              hanging: convertInchesToTwip(0.5),
-            },
-            tabStops: [
-              { type: TabStopType.LEFT, position: convertInchesToTwip(0.5) },
-            ],
-            spacing: { after: 0 },
-          }),
-
-          // PASAL 11
-          new Paragraph({ children: [], spacing: { after: 0 } }),
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "Pasal 11",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 120 },
-          }),
-
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "Segala sesuatu yang belum atau tidak cukup diatur dalam Perjanjian ini, dituangkan dalam perjanjian tambahan/",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "addendum",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                italics: true,
-              }),
-              new TextRun({
-                text: " dan merupakan bagian tidak terpisahkan dari perjanjian ini.",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-            ],
-            alignment: AlignmentType.JUSTIFIED,
-            spacing: { after: 0 },
-          }),
-
-          // PASAL 12
-          new Paragraph({ children: [], spacing: { after: 0 } }),
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "Pasal 12",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 120 },
-          }),
-
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "(1)\tSegala perselisihan atau perbedaan pendapat yang timbul sebagai akibat adanya Perjanjian ini akan diselesaikan secara musyawarah untuk mufakat.",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-            ],
-            alignment: AlignmentType.JUSTIFIED,
-            indent: {
-              left: convertInchesToTwip(0.5),
-              hanging: convertInchesToTwip(0.5),
-            },
-            tabStops: [
-              { type: TabStopType.LEFT, position: convertInchesToTwip(0.5) },
-            ],
-            spacing: { after: 120 },
-          }),
-
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "(2)\tApabila perselisihan tidak dapat diselesaikan sebagaimana dimaksud pada ayat (1), ",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "PARA PIHAK",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: " sepakat menyelesaikan perselisihan dengan memilih kedudukan/domisili hukum di Panitera Pengadilan Negeri Kota Malang.",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-            ],
-            alignment: AlignmentType.JUSTIFIED,
-            indent: {
-              left: convertInchesToTwip(0.5),
-              hanging: convertInchesToTwip(0.5),
-            },
-            tabStops: [
-              { type: TabStopType.LEFT, position: convertInchesToTwip(0.5) },
-            ],
-            spacing: { after: 240 },
-          }),
-
-          // Penutup
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "Demikian Perjanjian ini dibuat dan ditandatangani oleh ",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "PARA PIHAK",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: " dalam 2 (dua) rangkap asli bermeterai cukup, tanpa paksaan dari ",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "PIHAK",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: " manapun dan untuk dilaksanakan oleh ",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: "PARA PIHAK",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-              new TextRun({
-                text: ".",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-            ],
-            alignment: AlignmentType.JUSTIFIED,
-            spacing: { after: 480 },
-          }),
-
-          // Signature Table
-          createSignatureTable(mitraData.nama_mitra, namaPejabat),
-
-          // Page Break before Lampiran
-          new Paragraph({
-            children: [],
-            pageBreakBefore: true,
-          }),
-
-          // LAMPIRAN
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "LAMPIRAN",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: false,
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 0 },
-          }),
-
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "PERJANJIAN KERJA PETUGAS KEGIATAN SURVEI / SENSUS",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: false,
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 0 },
-          }),
-
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: `BULAN ${monthName.toUpperCase()} PADA BADAN PUSAT STATISTIK KOTA BATU`,
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: false,
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 0 },
-          }),
-
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "NOMOR: ",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: false,
-              }),
-              new TextRun({
-                text: nomorSPK,
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: false,
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 0 },
-          }),
-
-          // extra blank line after NOMOR in Lampiran
-          new Paragraph({ children: [], spacing: { after: 0 } }),
-
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "DAFTAR URAIAN TUGAS, JANGKA WAKTU, TARGET PEKERJAAN DAN NILAI PERJANJIAN",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: false,
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 0 },
-          }),
-
-          // extra blank line after section title in Lampiran
-          new Paragraph({ children: [], spacing: { after: 0 } }),
-
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "Nama Petugas : ",
-                font: FONT_NAME,
-                size: FONT_SIZE,
-              }),
-              new TextRun({
-                text: mitraData.nama_mitra,
-                font: FONT_NAME,
-                size: FONT_SIZE,
-                bold: true,
-              }),
-            ],
-            alignment: AlignmentType.LEFT,
-            spacing: { after: 0 },
-          }),
-
-          // Task Table
-          createTaskTable(tasks, totalHonor, totalHonorText),
         ],
       },
-    ],
-  });
+      sections: [
+        {
+          footers: {
+            default: new Footer({
+              children: [
+                new Paragraph({
+                  alignment: AlignmentType.CENTER,
+                  children: [
+                    new TextRun({ text: "[" }),
+                    new TextRun({ children: [PageNumber.CURRENT] }),
+                    new TextRun({ text: "]" }),
+                  ],
+                }),
+              ],
+            }),
+          },
+          properties: {
+            page: {
+              margin: {
+                top: convertInchesToTwip(0.3937), // 1cm
+                right: convertInchesToTwip(0.7874), // 2cm
+                bottom: convertInchesToTwip(0.9843), // 2.5cm
+                left: convertInchesToTwip(0.7874), // 2cm
+              },
+              size: {
+                width: convertInchesToTwip(8.27), // A4 width: 21cm
+                height: convertInchesToTwip(11.69), // A4 height: 29.7cm
+              },
+            },
+          },
+          children: [
+            // HEADER - PERJANJIAN KERJA
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "PERJANJIAN KERJA",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 0 },
+            }),
+
+            // PETUGAS KEGIATAN SURVEI / SENSUS BULAN ... TAHUN ...
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `PETUGAS KEGIATAN SURVEI / SENSUS BULAN ${monthName.toUpperCase()} TAHUN ${year}`,
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 0 },
+            }),
+
+            // PADA BADAN PUSAT STATISTIK KOTA BATU
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "PADA BADAN PUSAT STATISTIK KOTA BATU",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 0 },
+            }),
+
+            // NOMOR
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "NOMOR: ",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: nomorSPK,
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                  color: "FF0000",
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 0 },
+            }),
+
+            // extra blank line after NOMOR
+            new Paragraph({ children: [], spacing: { after: 0 } }),
+
+            // Tanggal penandatanganan
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `Pada hari ini ${tanggalText}, bertempat di Kota Batu, yang bertanda tangan di bawah ini:`,
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+              ],
+              alignment: AlignmentType.JUSTIFIED,
+              spacing: { after: 0 },
+            }),
+
+            // extra blank line after opening sentence
+            new Paragraph({ children: [], spacing: { after: 0 } }),
+
+            // Para Pihak Table
+            createParaPihakTable(namaPejabat, mitraData),
+
+            // Spacer line before opening paragraph so it doesn't stick to the table above
+            new Paragraph({
+              children: [],
+              spacing: { after: 0 },
+            }),
+
+            // Paragraf pembuka perjanjian
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "bahwa ",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "PIHAK PERTAMA",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: " dan ",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "PIHAK KEDUA",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: " yang secara bersama-sama disebut ",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "PARA PIHAK",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: `, sepakat untuk mengikatkan diri dalam Perjanjian Kerja Petugas Kegiatan Survei/Sensus Bulan ${monthName} Tahun ${year} di Badan Pusat Statistik Kota Batu, yang selanjutnya disebut Perjanjian, dengan ketentuan-ketentuan sebagai berikut:`,
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+              ],
+              alignment: AlignmentType.JUSTIFIED,
+              spacing: { after: 0 },
+            }),
+
+            // PASAL 1
+            new Paragraph({ children: [], spacing: { after: 0 } }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Pasal 1",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 0 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "PIHAK PERTAMA",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: " memberikan pekerjaan kepada ",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "PIHAK KEDUA",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: " dan ",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "PIHAK KEDUA",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: " menerima pekerjaan dari ",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "PIHAK PERTAMA",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: ` sebagai Petugas Kegiatan Survei / Sensus Bulan ${monthName} Tahun ${year}, dengan lingkup pekerjaan yang ditetapkan oleh `,
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "PIHAK PERTAMA",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: ".",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+              ],
+              alignment: AlignmentType.JUSTIFIED,
+              spacing: { after: 0 },
+            }),
+
+            // PASAL 2
+            new Paragraph({ children: [], spacing: { after: 0 } }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Pasal 2",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 0 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `Ruang lingkup pekerjaan dalam Perjanjian ini mengacu pada wilayah kerja dan beban kerja sebagaimana tertuang dalam lampiran Perjanjian serta pedoman Petugas Kegiatan Survei / Sensus Bulan ${monthName} Tahun ${year} pada Badan Pusat Statistik Kota Batu, dan ketentuan-ketentuan yang ditetapkan oleh `,
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "PIHAK PERTAMA",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: ".",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+              ],
+              alignment: AlignmentType.JUSTIFIED,
+              spacing: { after: 0 },
+            }),
+
+            // PASAL 3
+            new Paragraph({ children: [], spacing: { after: 0 } }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Pasal 3",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 0 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `Jangka Waktu Perjanjian terhitung sejak tanggal ${monthRange.startText} sampai dengan tanggal ${monthRange.endText}.`,
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+              ],
+              alignment: AlignmentType.JUSTIFIED,
+              spacing: { after: 0 },
+            }),
+
+            // PASAL 4
+            new Paragraph({ children: [], spacing: { after: 0 } }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Pasal 4",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 0 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "PIHAK KEDUA",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: " berkewajiban melaksanakan seluruh pekerjaan yang diberikan oleh ",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "PIHAK PERTAMA",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: " sampai selesai, sesuai ruang lingkup pekerjaan sebagaimana dimaksud dalam Pasal 2.",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+              ],
+              alignment: AlignmentType.JUSTIFIED,
+              spacing: { after: 0 },
+            }),
+
+            // PASAL 5
+            new Paragraph({ children: [], spacing: { after: 0 } }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Pasal 5",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 0 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "(1)\t",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "PIHAK KEDUA",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: ` berhak untuk mendapatkan honorarium Petugas Kegiatan Survei / Sensus Bulan ${monthName} Tahun ${year} dari `,
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "PIHAK PERTAMA",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: " sebesar (",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "terlampir",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  italics: true,
+                }),
+                new TextRun({
+                  text: ") untuk pekerjaan sebagaimana dimaksud dalam Pasal 2, sudah termasuk biaya pajak, bea materai, transport, dan jasa pelayanan keuangan.",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+              ],
+              alignment: AlignmentType.JUSTIFIED,
+              indent: {
+                left: convertInchesToTwip(0.5),
+                hanging: convertInchesToTwip(0.5),
+              },
+              tabStops: [
+                { type: TabStopType.LEFT, position: convertInchesToTwip(0.5) },
+              ],
+              spacing: { after: 0 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "(2)\t",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "PIHAK KEDUA",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: " tidak diberikan honorarium tambahan apabila melakukan kunjungan di luar jadwal pelaksanaan pekerjaan lapangan.",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+              ],
+              alignment: AlignmentType.JUSTIFIED,
+              indent: {
+                left: convertInchesToTwip(0.5),
+                hanging: convertInchesToTwip(0.5),
+              },
+              tabStops: [
+                { type: TabStopType.LEFT, position: convertInchesToTwip(0.5) },
+              ],
+              spacing: { after: 0 },
+            }),
+
+            // Continue with remaining Pasal sections...
+            // PASAL 6
+            new Paragraph({ children: [], spacing: { after: 0 } }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Pasal 6",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 0 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "(1)\tPembayaran honorarium sebagaimana dimaksud dalam Pasal 5 dilakukan setelah ",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "PIHAK KEDUA",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: " menyelesaikan dan menyerahkan seluruh hasil pekerjaan sebagaimana dimaksud dalam Pasal 2 kepada ",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "PIHAK PERTAMA",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: ".",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+              ],
+              alignment: AlignmentType.JUSTIFIED,
+              indent: {
+                left: convertInchesToTwip(0.5),
+                hanging: convertInchesToTwip(0.5),
+              },
+              tabStops: [
+                { type: TabStopType.LEFT, position: convertInchesToTwip(0.5) },
+              ],
+              spacing: { after: 0 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "(2)\tPembayaran sebagaimana dimaksud pada ayat (1) dilakukan oleh ",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "PIHAK PERTAMA",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: " kepada ",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "PIHAK KEDUA",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: " sesuai dengan ketentuan peraturan perundang-undangan.",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+              ],
+              alignment: AlignmentType.JUSTIFIED,
+              indent: {
+                left: convertInchesToTwip(0.5),
+                hanging: convertInchesToTwip(0.5),
+              },
+              tabStops: [
+                { type: TabStopType.LEFT, position: convertInchesToTwip(0.5) },
+              ],
+              spacing: { after: 0 },
+            }),
+
+            // PASAL 7
+            new Paragraph({ children: [], spacing: { after: 0 } }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Pasal 7",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 0 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `Penyerahan hasil pekerjaan lapangan sebagaimana dimaksud dalam Pasal 2 dilakukan secara bertahap dan selambat-lambatnya seluruh hasil pekerjaan lapangan diserahkan pada tanggal ${monthRange.endText} yang dinyatakan dalam Berita Acara Serah Terima Hasil Pekerjaan yang ditandatangani oleh `,
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "PARA PIHAK",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: ".",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+              ],
+              alignment: AlignmentType.JUSTIFIED,
+              spacing: { after: 240 },
+            }),
+
+            // PASAL 8
+            new Paragraph({ children: [], spacing: { after: 0 } }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Pasal 8",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 0 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "PIHAK PERTAMA",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: " dapat memutuskan Perjanjian ini secara sepihak sewaktu-waktu dalam hal ",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "PIHAK KEDUA",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: " tidak dapat melaksanakan kewajibannya sebagaimana dimaksud dalam Pasal 4, dengan menerbitkan Surat Pemutusan Perjanjian Kerja.",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+              ],
+              alignment: AlignmentType.JUSTIFIED,
+              spacing: { after: 240 },
+            }),
+
+            // PASAL 9
+            new Paragraph({ children: [], spacing: { after: 0 } }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Pasal 9",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 0 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "(1)\tApabila ",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "PIHAK KEDUA",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: " mengundurkan diri pada saat/setelah pelaksanaan pekerjaan lapangan dengan tidak menyelesaikan pekerjaan yang menjadi tanggung jawabnya, maka wajib membayar ganti rugi kepada ",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "PIHAK PERTAMA",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: " sebesar nilai perjanjian yang menjadi beban kerjanya",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+              ],
+              alignment: AlignmentType.JUSTIFIED,
+              indent: {
+                left: convertInchesToTwip(0.5),
+                hanging: convertInchesToTwip(0.5),
+              },
+              tabStops: [
+                { type: TabStopType.LEFT, position: convertInchesToTwip(0.5) },
+              ],
+              spacing: { after: 120 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "(2)\tDikecualikan tidak membayar ganti rugi sebagaimana dimaksud pada ayat (1) kepada ",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "PIHAK PERTAMA",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: ", apabila ",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "PIHAK KEDUA",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: " meninggal dunia, mengundurkan diri karena sakit dengan keterangan rawat inap, kecelakaan dengan keterangan kepolisian, dan/atau telah diberikan Surat Pemutusan Perjanjian Kerja dari ",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "PIHAK PERTAMA",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: ".",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+              ],
+              alignment: AlignmentType.JUSTIFIED,
+              indent: {
+                left: convertInchesToTwip(0.5),
+                hanging: convertInchesToTwip(0.5),
+              },
+              tabStops: [
+                { type: TabStopType.LEFT, position: convertInchesToTwip(0.5) },
+              ],
+              spacing: { after: 120 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "(3)\tDalam hal terjadi peristiwa sebagaimana dimaksud pada ayat (2), ",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "PIHAK PERTAMA",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: " membayarkan honorarium kepada ",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "PIHAK KEDUA",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: " secara proporsional sesuai pekerjaan yang telah dilaksanakan.",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+              ],
+              alignment: AlignmentType.JUSTIFIED,
+              indent: {
+                left: convertInchesToTwip(0.5),
+                hanging: convertInchesToTwip(0.5),
+              },
+              tabStops: [
+                { type: TabStopType.LEFT, position: convertInchesToTwip(0.5) },
+              ],
+              spacing: { after: 0 },
+            }),
+
+            // PASAL 10
+            new Paragraph({ children: [], spacing: { after: 0 } }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Pasal 10",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 120 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "(1)\tApabila terjadi Keadaan Kahar, yang meliputi bencana alam dan bencana sosial, ",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "PIHAK KEDUA",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: " memberitahukan kepada ",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "PIHAK PERTAMA",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: " dalam waktu paling lambat 7 (tujuh) hari sejak mengetahui atas kejadian Keadaan Kahar dengan menyertakan bukti.",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+              ],
+              alignment: AlignmentType.JUSTIFIED,
+              indent: {
+                left: convertInchesToTwip(0.5),
+                hanging: convertInchesToTwip(0.5),
+              },
+              tabStops: [
+                { type: TabStopType.LEFT, position: convertInchesToTwip(0.5) },
+              ],
+              spacing: { after: 120 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "(2)\tPada saat terjadi Keadaan Kahar, pelaksanaan pekerjaan oleh ",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "PIHAK KEDUA",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: " dihentikan sementara dan dilanjutkan kembali setelah Keadaan Kahar berakhir, namun apabila akibat Keadaan Kahar tidak memungkinkan dilanjutkan/diselesaikannya pelaksanaan pekerjaan, ",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "PIHAK KEDUA",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: " berhak menerima honorarium secara proporsional sesuai pekerjaan yang telah dilaksanakan.",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+              ],
+              alignment: AlignmentType.JUSTIFIED,
+              indent: {
+                left: convertInchesToTwip(0.5),
+                hanging: convertInchesToTwip(0.5),
+              },
+              tabStops: [
+                { type: TabStopType.LEFT, position: convertInchesToTwip(0.5) },
+              ],
+              spacing: { after: 0 },
+            }),
+
+            // PASAL 11
+            new Paragraph({ children: [], spacing: { after: 0 } }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Pasal 11",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 120 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Segala sesuatu yang belum atau tidak cukup diatur dalam Perjanjian ini, dituangkan dalam perjanjian tambahan/",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "addendum",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  italics: true,
+                }),
+                new TextRun({
+                  text: " dan merupakan bagian tidak terpisahkan dari perjanjian ini.",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+              ],
+              alignment: AlignmentType.JUSTIFIED,
+              spacing: { after: 0 },
+            }),
+
+            // PASAL 12
+            new Paragraph({ children: [], spacing: { after: 0 } }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Pasal 12",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 120 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "(1)\tSegala perselisihan atau perbedaan pendapat yang timbul sebagai akibat adanya Perjanjian ini akan diselesaikan secara musyawarah untuk mufakat.",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+              ],
+              alignment: AlignmentType.JUSTIFIED,
+              indent: {
+                left: convertInchesToTwip(0.5),
+                hanging: convertInchesToTwip(0.5),
+              },
+              tabStops: [
+                { type: TabStopType.LEFT, position: convertInchesToTwip(0.5) },
+              ],
+              spacing: { after: 120 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "(2)\tApabila perselisihan tidak dapat diselesaikan sebagaimana dimaksud pada ayat (1), ",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "PARA PIHAK",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: " sepakat menyelesaikan perselisihan dengan memilih kedudukan/domisili hukum di Panitera Pengadilan Negeri Kota Malang.",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+              ],
+              alignment: AlignmentType.JUSTIFIED,
+              indent: {
+                left: convertInchesToTwip(0.5),
+                hanging: convertInchesToTwip(0.5),
+              },
+              tabStops: [
+                { type: TabStopType.LEFT, position: convertInchesToTwip(0.5) },
+              ],
+              spacing: { after: 240 },
+            }),
+
+            // Penutup
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Demikian Perjanjian ini dibuat dan ditandatangani oleh ",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "PARA PIHAK",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: " dalam 2 (dua) rangkap asli bermeterai cukup, tanpa paksaan dari ",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "PIHAK",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: " manapun dan untuk dilaksanakan oleh ",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: "PARA PIHAK",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: ".",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+              ],
+              alignment: AlignmentType.JUSTIFIED,
+              spacing: { after: 480 },
+            }),
+
+            // Signature Table
+            createSignatureTable(mitraData.nama_mitra, namaPejabat),
+
+            // Page Break before Lampiran
+            new Paragraph({
+              children: [],
+              pageBreakBefore: true,
+            }),
+
+            // LAMPIRAN
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "LAMPIRAN",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: false,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 0 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "PERJANJIAN KERJA PETUGAS KEGIATAN SURVEI / SENSUS",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: false,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 0 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `BULAN ${monthName.toUpperCase()} PADA BADAN PUSAT STATISTIK KOTA BATU`,
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: false,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 0 },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "NOMOR: ",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: false,
+                }),
+                new TextRun({
+                  text: nomorSPK,
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: false,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 0 },
+            }),
+
+            // extra blank line after NOMOR in Lampiran
+            new Paragraph({ children: [], spacing: { after: 0 } }),
+
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "DAFTAR URAIAN TUGAS, JANGKA WAKTU, TARGET PEKERJAAN DAN NILAI PERJANJIAN",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: false,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 0 },
+            }),
+
+            // extra blank line after section title in Lampiran
+            new Paragraph({ children: [], spacing: { after: 0 } }),
+
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Nama Petugas : ",
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                }),
+                new TextRun({
+                  text: mitraData.nama_mitra,
+                  font: FONT_NAME,
+                  size: FONT_SIZE,
+                  bold: true,
+                }),
+              ],
+              alignment: AlignmentType.LEFT,
+              spacing: { after: 0 },
+            }),
+
+            // Task Table
+            createTaskTable(tasks, totalHonor, totalHonorText),
+          ],
+        },
+      ],
+    });
+  } catch (error) {
+    throw error;
+  }
 
   return doc;
 }

@@ -17,6 +17,7 @@ import {
   Clock,
   Sparkles,
   AlertCircle,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -28,6 +29,13 @@ interface AdminScheduleItem {
   end_date: string;
   created_by: string;
   created_at: string;
+  employee_ids?: string[] | null; // IDs of employees to block (null = all employees)
+}
+
+interface Employee {
+  id: string;
+  nama_lengkap: string;
+  nip?: string | null;
 }
 
 export default function AdminSchedule() {
@@ -40,6 +48,9 @@ export default function AdminSchedule() {
   const [schedules, setSchedules] = useState<AdminScheduleItem[]>([]);
   const [month, setMonth] = useState(new Date());
   const [loading, setLoading] = useState(false);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
+  const [loadingEmployees, setLoadingEmployees] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -56,7 +67,23 @@ export default function AdminSchedule() {
 
   useEffect(() => {
     load();
+    loadEmployees();
   }, []);
+
+  const loadEmployees = async () => {
+    setLoadingEmployees(true);
+    try {
+      const r = await fetch("/api/admin/users?role=pegawai&is_active=true");
+      const j = await r.json();
+      if (r.ok) {
+        setEmployees(j.data || []);
+      }
+    } catch (e) {
+      // ignore
+    } finally {
+      setLoadingEmployees(false);
+    }
+  };
 
   const create = async () => {
     if (!selectedRange.from || !selectedRange.to || !title.trim()) {
@@ -72,6 +99,8 @@ export default function AdminSchedule() {
           description: description.trim() || undefined,
           start_date: format(selectedRange.from, "yyyy-MM-dd"),
           end_date: format(selectedRange.to, "yyyy-MM-dd"),
+          employee_ids:
+            selectedEmployeeIds.length > 0 ? selectedEmployeeIds : null,
         }),
       });
       if (!r.ok) {
@@ -82,10 +111,29 @@ export default function AdminSchedule() {
       setTitle("");
       setDescription("");
       setSelectedRange({});
+      setSelectedEmployeeIds([]);
       load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Gagal menyimpan");
     }
+  };
+
+  const toggleEmployeeSelection = (employeeId: string) => {
+    setSelectedEmployeeIds((prev) => {
+      if (prev.includes(employeeId)) {
+        return prev.filter((id) => id !== employeeId);
+      } else {
+        return [...prev, employeeId];
+      }
+    });
+  };
+
+  const selectAllEmployees = () => {
+    setSelectedEmployeeIds(employees.map((e) => e.id));
+  };
+
+  const deselectAllEmployees = () => {
+    setSelectedEmployeeIds([]);
   };
 
   const remove = async (id: string) => {
@@ -236,18 +284,92 @@ export default function AdminSchedule() {
                   placeholder="Tambahkan detail atau informasi tambahan tentang jadwal ini..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  rows={6}
+                  rows={4}
                   className="border-2 border-emerald-100 focus:border-emerald-400 rounded-xl text-base shadow-sm resize-none"
                 />
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-semibold text-gray-700 flex items-center space-x-2">
+                    <Users className="w-4 h-4 text-emerald-600" />
+                    <span>Pilih Pegawai (opsional)</span>
+                  </label>
+                  {employees.length > 0 && (
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={selectAllEmployees}
+                        disabled={
+                          selectedEmployeeIds.length === employees.length
+                        }
+                        className="text-xs h-7"
+                      >
+                        Pilih Semua
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={deselectAllEmployees}
+                        disabled={selectedEmployeeIds.length === 0}
+                        className="text-xs h-7"
+                      >
+                        Hapus Pilihan
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                {loadingEmployees ? (
+                  <div className="text-sm text-gray-500 py-4">
+                    Memuat daftar pegawai...
+                  </div>
+                ) : employees.length === 0 ? (
+                  <div className="text-sm text-gray-500 py-4">
+                    Tidak ada pegawai aktif
+                  </div>
+                ) : (
+                  <div className="border-2 border-emerald-100 rounded-xl max-h-48 overflow-y-auto p-3 bg-white">
+                    {employees.map((employee) => (
+                      <label
+                        key={employee.id}
+                        className="flex items-center p-2 hover:bg-emerald-50 rounded cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedEmployeeIds.includes(employee.id)}
+                          onChange={() => toggleEmployeeSelection(employee.id)}
+                          className="mr-3 h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
+                        />
+                        <span className="text-sm">
+                          {employee.nama_lengkap}
+                          {employee.nip && (
+                            <span className="text-gray-500 ml-2">
+                              ({employee.nip})
+                            </span>
+                          )}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+                <div className="text-xs text-gray-500">
+                  {selectedEmployeeIds.length === 0
+                    ? "Kosongkan untuk memblokir semua pegawai"
+                    : `${selectedEmployeeIds.length} pegawai dipilih`}
+                </div>
               </div>
 
               <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
                 <div className="flex items-start space-x-3">
                   <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
                   <div className="text-sm text-blue-800">
-                    <span className="font-semibold">Perhatian:</span> Pegawai
-                    tidak dapat mengalokasikan transport pada tanggal yang masuk
-                    dalam jadwal global ini.
+                    <span className="font-semibold">Perhatian:</span>{" "}
+                    {selectedEmployeeIds.length === 0
+                      ? "Semua pegawai tidak dapat mengalokasikan transport pada tanggal yang masuk dalam jadwal global ini."
+                      : `Hanya ${selectedEmployeeIds.length} pegawai yang dipilih tidak dapat mengalokasikan transport pada tanggal yang masuk dalam jadwal global ini.`}
                   </div>
                 </div>
               </div>
@@ -359,6 +481,44 @@ export default function AdminSchedule() {
                           <p className="text-sm text-gray-600 bg-white/50 rounded-lg p-3 border border-emerald-100">
                             {s.description}
                           </p>
+                        )}
+
+                        {s.employee_ids && s.employee_ids.length > 0 && (
+                          <div className="mt-2">
+                            <div className="flex items-center space-x-2 mb-2">
+                              <Users className="w-4 h-4 text-emerald-600" />
+                              <span className="text-xs font-semibold text-gray-700">
+                                Terblokir untuk {s.employee_ids.length} pegawai:
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {s.employee_ids.map((empId) => {
+                                const emp = employees.find(
+                                  (e) => e.id === empId,
+                                );
+                                return emp ? (
+                                  <Badge
+                                    key={empId}
+                                    variant="outline"
+                                    className="bg-blue-50 text-blue-700 border-blue-200 text-xs"
+                                  >
+                                    {emp.nama_lengkap}
+                                  </Badge>
+                                ) : null;
+                              })}
+                            </div>
+                          </div>
+                        )}
+                        {(!s.employee_ids || s.employee_ids.length === 0) && (
+                          <div className="mt-2">
+                            <Badge
+                              variant="outline"
+                              className="bg-gray-50 text-gray-700 border-gray-200 text-xs"
+                            >
+                              <Users className="w-3 h-3 mr-1" />
+                              Semua pegawai terblokir
+                            </Badge>
+                          </div>
                         )}
 
                         <div className="flex items-center space-x-2 text-xs text-gray-500 pt-2">

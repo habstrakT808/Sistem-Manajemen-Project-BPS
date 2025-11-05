@@ -8,6 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   FileText,
   Download,
   ArrowLeft,
@@ -58,6 +65,8 @@ export function BASTForm() {
   const [showPreview, setShowPreview] = useState(false);
   const [loadingMitra, setLoadingMitra] = useState(false);
   const [loadingVolume, setLoadingVolume] = useState(false);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [projectSearchTerm, setProjectSearchTerm] = useState("");
 
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
@@ -93,9 +102,9 @@ export function BASTForm() {
     }
   }, []);
 
-  // Fetch mitra when project and month changes
+  // Fetch mitra when project changes
   useEffect(() => {
-    if (formData.projectId && formData.month && formData.year) {
+    if (formData.projectId) {
       fetchMitra();
       fetchProjectLeader();
     } else {
@@ -103,7 +112,7 @@ export function BASTForm() {
       setVolumeData(null);
       setLeaderName("");
     }
-  }, [formData.projectId, formData.month, formData.year]);
+  }, [formData.projectId]);
 
   // Fetch volume data when mitra changes
   useEffect(() => {
@@ -116,14 +125,20 @@ export function BASTForm() {
 
   const fetchProjects = async () => {
     try {
+      setLoadingProjects(true);
       const response = await fetch("/api/admin/export/projects");
       if (response.ok) {
         const data = await response.json();
-        setProjects(data);
+        setProjects(data || []);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        toast.error(errorData.error || "Gagal memuat data project");
       }
     } catch (error) {
       console.error("Error fetching projects:", error);
-      toast.error("Gagal memuat data project");
+      toast.error("Gagal memuat data project. Periksa koneksi Anda.");
+    } finally {
+      setLoadingProjects(false);
     }
   };
 
@@ -146,13 +161,13 @@ export function BASTForm() {
     try {
       setLoadingMitra(true);
       const response = await fetch(
-        `/api/admin/export/bast/mitra?projectId=${formData.projectId}&month=${formData.month}&year=${formData.year}`,
+        `/api/admin/export/bast/mitra?projectId=${formData.projectId}`,
       );
       if (response.ok) {
         const data = await response.json();
         setMitraList(data.mitra || []);
         if (data.mitra.length === 0) {
-          toast.info("Tidak ada mitra dengan tugas di bulan ini");
+          toast.info("Tidak ada mitra dengan tugas pada proyek ini");
         }
       }
     } catch (error) {
@@ -222,10 +237,6 @@ export function BASTForm() {
     }
     if (!formData.projectId) {
       toast.error("Project harus dipilih");
-      return false;
-    }
-    if (!formData.month || !formData.year) {
-      toast.error("Bulan dan tahun harus dipilih");
       return false;
     }
     if (formData.mitraIds.length === 0) {
@@ -646,68 +657,65 @@ export function BASTForm() {
                 />
               </div>
 
-              {/* Project Selection */}
+              {/* Project Selection with Search */}
               <div>
                 <Label htmlFor="projectId" className="flex items-center mb-2">
                   <Briefcase className="w-4 h-4 mr-2" />
                   Project
                 </Label>
-                <select
-                  id="projectId"
+                <Select
                   value={formData.projectId}
-                  onChange={(e) =>
-                    handleInputChange("projectId", e.target.value)
-                  }
-                  className="w-full border border-purple-200 rounded-md px-3 py-2 focus:border-purple-400 focus:outline-none"
+                  onValueChange={(value) => {
+                    handleInputChange("projectId", value);
+                    setProjectSearchTerm(""); // Reset search when project is selected
+                  }}
+                  disabled={loadingProjects}
                 >
-                  <option value="">Pilih Project</option>
-                  {projects.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.nama_project}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full border border-purple-200 focus:border-purple-400">
+                    <SelectValue
+                      placeholder={
+                        loadingProjects ? "Memuat..." : "Pilih Project"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[300px]">
+                    <div className="p-2 sticky top-0 bg-white z-10 border-b">
+                      <Input
+                        placeholder="Cari project..."
+                        value={projectSearchTerm}
+                        onChange={(e) => setProjectSearchTerm(e.target.value)}
+                        className="w-full"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                    {projects
+                      .filter((project) =>
+                        project.nama_project
+                          .toLowerCase()
+                          .includes(projectSearchTerm.toLowerCase()),
+                      )
+                      .map((project) => (
+                        <SelectItem key={project.id} value={project.id}>
+                          {project.nama_project}
+                        </SelectItem>
+                      ))}
+                    {projects.filter((project) =>
+                      project.nama_project
+                        .toLowerCase()
+                        .includes(projectSearchTerm.toLowerCase()),
+                    ).length === 0 && (
+                      <div className="px-2 py-4 text-sm text-gray-500 text-center">
+                        {loadingProjects
+                          ? "Memuat..."
+                          : "Tidak ada project yang ditemukan"}
+                      </div>
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
 
-              {/* Month and Year Selection */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="month" className="flex items-center mb-2">
-                    <Calendar className="w-4 h-4 mr-2" />
-                    Bulan
-                  </Label>
-                  <select
-                    id="month"
-                    value={formData.month}
-                    onChange={(e) => handleInputChange("month", e.target.value)}
-                    className="w-full border border-purple-200 rounded-md px-3 py-2 focus:border-purple-400 focus:outline-none"
-                  >
-                    {months.map((month) => (
-                      <option key={month.value} value={month.value}>
-                        {month.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <Label htmlFor="year" className="flex items-center mb-2">
-                    <Calendar className="w-4 h-4 mr-2" />
-                    Tahun
-                  </Label>
-                  <select
-                    id="year"
-                    value={formData.year}
-                    onChange={(e) => handleInputChange("year", e.target.value)}
-                    className="w-full border border-purple-200 rounded-md px-3 py-2 focus:border-purple-400 focus:outline-none"
-                  >
-                    {years.map((year) => (
-                      <option key={year} value={year}>
-                        {year}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+              {/* Month/Year removed: BAST per proyek mencakup seluruh durasi */}
 
               {/* Mitra Selection */}
               <div>

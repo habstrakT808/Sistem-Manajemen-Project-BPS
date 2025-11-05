@@ -65,6 +65,7 @@ export default function TransportCalendar({
   const [adminSchedules, setAdminSchedules] = useState<any[]>([]);
   const [scheduleDetailOpen, setScheduleDetailOpen] = useState(false);
   const [selectedScheduleDate, setSelectedScheduleDate] = useState<string>("");
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // Get first day of current month
   const firstDayOfMonth = new Date(
@@ -95,20 +96,28 @@ export default function TransportCalendar({
 
   const fetchAllocations = useCallback(async () => {
     try {
-      // 1) Always load global locked dates first
+      // Store allocation dates separately (these are user's own allocations)
+      let allocationDates = new Set<string>();
+
+      // 1) Always load global locked dates first (from user's own allocations)
       const globalRes = await fetch(`/api/pegawai/transport-allocations`, {
         cache: "no-store",
       });
       if (globalRes.ok) {
         const globalJson = await globalRes.json();
         if (Array.isArray(globalJson.locked_dates)) {
-          setLockedDates(new Set(globalJson.locked_dates as string[]));
+          allocationDates = new Set(globalJson.locked_dates as string[]);
         } else if (Array.isArray(globalJson.allocations)) {
-          setLockedDates(buildGlobalLockedDates(globalJson.allocations));
+          allocationDates = buildGlobalLockedDates(globalJson.allocations);
         }
       }
 
-      // 1b) Load admin schedules for detail view
+      // 1b) Load admin schedules and filter by employee_ids
+      // Only add schedule dates if we have currentUserId
+      let scheduleDates = new Set<string>();
+      let applicableSchedules: any[] = [];
+
+      // Always fetch schedules for detail view, but only add dates if we have user ID
       try {
         const schRes = await fetch(`/api/admin/schedule`, {
           cache: "no-store",
@@ -116,8 +125,6 @@ export default function TransportCalendar({
         if (schRes.ok) {
           const schJson = await schRes.json();
           if (Array.isArray(schJson.schedules)) {
-            setAdminSchedules(schJson.schedules);
-            // Union locked dates with expanded schedule ranges (client-side)
             const parseYmd = (ymd: string) => {
               const [yy, mm, dd] = ymd.split("-").map((x: string) => Number(x));
               return new Date(yy, (mm || 1) - 1, dd || 1);
@@ -139,22 +146,63 @@ export default function TransportCalendar({
               }
               return out;
             };
-            const scheduleDates = new Set<string>();
-            (schJson.schedules as any[]).forEach((s: any) => {
-              if (s?.start_date && s?.end_date) {
-                expandRangeToDates(s.start_date, s.end_date).forEach((ds) =>
-                  scheduleDates.add(ds),
-                );
-              }
-            });
-            setLockedDates((prev) => {
-              const merged = new Set(prev);
-              scheduleDates.forEach((d) => merged.add(d));
-              return merged;
-            });
+
+            // Filter schedules that apply to current user
+            // CRITICAL: Only process schedules if we have currentUserId
+            // If currentUserId is null, we can't know which schedules apply, so don't add any dates
+            if (currentUserId !== null) {
+              // Filter schedules that apply to current user
+              applicableSchedules = (schJson.schedules as any[]).filter(
+                (s: any) => {
+                  // Ensure employee_ids is always treated as an array
+                  const scheduleEmployeeIds = Array.isArray(s.employee_ids)
+                    ? s.employee_ids
+                    : [];
+                  // If employee_ids is null or empty, it applies to all employees
+                  if (scheduleEmployeeIds.length === 0) {
+                    return true;
+                  }
+                  // Otherwise, only apply if current user is in the list
+                  return scheduleEmployeeIds.includes(currentUserId);
+                },
+              );
+
+              // IMPORTANT: Always set adminSchedules with applicable schedules for detail view
+              setAdminSchedules(applicableSchedules);
+
+              // Add dates from applicable schedules only
+              applicableSchedules.forEach((s: any) => {
+                if (s?.start_date && s?.end_date) {
+                  expandRangeToDates(s.start_date, s.end_date).forEach((ds) =>
+                    scheduleDates.add(ds),
+                  );
+                }
+              });
+            } else {
+              // If user ID not available yet, only show global schedules (no employee_ids) for detail view
+              // But don't add any dates to lockedDates until we know the user ID
+              applicableSchedules = (schJson.schedules as any[]).filter(
+                (s: any) => {
+                  const scheduleEmployeeIds = Array.isArray(s.employee_ids)
+                    ? s.employee_ids
+                    : [];
+                  return scheduleEmployeeIds.length === 0;
+                },
+              );
+              // Set adminSchedules even when user ID is not available (for global schedules)
+              setAdminSchedules(applicableSchedules);
+            }
           }
         }
       } catch (_) {}
+
+      // Combine allocation dates with schedule dates
+      // IMPORTANT: Start completely fresh - only use allocationDates and scheduleDates
+      // This ensures we don't carry over dates from schedules that don't apply to this user
+      const combinedDates = new Set<string>();
+      allocationDates.forEach((d) => combinedDates.add(d));
+      scheduleDates.forEach((d) => combinedDates.add(d));
+      setLockedDates(combinedDates);
 
       // 2) Then load allocations for selected project (or all)
       const qs = projectId
@@ -186,11 +234,33 @@ export default function TransportCalendar({
     } finally {
       setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, currentUserId]);
+
+  // Fetch current user ID on mount (once)
+  useEffect(() => {
+    const fetchUserId = async () => {
+      try {
+        const profileRes = await fetch(`/api/pegawai/profile`, {
+          cache: "no-store",
+        });
+        if (profileRes.ok) {
+          const profileJson = await profileRes.json();
+          if (profileJson.profile?.id) {
+            setCurrentUserId(profileJson.profile.id);
+          }
+        }
+      } catch (_) {
+        // Ignore profile fetch error
+      }
+    };
+    fetchUserId();
+  }, []);
 
   useEffect(() => {
+    // Fetch allocations whenever projectId or currentUserId changes
+    // This ensures schedules are filtered correctly based on current user
     fetchAllocations();
-  }, [projectId, fetchAllocations]);
+  }, [projectId, fetchAllocations, currentUserId]);
 
   // Always preload activity note when modal opens or selection changes
   useEffect(() => {
@@ -910,16 +980,37 @@ export default function TransportCalendar({
               </span>
             </div>
             {(() => {
-              const list = adminSchedules.filter((s) => {
-                const sd = new Date(s.start_date);
-                const ed = new Date(s.end_date);
-                const cur = new Date(selectedScheduleDate);
-                return cur >= sd && cur <= ed;
-              });
-              if (list.length === 0) {
+              // Parse selectedScheduleDate to YYYY-MM-DD format for comparison
+              const selectedDateStr = selectedScheduleDate;
+
+              const list = adminSchedules.filter((s: any) => {
+                if (!s?.start_date || !s?.end_date) return false;
+
+                // Parse dates to YYYY-MM-DD format for accurate comparison
+                const startDateStr = String(s.start_date).slice(0, 10);
+                const endDateStr = String(s.end_date).slice(0, 10);
+
+                // Compare date strings directly (YYYY-MM-DD format)
                 return (
-                  <div className="text-gray-600">
-                    Tidak ada jadwal aktif di tanggal ini.
+                  selectedDateStr >= startDateStr &&
+                  selectedDateStr <= endDateStr
+                );
+              });
+
+              if (list.length === 0) {
+                // If date is locked but no schedule detail found, show generic message
+                const isDateLocked = lockedDates.has(selectedScheduleDate);
+                return (
+                  <div className="space-y-3">
+                    <div className="text-gray-600">
+                      Tidak ada jadwal aktif di tanggal ini.
+                    </div>
+                    {isDateLocked && (
+                      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-blue-800 text-xs">
+                        Pegawai tidak dapat mengalokasikan transport pada
+                        tanggal dalam jadwal global.
+                      </div>
+                    )}
                   </div>
                 );
               }
@@ -938,15 +1029,22 @@ export default function TransportCalendar({
                           {s.description}
                         </div>
                       )}
+                      {s.employee_ids &&
+                        Array.isArray(s.employee_ids) &&
+                        s.employee_ids.length > 0 && (
+                          <div className="text-gray-600 text-xs mt-1">
+                            Terblokir untuk {s.employee_ids.length} pegawai
+                          </div>
+                        )}
                     </div>
                   ))}
+                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-blue-800 text-xs">
+                    Pegawai tidak dapat mengalokasikan transport pada tanggal
+                    dalam jadwal global.
+                  </div>
                 </div>
               );
             })()}
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-blue-800 text-xs">
-              Pegawai tidak dapat mengalokasikan transport pada tanggal dalam
-              jadwal global.
-            </div>
           </div>
         </div>
       )}

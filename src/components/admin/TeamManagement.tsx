@@ -36,7 +36,9 @@ import {
   Loader2,
   Crown,
   Building2,
+  Monitor,
 } from "lucide-react";
+import Link from "next/link";
 import { toast } from "sonner";
 
 interface Team {
@@ -236,131 +238,140 @@ export default function TeamManagement() {
           </p>
         </div>
 
-        <Dialog
-          open={isCreateDialogOpen}
-          onOpenChange={(open) => {
-            setIsCreateDialogOpen(open);
-            if (!open) {
-              setEditingTeamId(null);
-              setFormData(initialFormData);
-            }
-          }}
-        >
-          <DialogTrigger asChild>
-            <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300">
-              <Plus className="w-4 h-4 mr-2" />
-              Buat Tim
+        <div className="flex items-center space-x-3">
+          <Link href="/admin/monitoring">
+            <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300">
+              <Monitor className="w-4 h-4 mr-2" />
+              Monitoring Tim
             </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>
-                {editingTeamId ? "Ubah Tim" : "Buat Tim Baru"}
-              </DialogTitle>
-              <DialogDescription>
-                {editingTeamId
-                  ? "Perbarui informasi tim dan penunjukan ketua."
-                  : "Buat tim dan tetapkan ketua tim (opsional)."}
-              </DialogDescription>
-            </DialogHeader>
+          </Link>
 
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="name">Nama Tim *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, name: e.target.value }))
-                  }
-                  placeholder="Masukkan nama tim"
-                />
-              </div>
+          <Dialog
+            open={isCreateDialogOpen}
+            onOpenChange={(open) => {
+              setIsCreateDialogOpen(open);
+              if (!open) {
+                setEditingTeamId(null);
+                setFormData(initialFormData);
+              }
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300">
+                <Plus className="w-4 h-4 mr-2" />
+                Buat Tim
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>
+                  {editingTeamId ? "Ubah Tim" : "Buat Tim Baru"}
+                </DialogTitle>
+                <DialogDescription>
+                  {editingTeamId
+                    ? "Perbarui informasi tim dan penunjukan ketua."
+                    : "Buat tim dan tetapkan ketua tim (opsional)."}
+                </DialogDescription>
+              </DialogHeader>
 
-              <div className="space-y-2">
-                <Label htmlFor="description">Deskripsi</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      description: e.target.value,
-                    }))
-                  }
-                  placeholder="Deskripsikan tujuan dan tanggung jawab tim"
-                  rows={3}
-                />
-              </div>
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Nama Tim *</Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, name: e.target.value }))
+                    }
+                    placeholder="Masukkan nama tim"
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="leader">Ketua Tim</Label>
-                <Select
-                  value={formData.leader_user_id || undefined}
-                  onValueChange={(value) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      leader_user_id: value === "none" ? "" : value,
-                    }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih ketua tim (opsional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Tidak ada ketua tim</SelectItem>
-                    {(pegawaiUsers || []).map((user) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        <div className="flex items-center space-x-2">
-                          <Crown className="w-4 h-4 text-yellow-500" />
-                          <div>
-                            <div className="font-medium">
-                              {user.nama_lengkap}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {user.email}
+                <div className="space-y-2">
+                  <Label htmlFor="description">Deskripsi</Label>
+                  <Textarea
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        description: e.target.value,
+                      }))
+                    }
+                    placeholder="Deskripsikan tujuan dan tanggung jawab tim"
+                    rows={3}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="leader">Ketua Tim</Label>
+                  <Select
+                    value={formData.leader_user_id || undefined}
+                    onValueChange={(value) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        leader_user_id: value === "none" ? "" : value,
+                      }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih ketua tim (opsional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Tidak ada ketua tim</SelectItem>
+                      {(pegawaiUsers || []).map((user) => (
+                        <SelectItem key={user.id} value={user.id}>
+                          <div className="flex items-center space-x-2">
+                            <Crown className="w-4 h-4 text-yellow-500" />
+                            <div>
+                              <div className="font-medium">
+                                {user.nama_lengkap}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {user.email}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-            </div>
 
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setIsCreateDialogOpen(false);
-                  setFormData(initialFormData);
-                  setEditingTeamId(null);
-                }}
-                disabled={creating}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={editingTeamId ? handleUpdateTeam : handleCreateTeam}
-                disabled={creating}
-                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-              >
-                {creating ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    {editingTeamId ? "Saving..." : "Creating..."}
-                  </>
-                ) : (
-                  <>
-                    <Plus className="w-4 h-4 mr-2" />
-                    {editingTeamId ? "Save Changes" : "Create Team"}
-                  </>
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsCreateDialogOpen(false);
+                    setFormData(initialFormData);
+                    setEditingTeamId(null);
+                  }}
+                  disabled={creating}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={editingTeamId ? handleUpdateTeam : handleCreateTeam}
+                  disabled={creating}
+                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                >
+                  {creating ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      {editingTeamId ? "Saving..." : "Creating..."}
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4 mr-2" />
+                      {editingTeamId ? "Save Changes" : "Create Team"}
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Search */}

@@ -23,6 +23,7 @@ export async function GET(request: Request) {
     }
 
     // Ensure allocations are released if they collide with admin schedules
+    // Only release if the schedule applies to this user (employee_ids is null/empty OR includes this user)
     try {
       const { data: settingsRow } = await serviceClient
         .from("system_settings")
@@ -38,13 +39,25 @@ export async function GET(request: Request) {
       if (schedules.length > 0) {
         for (const s of schedules) {
           if (s?.start_date && s?.end_date) {
-            await (serviceClient as any)
-              .from("task_transport_allocations")
-              .update({ allocation_date: null, allocated_at: null })
-              .eq("user_id", user.id)
-              .gte("allocation_date", s.start_date)
-              .lte("allocation_date", s.end_date)
-              .is("canceled_at", null);
+            // Check if this schedule applies to current user
+            const appliesToUser =
+              // If employee_ids is null or empty, it applies to all employees
+              !s.employee_ids ||
+              s.employee_ids.length === 0 ||
+              // Otherwise, only if current user is in the list
+              (s.employee_ids &&
+                Array.isArray(s.employee_ids) &&
+                s.employee_ids.includes(user.id));
+
+            if (appliesToUser) {
+              await (serviceClient as any)
+                .from("task_transport_allocations")
+                .update({ allocation_date: null, allocated_at: null })
+                .eq("user_id", user.id)
+                .gte("allocation_date", s.start_date)
+                .lte("allocation_date", s.end_date)
+                .is("canceled_at", null);
+            }
           }
         }
       }
@@ -252,9 +265,21 @@ export async function GET(request: Request) {
         (settingsRow as any)?.config?.admin_schedules ?? [];
       schedules.forEach((s: any) => {
         if (s?.start_date && s?.end_date) {
-          expandRangeToDates(s.start_date, s.end_date).forEach((ds) =>
-            allocationLocked.add(ds),
-          );
+          // CRITICAL: Only add dates from schedules that apply to this user
+          // If employee_ids is null or empty, it applies to all employees
+          // Otherwise, only if current user is in the list
+          const scheduleEmployeeIds = Array.isArray(s.employee_ids)
+            ? s.employee_ids
+            : [];
+          const appliesToUser =
+            scheduleEmployeeIds.length === 0 ||
+            scheduleEmployeeIds.includes(user.id);
+
+          if (appliesToUser) {
+            expandRangeToDates(s.start_date, s.end_date).forEach((ds) =>
+              allocationLocked.add(ds),
+            );
+          }
         }
       });
     } catch (_) {}

@@ -27,13 +27,6 @@ import {
   getMonthRange,
 } from "@/lib/utils/documentUtils";
 
-interface Project {
-  id: string;
-  nama_project: string;
-  tanggal_mulai: string;
-  deadline: string;
-}
-
 interface Mitra {
   id: string;
   nama_mitra: string;
@@ -44,29 +37,11 @@ interface Mitra {
   totalHonor: number;
 }
 
-interface Task {
-  id: string;
-  title: string;
-  start_date: string;
-  end_date: string;
-  honor_amount: number;
-}
-
-interface TaskDetail {
-  uraianTugas: string;
-  jangkaWaktu: string;
-  volume: string;
-  satuan: string;
-  hargaSatuan: number;
-  nilaiPerjanjian: number;
-}
-
 interface FormData {
-  nomorSPK: string;
-  projectId: string;
+  nomorSPK: string; // Base nomor SPK, akan auto-generate per tugas
   month: string;
   year: string;
-  mitraId: string;
+  mitraIds: string[]; // Multiple mitra selection
   tanggalPenandatanganan: string;
   namaPejabat: string;
 }
@@ -74,30 +49,21 @@ interface FormData {
 export function SPKForm() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [projects, setProjects] = useState<Project[]>([]);
   const [mitraList, setMitraList] = useState<Mitra[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
   const [showPreview, setShowPreview] = useState(false);
   const [loadingMitra, setLoadingMitra] = useState(false);
-  const [loadingTasks, setLoadingTasks] = useState(false);
 
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
 
   const [formData, setFormData] = useState<FormData>({
     nomorSPK: "",
-    projectId: "",
     month: currentMonth.toString(),
     year: currentYear.toString(),
-    mitraId: "",
+    mitraIds: [],
     tanggalPenandatanganan: "",
     namaPejabat: "",
   });
-
-  // Fetch initial data
-  useEffect(() => {
-    fetchProjects();
-  }, []);
 
   // Load draft if exists
   useEffect(() => {
@@ -114,48 +80,20 @@ export function SPKForm() {
     }
   }, []);
 
-  // Fetch mitra when project and month changes
+  // Fetch mitra when month and year changes (no project filter)
   useEffect(() => {
-    if (formData.projectId && formData.month && formData.year) {
+    if (formData.month && formData.year) {
       fetchMitra();
     } else {
       setMitraList([]);
-      setTasks([]);
     }
-  }, [formData.projectId, formData.month, formData.year]);
-
-  // Fetch tasks when mitra changes
-  useEffect(() => {
-    if (
-      formData.mitraId &&
-      formData.projectId &&
-      formData.month &&
-      formData.year
-    ) {
-      fetchTasks();
-    } else {
-      setTasks([]);
-    }
-  }, [formData.mitraId]);
-
-  const fetchProjects = async () => {
-    try {
-      const response = await fetch("/api/admin/export/projects");
-      if (response.ok) {
-        const data = await response.json();
-        setProjects(data);
-      }
-    } catch (error) {
-      console.error("Error fetching projects:", error);
-      toast.error("Gagal memuat data project");
-    }
-  };
+  }, [formData.month, formData.year]);
 
   const fetchMitra = async () => {
     try {
       setLoadingMitra(true);
       const response = await fetch(
-        `/api/admin/export/spk/mitra?projectId=${formData.projectId}&month=${formData.month}&year=${formData.year}`,
+        `/api/admin/export/spk/mitra?month=${formData.month}&year=${formData.year}`,
       );
       if (response.ok) {
         const data = await response.json();
@@ -163,30 +101,15 @@ export function SPKForm() {
         if (data.mitra.length === 0) {
           toast.info("Tidak ada mitra dengan tugas di bulan ini");
         }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        toast.error(errorData.error || "Gagal memuat data mitra");
       }
     } catch (error) {
       console.error("Error fetching mitra:", error);
-      toast.error("Gagal memuat data mitra");
+      toast.error("Gagal memuat data mitra. Periksa koneksi Anda.");
     } finally {
       setLoadingMitra(false);
-    }
-  };
-
-  const fetchTasks = async () => {
-    try {
-      setLoadingTasks(true);
-      const response = await fetch(
-        `/api/admin/export/spk/tasks?projectId=${formData.projectId}&month=${formData.month}&year=${formData.year}&mitraId=${formData.mitraId}`,
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setTasks(data.tasks || []);
-      }
-    } catch (error) {
-      console.error("Error fetching tasks:", error);
-      toast.error("Gagal memuat data tasks");
-    } finally {
-      setLoadingTasks(false);
     }
   };
 
@@ -194,21 +117,43 @@ export function SPKForm() {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
+  const toggleMitraSelection = (mitraId: string) => {
+    setFormData((prev) => {
+      const isSelected = prev.mitraIds.includes(mitraId);
+      return {
+        ...prev,
+        mitraIds: isSelected
+          ? prev.mitraIds.filter((id) => id !== mitraId)
+          : [...prev.mitraIds, mitraId],
+      };
+    });
+  };
+
+  const selectAllMitra = () => {
+    setFormData((prev) => ({
+      ...prev,
+      mitraIds: mitraList.map((m) => m.id),
+    }));
+  };
+
+  const deselectAllMitra = () => {
+    setFormData((prev) => ({
+      ...prev,
+      mitraIds: [],
+    }));
+  };
+
   const validateForm = (): boolean => {
     if (!formData.nomorSPK) {
       toast.error("Nomor SPK harus diisi");
-      return false;
-    }
-    if (!formData.projectId) {
-      toast.error("Project harus dipilih");
       return false;
     }
     if (!formData.month || !formData.year) {
       toast.error("Bulan dan tahun harus dipilih");
       return false;
     }
-    if (!formData.mitraId) {
-      toast.error("Mitra harus dipilih");
+    if (formData.mitraIds.length === 0) {
+      toast.error("Minimal 1 mitra harus dipilih");
       return false;
     }
     if (!formData.tanggalPenandatanganan) {
@@ -217,10 +162,6 @@ export function SPKForm() {
     }
     if (!formData.namaPejabat) {
       toast.error("Nama pejabat harus diisi");
-      return false;
-    }
-    if (tasks.length === 0) {
-      toast.error("Tidak ada tugas untuk mitra ini di bulan yang dipilih");
       return false;
     }
     return true;
@@ -305,19 +246,11 @@ export function SPKForm() {
     }
   };
 
-  const getSelectedProject = () => {
-    return projects.find((p) => p.id === formData.projectId);
-  };
-
-  const getSelectedMitra = () => {
-    return mitraList.find((m) => m.id === formData.mitraId);
-  };
-
-  const getTotalHonor = () => {
-    return tasks.reduce(
-      (sum, task) => sum + parseFloat(task.honor_amount.toString()),
-      0,
-    );
+  // Calculate total tasks count for selected mitra
+  const getTotalTasksCount = () => {
+    return mitraList
+      .filter((m) => formData.mitraIds.includes(m.id))
+      .reduce((sum, m) => sum + (m.taskCount || 0), 0);
   };
 
   const months = [
@@ -338,27 +271,24 @@ export function SPKForm() {
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
 
   const renderPreview = () => {
-    const selectedMitra = getSelectedMitra();
-    const monthRange = getMonthRange(
-      parseInt(formData.year),
-      parseInt(formData.month),
-    );
-    const totalHonor = getTotalHonor();
     const monthName =
       months.find((m) => m.value === formData.month)?.label || "";
-
-    if (!selectedMitra) return null;
+    const selectedMitraList = mitraList.filter((m) =>
+      formData.mitraIds.includes(m.id),
+    );
+    const totalTasks = getTotalTasksCount();
 
     return (
-      <Card className="border-2 border-blue-200 overflow-hidden pt-0">
+      <Card className="border-2 border-green-200 overflow-hidden pt-0">
         <CardHeader className="px-0 py-0 bg-transparent">
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-6 rounded-t-xl">
-            <CardTitle className="text-center">Preview SPK</CardTitle>
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 px-6 py-6 rounded-t-xl">
+            <CardTitle className="text-center">
+              Preview SPK Generation
+            </CardTitle>
           </div>
         </CardHeader>
         <CardContent className="p-8">
           <div className="space-y-6">
-            {/* Header */}
             <div className="text-center space-y-2">
               <h2 className="font-bold text-lg">PERJANJIAN KERJA</h2>
               <h2 className="font-bold text-lg">
@@ -371,140 +301,53 @@ export function SPKForm() {
               <h2 className="font-bold text-lg">NOMOR: {formData.nomorSPK}</h2>
             </div>
 
-            {/* Tanggal Penandatanganan */}
-            <div className="mt-6">
-              <p>
-                Pada hari ini{" "}
-                {dateToIndonesianText(formData.tanggalPenandatanganan)},
-                bertempat di Kota Batu, yang bertanda tangan di bawah ini:
-              </p>
-            </div>
-
-            {/* Para Pihak */}
-            <div className="space-y-2">
-              <div className="grid grid-cols-12 gap-2">
-                <div className="col-span-1">1.</div>
-                <div className="col-span-3">{formData.namaPejabat}</div>
-                <div className="col-span-1">:</div>
-                <div className="col-span-7">
-                  Pejabat Pembuat Komitmen Badan Pusat Statistik Kota Batu,
-                  berkedudukan di Jalan Melati No 1 Songgokerto Kota Batu,
-                  bertindak untuk dan atas nama Badan Pusat Statistik Kota Batu,
-                  selanjutnya disebut sebagai <strong>PIHAK PERTAMA</strong>
-                </div>
+            <div className="mt-6 space-y-4">
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <p className="font-semibold text-blue-900 mb-2">
+                  Ringkasan Generate SPK:
+                </p>
+                <ul className="space-y-1 text-sm text-blue-800">
+                  <li>
+                    • Periode: {monthName} {formData.year}
+                  </li>
+                  <li>• Jumlah Mitra: {selectedMitraList.length}</li>
+                  <li>• Total Tugas: {totalTasks}</li>
+                  <li>
+                    • Akan di-generate: {selectedMitraList.length} SPK (1 SPK
+                    per mitra)
+                  </li>
+                  <li>
+                    • Tanggal Penandatanganan:{" "}
+                    {dateToIndonesianText(formData.tanggalPenandatanganan)}
+                  </li>
+                  <li>• Pejabat: {formData.namaPejabat}</li>
+                </ul>
               </div>
-              <div className="grid grid-cols-12 gap-2">
-                <div className="col-span-1">2.</div>
-                <div className="col-span-3">{selectedMitra.nama_mitra}</div>
-                <div className="col-span-1">:</div>
-                <div className="col-span-7">
-                  {selectedMitra.pekerjaan}, berkedudukan di{" "}
-                  {selectedMitra.alamat} bertindak untuk dan atas nama diri
-                  sendiri, selanjutnya disebut <strong>PIHAK KEDUA</strong>.
-                </div>
+
+              <div className="bg-green-50 p-4 rounded-lg">
+                <p className="font-semibold text-green-900 mb-2">
+                  Mitra yang dipilih:
+                </p>
+                <ul className="space-y-1 text-sm text-green-800">
+                  {selectedMitraList.map((mitra, index) => (
+                    <li key={mitra.id}>
+                      • {mitra.nama_mitra} - {mitra.taskCount} tugas (SPK:{" "}
+                      {index === 0
+                        ? formData.nomorSPK
+                        : `${formData.nomorSPK}-${String(index + 1).padStart(3, "0")}`}
+                      )
+                    </li>
+                  ))}
+                </ul>
               </div>
-            </div>
 
-            {/* Masa Kerja */}
-            <div className="mt-4">
-              <p className="font-semibold">Pasal 3</p>
-              <p>
-                Jangka Waktu Perjanjian terhitung sejak tanggal{" "}
-                {monthRange.startText} sampai dengan tanggal{" "}
-                {monthRange.endText}.
-              </p>
-            </div>
-
-            {/* Lampiran - Daftar Tugas */}
-            <div className="mt-6">
-              <h3 className="font-bold text-center mb-2">LAMPIRAN</h3>
-              <p className="text-center">
-                PERJANJIAN KERJA PETUGAS KEGIATAN SURVEI / SENSUS
-              </p>
-              <p className="text-center">
-                BULAN {monthName.toUpperCase()} PADA BADAN PUSAT STATISTIK KOTA
-                BATU
-              </p>
-              <p className="text-center">NOMOR: {formData.nomorSPK}</p>
-
-              <p className="mt-4 font-semibold">
-                Nama Petugas: {selectedMitra.nama_mitra}
-              </p>
-
-              <table className="w-full mt-4 border-collapse border border-gray-300">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="border border-gray-300 p-2">Uraian Tugas</th>
-                    <th className="border border-gray-300 p-2">Jangka Waktu</th>
-                    <th className="border border-gray-300 p-2">Volume</th>
-                    <th className="border border-gray-300 p-2">Satuan</th>
-                    <th className="border border-gray-300 p-2">Harga Satuan</th>
-                    <th className="border border-gray-300 p-2">
-                      Nilai Perjanjian
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tasks.map((task, idx) => {
-                    const startDate = new Date(task.start_date);
-                    const endDate = new Date(task.end_date);
-                    const monthNames = months.map((m) => m.label);
-                    const jangkaWaktu = `${startDate.getDate()} - ${endDate.getDate()} ${monthNames[endDate.getMonth()]} ${endDate.getFullYear()}`;
-
-                    const volume = (task as any).volume || "-";
-                    const namaSatuan = (task as any).satuan?.nama_satuan || "-";
-                    const rate = (task as any).rate_per_satuan || 0;
-                    const nilai =
-                      rate && volume ? rate * volume : task.honor_amount;
-                    return (
-                      <tr key={idx}>
-                        <td className="border border-gray-300 p-2">
-                          {task.title}
-                        </td>
-                        <td className="border border-gray-300 p-2">
-                          {jangkaWaktu}
-                        </td>
-                        <td className="border border-gray-300 p-2 text-center">
-                          {volume || "-"}
-                        </td>
-                        <td className="border border-gray-300 p-2 text-center">
-                          {namaSatuan}
-                        </td>
-                        <td className="border border-gray-300 p-2 text-right">
-                          {formatRupiah(rate || 0)}
-                        </td>
-                        <td className="border border-gray-300 p-2 text-right">
-                          {formatRupiah(nilai)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  <tr className="font-semibold">
-                    <td
-                      colSpan={5}
-                      className="border border-gray-300 p-2 text-center"
-                    >
-                      Terbilang: {rupiahToWords(getTotalHonor())}
-                    </td>
-                    <td className="border border-gray-300 p-2 text-right">
-                      {formatRupiah(getTotalHonor())}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            {/* Tanda Tangan */}
-            <div className="mt-8 grid grid-cols-2 gap-8">
-              <div className="text-center">
-                <p className="font-semibold">PIHAK KEDUA,</p>
-                <div className="h-20"></div>
-                <p className="font-semibold">{selectedMitra.nama_mitra}</p>
-              </div>
-              <div className="text-center">
-                <p className="font-semibold">PIHAK PERTAMA,</p>
-                <div className="h-20"></div>
-                <p className="font-semibold">{formData.namaPejabat}</p>
+              <div className="bg-yellow-50 p-4 rounded-lg">
+                <p className="text-sm text-yellow-800">
+                  <strong>Catatan:</strong> Setiap mitra akan di-generate
+                  menjadi 1 SPK yang berisi semua tugas mitra tersebut dalam
+                  bulan yang dipilih. Page break akan ditambahkan di antara
+                  setiap SPK.
+                </p>
               </div>
             </div>
           </div>
@@ -575,29 +418,6 @@ export function SPKForm() {
                 />
               </div>
 
-              {/* Project Selection */}
-              <div>
-                <Label htmlFor="projectId" className="flex items-center mb-2">
-                  <Briefcase className="w-4 h-4 mr-2" />
-                  Project
-                </Label>
-                <select
-                  id="projectId"
-                  value={formData.projectId}
-                  onChange={(e) =>
-                    handleInputChange("projectId", e.target.value)
-                  }
-                  className="w-full border border-green-200 rounded-md px-3 py-2 focus:border-green-400 focus:outline-none"
-                >
-                  <option value="">Pilih Project</option>
-                  {projects.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.nama_project}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
               {/* Month and Year Selection */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -638,12 +458,38 @@ export function SPKForm() {
                 </div>
               </div>
 
-              {/* Mitra Selection */}
+              {/* Mitra Selection - Multiple */}
               <div>
-                <Label htmlFor="mitraId" className="flex items-center mb-2">
-                  <User className="w-4 h-4 mr-2" />
-                  Mitra
-                </Label>
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="flex items-center">
+                    <User className="w-4 h-4 mr-2" />
+                    Mitra ({formData.mitraIds.length} dipilih)
+                  </Label>
+                  {mitraList.length > 0 && (
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={selectAllMitra}
+                        disabled={formData.mitraIds.length === mitraList.length}
+                        className="text-xs"
+                      >
+                        Select All
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={deselectAllMitra}
+                        disabled={formData.mitraIds.length === 0}
+                        className="text-xs"
+                      >
+                        Deselect All
+                      </Button>
+                    </div>
+                  )}
+                </div>
                 {loadingMitra ? (
                   <div className="text-sm text-gray-500">
                     Memuat daftar mitra...
@@ -652,28 +498,31 @@ export function SPKForm() {
                   <Alert>
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                      {formData.projectId && formData.month && formData.year
+                      {formData.month && formData.year
                         ? "Tidak ada mitra dengan tugas di bulan ini"
-                        : "Pilih project, bulan, dan tahun terlebih dahulu"}
+                        : "Pilih bulan dan tahun terlebih dahulu"}
                     </AlertDescription>
                   </Alert>
                 ) : (
-                  <select
-                    id="mitraId"
-                    value={formData.mitraId}
-                    onChange={(e) =>
-                      handleInputChange("mitraId", e.target.value)
-                    }
-                    className="w-full border border-green-200 rounded-md px-3 py-2 focus:border-green-400 focus:outline-none"
-                  >
-                    <option value="">Pilih Mitra</option>
+                  <div className="border border-green-200 rounded-md max-h-60 overflow-y-auto p-2">
                     {mitraList.map((mitra) => (
-                      <option key={mitra.id} value={mitra.id}>
-                        {mitra.nama_mitra} ({mitra.taskCount} tugas, Total:{" "}
-                        {formatRupiah(mitra.totalHonor)})
-                      </option>
+                      <label
+                        key={mitra.id}
+                        className="flex items-center p-2 hover:bg-green-50 rounded cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={formData.mitraIds.includes(mitra.id)}
+                          onChange={() => toggleMitraSelection(mitra.id)}
+                          className="mr-3 h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                        />
+                        <span className="text-sm">
+                          {mitra.nama_mitra} ({mitra.taskCount} tugas, Total:{" "}
+                          {formatRupiah(mitra.totalHonor)})
+                        </span>
+                      </label>
                     ))}
-                  </select>
+                  </div>
                 )}
               </div>
 
@@ -754,7 +603,7 @@ export function SPKForm() {
 
           {/* Preview Section */}
           <div>
-            {showPreview && formData.mitraId ? (
+            {showPreview && formData.mitraIds.length > 0 ? (
               renderPreview()
             ) : (
               <Card className="border-2 border-gray-200">
@@ -769,58 +618,7 @@ export function SPKForm() {
               </Card>
             )}
 
-            {/* Task List */}
-            {loadingTasks && (
-              <Card className="border-2 border-gray-200 mt-4">
-                <CardContent className="p-6">
-                  <p className="text-sm text-gray-500">
-                    Memuat daftar tugas...
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-
-            {!loadingTasks && tasks.length > 0 && (
-              <Card className="border-2 border-green-200 mt-4 overflow-hidden pt-0">
-                <CardHeader className="px-0 py-0 bg-transparent">
-                  <div className="bg-gradient-to-r from-green-500 to-emerald-600 px-6 py-6 rounded-t-xl">
-                    <CardTitle className="text-white">
-                      Daftar Tugas ({tasks.length})
-                    </CardTitle>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-4">
-                  <div className="space-y-2">
-                    {tasks.map((task, idx) => (
-                      <div key={idx} className="border rounded p-3 bg-white">
-                        <p className="font-semibold text-sm">{task.title}</p>
-                        <div className="text-xs text-gray-600 mt-1">
-                          <p>
-                            Periode:{" "}
-                            {new Date(task.start_date).toLocaleDateString(
-                              "id-ID",
-                            )}{" "}
-                            -{" "}
-                            {new Date(task.end_date).toLocaleDateString(
-                              "id-ID",
-                            )}
-                          </p>
-                          <p>Honor: {formatRupiah(task.honor_amount)}</p>
-                        </div>
-                      </div>
-                    ))}
-                    <div className="border-t pt-2 mt-2">
-                      <p className="font-bold text-right">
-                        Total: {formatRupiah(getTotalHonor())}
-                      </p>
-                      <p className="text-xs text-gray-600 text-right">
-                        {rupiahToWords(getTotalHonor())}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+            {/* Task List dihapus pada mode multi-generate */}
           </div>
         </div>
       </div>

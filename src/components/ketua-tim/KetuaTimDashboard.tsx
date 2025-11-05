@@ -29,6 +29,7 @@ import {
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import Link from "next/link";
+import { AttendanceStatus } from "@/components/attendance/AttendanceStatus";
 
 interface DashboardStats {
   my_projects: number;
@@ -281,6 +282,8 @@ export default function KetuaTimDashboard() {
         </div>
 
         <div className="flex items-center space-x-4">
+          <AttendanceStatus />
+
           <div className="flex items-center space-x-2">
             <Select
               value={selectedMonth.toString()}

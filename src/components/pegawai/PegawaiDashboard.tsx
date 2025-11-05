@@ -32,6 +32,7 @@ import {
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import Link from "next/link";
+import { AttendanceStatus } from "@/components/attendance/AttendanceStatus";
 
 interface PegawaiDashboardStats {
   total_tasks: number;
@@ -320,12 +321,7 @@ export default function PegawaiDashboard() {
               </div>
 
               <div className="hidden lg:flex items-center space-x-4">
-                <div className="flex items-center space-x-2 px-4 py-3 bg-white/20 backdrop-blur-sm rounded-2xl border border-white/30">
-                  <TrendingUp className="w-5 h-5 text-white" />
-                  <span className="text-white font-semibold">
-                    Hari yang Produktif!
-                  </span>
-                </div>
+                <AttendanceStatus variant="gradient" />
 
                 <Button
                   onClick={handleRefresh}

@@ -6,6 +6,7 @@ import { generateSKDocumentWithTemplate } from "@/lib/utils/docxtemplaterGenerat
 import { generateSPKDocument } from "@/lib/utils/spkGenerator";
 import { generateBASTDocument } from "@/lib/utils/bastGenerator";
 import { generateMultiBASTDocument } from "@/lib/utils/bastGeneratorMulti";
+import { generateMultiSPKDocument } from "@/lib/utils/spkGeneratorMulti";
 
 interface ProjectData {
   nama_project: string;
@@ -165,14 +166,31 @@ async function handleBASTGeneration(data: any, format: string) {
 }
 
 /**
- * Handle SPK document generation
+ * Handle SPK document generation (multi-mitra, 1 SPK per tugas)
  */
 async function handleSPKGeneration(data: any, format: string) {
   try {
     const svc = await createServiceRoleClient();
 
-    // Fetch mitra details
-    const { data: mitraData, error: mitraError } = await (svc as any)
+    const mitraIds = data.mitraIds || [];
+    if (mitraIds.length === 0) {
+      return NextResponse.json(
+        { error: "At least one mitra must be selected" },
+        { status: 400 },
+      );
+    }
+
+    // Calculate date range for the month
+    const monthNum = parseInt(data.month);
+    const yearNum = parseInt(data.year);
+    // Use manual string format to avoid timezone issues
+    const monthStr = monthNum.toString().padStart(2, "0");
+    const startDateStr = `${yearNum}-${monthStr}-01`;
+    const lastDay = new Date(yearNum, monthNum, 0).getDate();
+    const endDateStr = `${yearNum}-${monthStr}-${lastDay.toString().padStart(2, "0")}`;
+
+    // Fetch all mitra details
+    const { data: mitraList, error: mitraError } = await (svc as any)
       .from("mitra")
       .select(
         `
@@ -186,23 +204,19 @@ async function handleSPKGeneration(data: any, format: string) {
         )
       `,
       )
-      .eq("id", data.mitraId)
-      .single();
+      .in("id", mitraIds);
 
-    if (mitraError || !mitraData) {
-      console.error("Mitra fetch error:", mitraError);
+    if (mitraError || !mitraList || mitraList.length === 0) {
       return NextResponse.json({ error: "Mitra not found" }, { status: 404 });
     }
 
-    // Fetch tasks for this mitra in the specified month
-    const monthNum = parseInt(data.month);
-    const yearNum = parseInt(data.year);
-    const startDate = new Date(yearNum, monthNum - 1, 1);
-    const endDate = new Date(yearNum, monthNum, 0);
-    const startDateStr = startDate.toISOString().split("T")[0];
-    const endDateStr = endDate.toISOString().split("T")[0];
+    // Fetch all tasks for selected mitra in the specified month (from all projects)
+    // Note: Avoid FK join to avoid schema cache issues, fetch project details separately
+    // Use OR query to get tasks matching either start_date OR tanggal_tugas in the month
 
-    const { data: tasks, error: tasksError } = await (svc as any)
+    // Query 1: Tasks with start_date in the month (fetch all first, then filter)
+    // Note: We fetch all tasks in the month first, then filter by mitraIds in JS
+    const { data: allTasksByStartDate, error: error1 } = await (svc as any)
       .from("tasks")
       .select(
         `
@@ -210,54 +224,186 @@ async function handleSPKGeneration(data: any, format: string) {
         title,
         start_date,
         end_date,
+        tanggal_tugas,
+        assignee_mitra_id,
         honor_amount,
         satuan_id,
         rate_per_satuan,
         volume,
+        project_id,
         satuan:satuan_id ( nama_satuan )
       `,
       )
-      .eq("project_id", data.projectId)
-      .eq("assignee_mitra_id", data.mitraId)
-      .lte("start_date", endDateStr)
-      .gte("end_date", startDateStr)
-      .order("start_date", { ascending: true });
+      .not("assignee_mitra_id", "is", null)
+      .gte("start_date", startDateStr)
+      .lte("start_date", endDateStr);
 
-    if (tasksError) {
-      console.error("Tasks fetch error:", tasksError);
-      return NextResponse.json(
-        { error: "Failed to fetch tasks" },
-        { status: 500 },
-      );
+    // Filter by mitraIds in JavaScript
+    const tasksByStartDate = (allTasksByStartDate || []).filter(
+      (task: any) =>
+        task.assignee_mitra_id && mitraIds.includes(task.assignee_mitra_id),
+    );
+
+    // Query 2: Tasks with tanggal_tugas in the month (for legacy records)
+    const { data: allTasksByTanggalTugas, error: error2 } = await (svc as any)
+      .from("tasks")
+      .select(
+        `
+        id,
+        title,
+        start_date,
+        end_date,
+        tanggal_tugas,
+        assignee_mitra_id,
+        honor_amount,
+        satuan_id,
+        rate_per_satuan,
+        volume,
+        project_id,
+        satuan:satuan_id ( nama_satuan )
+      `,
+      )
+      .not("assignee_mitra_id", "is", null)
+      .gte("tanggal_tugas", startDateStr)
+      .lte("tanggal_tugas", endDateStr);
+
+    // Filter by mitraIds in JavaScript
+    const tasksByTanggalTugas = (allTasksByTanggalTugas || []).filter(
+      (task: any) =>
+        task.assignee_mitra_id && mitraIds.includes(task.assignee_mitra_id),
+    );
+
+    // Combine and deduplicate tasks
+    const taskMap = new Map<string, any>();
+
+    (tasksByStartDate || []).forEach((task: any) => {
+      taskMap.set(task.id, task);
+    });
+
+    (tasksByTanggalTugas || []).forEach((task: any) => {
+      if (!taskMap.has(task.id)) {
+        taskMap.set(task.id, task);
+      }
+    });
+
+    const allTasks = Array.from(taskMap.values());
+
+    // Sort by start_date or tanggal_tugas
+    allTasks.sort((a: any, b: any) => {
+      const dateA = a.start_date || a.tanggal_tugas || "";
+      const dateB = b.start_date || b.tanggal_tugas || "";
+      return dateA.localeCompare(dateB);
+    });
+
+    if (error1 || error2) {
+      // Don't fail if one query succeeds
+      if (allTasks.length === 0) {
+        return NextResponse.json(
+          { error: "Failed to fetch tasks" },
+          { status: 500 },
+        );
+      }
     }
 
-    if (!tasks || tasks.length === 0) {
+    if (!allTasks || allTasks.length === 0) {
       return NextResponse.json(
-        { error: "No tasks found for this mitra in the selected month" },
+        {
+          error: `No tasks found for selected mitra in ${monthStr}/${yearNum}. Please check if tasks exist for these mitra in the selected month.`,
+          debug: {
+            mitraIds,
+            month: monthNum,
+            year: yearNum,
+            dateRange: { start: startDateStr, end: endDateStr },
+          },
+        },
         { status: 404 },
       );
     }
 
-    // Prepare SPK data
-    const spkData = {
+    // Fetch project details separately to avoid FK relationship issues
+    const projectIds = Array.from(
+      new Set((allTasks || []).map((t: any) => t.project_id).filter(Boolean)),
+    );
+
+    const projectNameById: Record<string, string> = {};
+    if (projectIds.length > 0) {
+      const { data: projects } = await (svc as any)
+        .from("projects")
+        .select("id, nama_project")
+        .in("id", projectIds);
+
+      (projects || []).forEach((p: any) => {
+        projectNameById[p.id] = p.nama_project;
+      });
+    }
+
+    // Group tasks by mitra
+    const mitraTasksMap = new Map<string, any[]>();
+    for (const task of allTasks || []) {
+      const mitraId = task.assignee_mitra_id;
+      if (mitraId) {
+        if (!mitraTasksMap.has(mitraId)) {
+          mitraTasksMap.set(mitraId, []);
+        }
+        mitraTasksMap.get(mitraId)!.push(task);
+      }
+    }
+
+    // Build mitraTasks array - only include mitra that were selected AND have tasks
+    const mitraTasks = mitraList
+      .filter((m: any) => {
+        return mitraTasksMap.has(m.id);
+      })
+      .map((mitra: any) => ({
+        mitra: {
+          id: mitra.id,
+          nama_mitra: mitra.nama_mitra,
+          alamat: mitra.alamat || "",
+          pekerjaan: mitra.mitra_occupations?.name || "",
+        },
+        tasks: mitraTasksMap.get(mitra.id)!.map((task: any) => ({
+          id: task.id,
+          title: task.title,
+          start_date: task.start_date,
+          end_date: task.end_date,
+          honor_amount: task.honor_amount,
+          satuan_id: task.satuan_id,
+          rate_per_satuan: task.rate_per_satuan,
+          volume: task.volume,
+          satuan: task.satuan,
+          project_id: task.project_id,
+          project_name: projectNameById[task.project_id] || "",
+        })),
+      }));
+
+    if (mitraTasks.length === 0) {
+      return NextResponse.json(
+        {
+          error: "No tasks found for selected mitra",
+          debug: {
+            tasksFound: allTasks.length,
+            tasksMitraIds: Array.from(mitraTasksMap.keys()),
+            selectedMitraIds: mitraIds,
+            mitraListIds: mitraList.map((m: any) => m.id),
+          },
+        },
+        { status: 404 },
+      );
+    }
+
+    // Prepare multi-SPK data
+    const multiSPKData = {
       nomorSPK: data.nomorSPK,
-      projectId: data.projectId,
       month: data.month,
       year: data.year,
-      mitraId: data.mitraId,
       tanggalPenandatanganan: data.tanggalPenandatanganan,
       namaPejabat: data.namaPejabat,
-      mitraData: {
-        nama_mitra: mitraData.nama_mitra,
-        alamat: mitraData.alamat || "",
-        pekerjaan: mitraData.mitra_occupations?.name || "",
-      },
-      tasks: tasks || [],
+      mitraTasks,
     };
 
     if (format === "docx") {
-      // Generate SPK document
-      const doc = await generateSPKDocument(spkData);
+      // Generate multi-SPK document
+      const doc = await generateMultiSPKDocument(multiSPKData);
       const buffer = await Packer.toBuffer(doc);
 
       return new NextResponse(buffer as unknown as BodyInit, {
@@ -274,7 +420,6 @@ async function handleSPKGeneration(data: any, format: string) {
       );
     }
   } catch (error) {
-    console.error("Error generating SPK:", error);
     return NextResponse.json(
       { error: "Failed to generate SPK document" },
       { status: 500 },
