@@ -125,7 +125,7 @@ export function AttendanceStatus({
           await new Promise((resolve) => setTimeout(resolve, 300));
 
           // Try to get updated status
-          const { data: updatedStatus } = await queryClient.fetchQuery({
+          const updatedStatus = await queryClient.fetchQuery({
             queryKey: ["attendance", "status"],
             queryFn: fetchAttendanceStatus,
             staleTime: 0, // Force fresh fetch
@@ -194,7 +194,7 @@ export function AttendanceStatus({
       };
     } else {
       // Refetch status to get latest currentLog
-      const { data: latestStatus } = await queryClient.fetchQuery({
+      const latestStatus = await queryClient.fetchQuery({
         queryKey: ["attendance", "status"],
         queryFn: fetchAttendanceStatus,
         staleTime: 0,

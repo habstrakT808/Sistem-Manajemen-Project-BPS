@@ -3,7 +3,6 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { format } from "date-fns";
 
 // Helper function to get WIB time (UTC+7)
 function getWIBTime(date: Date = new Date()): Date {
@@ -68,7 +67,6 @@ export async function POST(request: NextRequest) {
     // Get current time in WIB
     const now = new Date();
     const wibTime = getWIBTime(now);
-    const wibTimeStr = format(wibTime, "HH:mm:ss");
 
     // Check if within working hours (07:30 - 15:30)
     const currentHour = wibTime.getHours();
@@ -91,8 +89,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify attendance log belongs to user and doesn't already have check_out_at
-    const { data: existingLog, error: fetchError } = await supabase
-      .from("attendance_logs")
+    const { data: existingLog, error: fetchError } = await (
+      supabase.from("attendance_logs") as any
+    )
       .select("*")
       .eq("id", attendanceLogId)
       .eq("user_id", user.id)
@@ -111,9 +110,10 @@ export async function POST(request: NextRequest) {
       check_out_at: now.toISOString(),
       check_out_reason: reason.trim(),
     };
-    const { data: updatedLog, error: updateError } = await supabase
-      .from("attendance_logs")
-      .update(updateData as any)
+    const { data: updatedLog, error: updateError } = await (
+      supabase.from("attendance_logs") as any
+    )
+      .update(updateData)
       .eq("id", attendanceLogId)
       .select()
       .single();

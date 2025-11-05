@@ -12,7 +12,7 @@ function getWIBTime(date: Date = new Date()): Date {
   return wibTime;
 }
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const supabase = await createClient();
 
@@ -63,8 +63,9 @@ export async function GET(request: NextRequest) {
       currentTimeMinutes <= workEndMinutes;
 
     // Get today's attendance logs for this user
-    const { data: todayLogs, error: logsError } = await supabase
-      .from("attendance_logs")
+    const { data: todayLogs, error: logsError } = await (
+      supabase.from("attendance_logs") as any
+    )
       .select("*")
       .eq("user_id", user.id)
       .eq("date", wibDate)
@@ -80,7 +81,7 @@ export async function GET(request: NextRequest) {
 
     // Find the most recent active log (check-in without check-out)
     const activeLog =
-      todayLogs?.find((log) => log.check_out_at === null) || null;
+      todayLogs?.find((log: any) => log.check_out_at === null) || null;
 
     // Determine status
     let status: "check_in" | "check_out" | "off" = "check_in";

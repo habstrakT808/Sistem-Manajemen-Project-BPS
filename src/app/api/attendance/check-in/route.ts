@@ -12,7 +12,7 @@ function getWIBTime(date: Date = new Date()): Date {
   return wibTime;
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     const supabase = await createClient();
 
@@ -51,7 +51,6 @@ export async function POST(request: NextRequest) {
     const now = new Date();
     const wibTime = getWIBTime(now);
     const wibDate = format(wibTime, "yyyy-MM-dd");
-    const wibTimeStr = format(wibTime, "HH:mm:ss");
 
     // Check if within working hours (07:30 - 15:30)
     const currentHour = wibTime.getHours();
@@ -74,13 +73,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Create check-in record
-    const { data: attendanceLog, error: insertError } = await supabase
-      .from("attendance_logs")
-      .insert({
-        user_id: user.id,
-        check_in_at: now.toISOString(),
-        date: wibDate,
-      } as any)
+    const insertPayload = {
+      user_id: user.id,
+      check_in_at: now.toISOString(),
+      date: wibDate,
+    };
+    const { data: attendanceLog, error: insertError } = await (
+      supabase.from("attendance_logs") as any
+    )
+      .insert(insertPayload)
       .select()
       .single();
 
