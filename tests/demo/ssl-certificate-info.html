@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSL Certificate Information</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            overflow-x: hidden;
+        }
+        .browser-window {
+            width: 100vw;
+            min-height: 100vh;
+            background: #f5f5f5;
+        }
+        .browser-chrome {
+            background: #ffffff;
+            border-bottom: 1px solid #e0e0e0;
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .browser-controls {
+            display: flex;
+            gap: 8px;
+        }
+        .control-btn {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: none;
+        }
+        .close { background: #ff5f57; }
+        .minimize { background: #ffbd2e; }
+        .maximize { background: #28ca42; }
+        .address-bar {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #f1f3f4;
+            border-radius: 24px;
+            padding: 8px 16px;
+            margin: 0 8px;
+        }
+        .lock-icon {
+            width: 16px;
+            height: 16px;
+            color: #1a73e8;
+        }
+        .lock-icon svg {
+            width: 100%;
+            height: 100%;
+        }
+        .url-text {
+            flex: 1;
+            font-size: 14px;
+            color: #1a1a1a;
+        }
+        .secure-badge {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            color: #1a73e8;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .browser-tabs {
+            background: #ffffff;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            padding: 0 8px;
+        }
+        .tab {
+            padding: 10px 16px;
+            background: #f1f3f4;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+            margin-right: 2px;
+            font-size: 13px;
+            color: #5f6368;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .tab.active {
+            background: #ffffff;
+            color: #1a1a1a;
+            border-bottom: 2px solid #1a73e8;
+        }
+        .content-area {
+            position: relative;
+            min-height: calc(100vh - 120px);
+        }
+        .app-content {
+            padding: 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 500px;
+            opacity: 0.3;
+            filter: blur(2px);
+            pointer-events: none;
+        }
+        .certificate-panel {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 600px;
+            max-width: 90vw;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            overflow: hidden;
+        }
+        .certificate-header {
+            background: #1a73e8;
+            color: white;
+            padding: 20px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .certificate-header h2 {
+            font-size: 20px;
+            font-weight: 500;
+        }
+        .close-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+        .close-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .certificate-content {
+            padding: 24px;
+        }
+        .status-section {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            background: #e8f5e9;
+            border-radius: 8px;
+            margin-bottom: 24px;
+        }
+        .status-icon {
+            width: 24px;
+            height: 24px;
+            background: #4caf50;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        .status-text {
+            flex: 1;
+        }
+        .status-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 4px;
+        }
+        .status-subtitle {
+            font-size: 14px;
+            color: #666;
+        }
+        .info-section {
+            margin-bottom: 24px;
+        }
+        .info-section h3 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #5f6368;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .info-row {
+            display: flex;
+            padding: 12px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        .info-label {
+            width: 140px;
+            font-size: 14px;
+            color: #666;
+            font-weight: 500;
+        }
+        .info-value {
+            flex: 1;
+            font-size: 14px;
+            color: #1a1a1a;
+        }
+        .info-value.highlight {
+            color: #1a73e8;
+            font-weight: 600;
+            background: #e8f0fe;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+        .certificate-chain {
+            background: #f9fafb;
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 12px;
+        }
+        .chain-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 0;
+        }
+        .chain-item:not(:last-child) {
+            border-bottom: 1px solid #e5e5e5;
+            padding-bottom: 12px;
+            margin-bottom: 12px;
+        }
+        .chain-icon {
+            width: 20px;
+            height: 20px;
+            color: #1a73e8;
+        }
+        .chain-name {
+            flex: 1;
+            font-size: 14px;
+            color: #1a1a1a;
+        }
+        .expand-btn {
+            width: 100%;
+            padding: 12px;
+            background: #f1f3f4;
+            border: none;
+            border-radius: 8px;
+            margin-top: 16px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #1a73e8;
+            font-weight: 500;
+        }
+        .expand-btn:hover {
+            background: #e8f0fe;
+        }
+        .expanded-details {
+            margin-top: 16px;
+            padding: 16px;
+            background: #f9fafb;
+            border-radius: 8px;
+            display: none;
+        }
+        .expanded-details.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="browser-window">
+        <!-- Browser Chrome -->
+        <div class="browser-chrome">
+            <div class="browser-controls">
+                <button class="control-btn close"></button>
+                <button class="control-btn minimize"></button>
+                <button class="control-btn maximize"></button>
+            </div>
+            <div class="address-bar">
+                <div class="lock-icon">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+                    </svg>
+                </div>
+                <div class="url-text">https://project-management.bps.go.id</div>
+                <div class="secure-badge">
+                    <span>Secure</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Browser Tabs -->
+        <div class="browser-tabs">
+            <div class="tab active">Project Management System</div>
+            <div class="tab">New Tab</div>
+        </div>
+
+        <!-- Content Area -->
+        <div class="content-area">
+            <!-- App Content (blurred background) -->
+            <div class="app-content">
+                <h1>Project Management System</h1>
+                <p>Dashboard content and application interface visible in background</p>
+            </div>
+
+            <!-- Certificate Panel (overlay) -->
+            <div class="certificate-panel">
+                <div class="certificate-header">
+                    <h2>Connection is secure</h2>
+                    <button class="close-btn" onclick="closePanel()">×</button>
+                </div>
+                <div class="certificate-content">
+                    <!-- Status Section -->
+                    <div class="status-section">
+                        <div class="status-icon">✓</div>
+                        <div class="status-text">
+                            <div class="status-title">Connection is secure</div>
+                            <div class="status-subtitle">Your information (for example, passwords or credit card numbers) is private when it is sent to this site.</div>
+                        </div>
+                    </div>
+
+                    <!-- Certificate Information -->
+                    <div class="info-section">
+                        <h3>Certificate Information</h3>
+                        <div class="info-row">
+                            <div class="info-label">Issued by:</div>
+                            <div class="info-value">Let's Encrypt</div>
+                        </div>
+                        <div class="info-row">
+                            <div class="info-label">Valid from:</div>
+                            <div class="info-value">November 1, 2024</div>
+                        </div>
+                        <div class="info-row">
+                            <div class="info-label">Valid to:</div>
+                            <div class="info-value">January 30, 2025</div>
+                        </div>
+                    </div>
+
+                    <!-- Security Details -->
+                    <div class="info-section">
+                        <h3>Security Details</h3>
+                        <div class="info-row">
+                            <div class="info-label">Protocol:</div>
+                            <div class="info-value highlight">TLS 1.3</div>
+                        </div>
+                        <div class="info-row">
+                            <div class="info-label">Cipher Suite:</div>
+                            <div class="info-value">TLS_AES_256_GCM_SHA384</div>
+                        </div>
+                        <div class="info-row">
+                            <div class="info-label">Key Exchange:</div>
+                            <div class="info-value">ECDHE-RSA</div>
+                        </div>
+                    </div>
+
+                    <!-- Certificate Chain -->
+                    <div class="info-section">
+                        <h3>Certificate Chain</h3>
+                        <div class="certificate-chain">
+                            <div class="chain-item">
+                                <svg class="chain-icon" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                                </svg>
+                                <div class="chain-name">DST Root CA X3</div>
+                            </div>
+                            <div class="chain-item">
+                                <svg class="chain-icon" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                                </svg>
+                                <div class="chain-name">Let's Encrypt Authority X3</div>
+                            </div>
+                            <div class="chain-item">
+                                <svg class="chain-icon" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                                </svg>
+                                <div class="chain-name">project-management.bps.go.id</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Expand Button -->
+                    <button class="expand-btn" onclick="toggleDetails()">Certificate Details</button>
+
+                    <!-- Expanded Details -->
+                    <div class="expanded-details" id="expandedDetails">
+                        <div class="info-section">
+                            <h3>Certificate Subject</h3>
+                            <div class="info-row">
+                                <div class="info-label">Common Name:</div>
+                                <div class="info-value">project-management.bps.go.id</div>
+                            </div>
+                            <div class="info-row">
+                                <div class="info-label">Organization:</div>
+                                <div class="info-value">Badan Pusat Statistik</div>
+                            </div>
+                        </div>
+                        <div class="info-section">
+                            <h3>Issuer Information</h3>
+                            <div class="info-row">
+                                <div class="info-label">Organization:</div>
+                                <div class="info-value">Let's Encrypt</div>
+                            </div>
+                            <div class="info-row">
+                                <div class="info-label">Country:</div>
+                                <div class="info-value">US</div>
+                            </div>
+                        </div>
+                        <div class="info-section">
+                            <h3>Fingerprint</h3>
+                            <div class="info-row">
+                                <div class="info-label">SHA-256:</div>
+                                <div class="info-value" style="font-family: monospace; font-size: 12px;">A1:B2:C3:D4:E5:F6:78:90:12:34:56:78:90:AB:CD:EF:12:34:56:78:90:AB:CD:EF:12:34:56:78:90:AB:CD:EF</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function closePanel() {
+            // Panel tetap visible untuk screenshot
+            // In real browser, this would close the panel
+        }
+
+        function toggleDetails() {
+            const details = document.getElementById('expandedDetails');
+            details.classList.toggle('show');
+            const btn = event.target;
+            btn.textContent = details.classList.contains('show') ? 'Hide Details' : 'Certificate Details';
+        }
+    </script>
+</body>
+</html>
+

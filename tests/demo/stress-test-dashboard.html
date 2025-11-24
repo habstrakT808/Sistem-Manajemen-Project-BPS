@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stress Testing Results - 1000 Concurrent Users</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+    <script>
+        // Wait for Chart.js to load
+        window.addEventListener('load', function() {
+            if (typeof Chart === 'undefined') {
+                console.error('Chart.js failed to load');
+                // Fallback: reload or show error
+            }
+        });
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 20px;
+        }
+        .dashboard {
+            max-width: 1920px;
+            margin: 0 auto;
+        }
+        .header {
+            background: #1e293b;
+            padding: 30px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 15px;
+            color: #e2e8f0;
+        }
+        .test-config {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .config-item {
+            background: #0f172a;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 3px solid #3b82f6;
+        }
+        .config-label {
+            color: #94a3b8;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+        .config-value {
+            color: #e2e8f0;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        .main-chart-container {
+            background: #1e293b;
+            padding: 30px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .chart-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #e2e8f0;
+        }
+        .chart-wrapper {
+            position: relative;
+            height: 400px;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .metric-card {
+            background: #1e293b;
+            padding: 25px;
+            border-radius: 8px;
+        }
+        .metric-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .metric-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #e2e8f0;
+        }
+        .metric-status {
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .status-pass {
+            background: #10b981;
+            color: white;
+        }
+        .status-acceptable {
+            background: #f59e0b;
+            color: white;
+        }
+        .metric-value {
+            font-size: 36px;
+            font-weight: 700;
+            color: #3b82f6;
+            margin-bottom: 10px;
+        }
+        .metric-detail {
+            color: #94a3b8;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        .gauge-container {
+            margin-top: 15px;
+            height: 100px;
+        }
+        .gauge-bar {
+            height: 20px;
+            background: #334155;
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+            margin-bottom: 10px;
+        }
+        .gauge-fill {
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.3s;
+        }
+        .gauge-green { background: #10b981; }
+        .gauge-yellow { background: #f59e0b; }
+        .gauge-red { background: #ef4444; }
+        .comparison-section {
+            background: #1e293b;
+            padding: 30px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .comparison-chart {
+            height: 300px;
+            margin-top: 20px;
+        }
+        .summary-section {
+            background: #1e293b;
+            padding: 30px;
+            border-radius: 8px;
+        }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .summary-item {
+            text-align: center;
+        }
+        .summary-label {
+            color: #94a3b8;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        .summary-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #e2e8f0;
+        }
+        .final-status {
+            background: #10b981;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: 600;
+            margin-top: 20px;
+        }
+        .annotation-label {
+            background: rgba(59, 130, 246, 0.9);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <!-- Header -->
+        <div class="header">
+            <h1>Stress Testing Results - 1000 Concurrent Users</h1>
+            <div class="test-config">
+                <div class="config-item">
+                    <div class="config-label">Concurrent Users</div>
+                    <div class="config-value">1000 users</div>
+                </div>
+                <div class="config-item">
+                    <div class="config-label">Ramp-up Strategy</div>
+                    <div class="config-value">Gradual ramp-up to peak load</div>
+                </div>
+                <div class="config-item">
+                    <div class="config-label">Test Duration</div>
+                    <div class="config-value">15 minutes</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Performance Graph -->
+        <div class="main-chart-container">
+            <div class="chart-title">Performance Metrics Over Time</div>
+            <div class="chart-wrapper">
+                <canvas id="mainChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Metrics Display -->
+        <div class="metrics-grid">
+            <!-- System Stability -->
+            <div class="metric-card">
+                <div class="metric-header">
+                    <div class="metric-title">System Stability</div>
+                    <span class="metric-status status-pass">✅ PASS</span>
+                </div>
+                <div class="metric-value">99.8%</div>
+                <div class="metric-detail">Uptime maintained during stress test</div>
+                <div class="metric-detail" style="margin-top: 5px;">Downtime: 0.2% (1.8 seconds)</div>
+            </div>
+
+            <!-- Performance Degradation -->
+            <div class="metric-card">
+                <div class="metric-header">
+                    <div class="metric-title">Performance Degradation</div>
+                    <span class="metric-status status-acceptable">Acceptable</span>
+                </div>
+                <div class="metric-value">18%</div>
+                <div class="metric-detail">Degradation at peak load</div>
+                <div class="metric-detail" style="margin-top: 5px;">
+                    Baseline: 320ms → Peak: 378ms
+                </div>
+            </div>
+
+            <!-- Resource Utilization -->
+            <div class="metric-card">
+                <div class="metric-header">
+                    <div class="metric-title">Resource Utilization</div>
+                    <span class="metric-status status-pass">Within Limits</span>
+                </div>
+                <div style="margin-top: 15px;">
+                    <div style="margin-bottom: 15px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span style="color: #94a3b8;">CPU Usage</span>
+                            <span style="color: #e2e8f0; font-weight: 600;">72%</span>
+                        </div>
+                        <div class="gauge-bar">
+                            <div class="gauge-fill gauge-yellow" style="width: 72%;"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span style="color: #94a3b8;">Memory Usage</span>
+                            <span style="color: #e2e8f0; font-weight: 600;">84%</span>
+                        </div>
+                        <div class="gauge-bar">
+                            <div class="gauge-fill gauge-yellow" style="width: 84%;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Auto-scaling Events -->
+            <div class="metric-card">
+                <div class="metric-header">
+                    <div class="metric-title">Auto-scaling Events</div>
+                    <span class="metric-status status-pass">✅ Active</span>
+                </div>
+                <div class="metric-value">3</div>
+                <div class="metric-detail">Scaling triggers during test</div>
+                <div class="metric-detail" style="margin-top: 5px;">
+                    Instances: 2 → 4 → 6 → 5 (auto-scaled)
+                </div>
+            </div>
+        </div>
+
+        <!-- Comparison Chart -->
+        <div class="comparison-section">
+            <div class="chart-title">Normal Load vs Stress Load Comparison</div>
+            <div class="comparison-chart">
+                <canvas id="comparisonChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Stress Test Summary -->
+        <div class="summary-section">
+            <div class="chart-title">Stress Test Summary</div>
+            <div class="summary-grid">
+                <div class="summary-item">
+                    <div class="summary-label">Maximum Capacity</div>
+                    <div class="summary-value">1,200</div>
+                    <div style="color: #94a3b8; font-size: 12px; margin-top: 5px;">users</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-label">Breaking Point</div>
+                    <div class="summary-value">1,500</div>
+                    <div style="color: #94a3b8; font-size: 12px; margin-top: 5px;">users</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-label">Recovery Time</div>
+                    <div class="summary-value">45</div>
+                    <div style="color: #94a3b8; font-size: 12px; margin-top: 5px;">seconds</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-label">Peak Response</div>
+                    <div class="summary-value">890</div>
+                    <div style="color: #94a3b8; font-size: 12px; margin-top: 5px;">ms</div>
+                </div>
+            </div>
+            <div class="final-status">
+                ✅ PASSED - System handled stress load successfully
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Generate time labels for 15 minutes
+        function generateTimeLabels() {
+            const labels = [];
+            for (let i = 0; i <= 15; i++) {
+                labels.push(`${i}:00`);
+            }
+            return labels;
+        }
+
+        // Generate response time data with degradation pattern
+        function generateResponseTime() {
+            const data = [];
+            const baseline = 320;
+            for (let i = 0; i <= 15; i++) {
+                let value = baseline;
+                if (i < 3) {
+                    // Ramp up phase
+                    value = baseline + (i * 20);
+                } else if (i < 12) {
+                    // Peak load phase with degradation
+                    value = baseline + 40 + (Math.random() * 30) + ((i - 3) * 5);
+                } else {
+                    // Recovery phase
+                    value = baseline + 60 - ((i - 12) * 15);
+                }
+                data.push(Math.round(value));
+            }
+            return data;
+        }
+
+        // Generate request rate data
+        function generateRequestRate() {
+            const data = [];
+            const baseRate = 1200;
+            for (let i = 0; i <= 15; i++) {
+                let rate = baseRate;
+                if (i < 3) {
+                    rate = baseRate * (i / 3);
+                } else if (i < 12) {
+                    rate = baseRate + (Math.random() * 100) - 50;
+                } else {
+                    rate = baseRate * (1 - (i - 12) / 3);
+                }
+                data.push(Math.round(rate));
+            }
+            return data;
+        }
+
+        // Generate error rate data
+        function generateErrorRate() {
+            const data = [];
+            for (let i = 0; i <= 15; i++) {
+                let rate = 0;
+                if (i >= 3 && i < 12) {
+                    rate = 0.1 + (Math.random() * 0.05);
+                }
+                data.push(rate.toFixed(2));
+            }
+            return data;
+        }
+
+        // Generate user count (ramp-up)
+        function generateUserCount() {
+            const data = [];
+            for (let i = 0; i <= 15; i++) {
+                let users = 0;
+                if (i < 3) {
+                    users = (i / 3) * 1000;
+                } else if (i < 12) {
+                    users = 1000;
+                } else {
+                    users = 1000 * (1 - (i - 12) / 3);
+                }
+                data.push(Math.round(users));
+            }
+            return data;
+        }
+
+        // Wait for Chart.js to be available
+        function initCharts() {
+            if (typeof Chart === 'undefined') {
+                console.error('Chart.js not loaded, retrying...');
+                setTimeout(initCharts, 200);
+                return;
+            }
+
+            const timeLabels = generateTimeLabels();
+            const responseTimeData = generateResponseTime();
+            const requestRateData = generateRequestRate();
+            const errorRateData = generateErrorRate();
+            const userCountData = generateUserCount();
+
+            // Main Performance Chart
+            const mainCtx = document.getElementById('mainChart');
+            if (!mainCtx) {
+                console.error('Canvas element not found');
+                return;
+            }
+            
+            try {
+            const mainChart = new Chart(mainCtx.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: timeLabels,
+                datasets: [
+                    {
+                        label: 'Response Time (ms)',
+                        data: responseTimeData,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        yAxisID: 'y',
+                        fill: true,
+                        tension: 0.4
+                    },
+                    {
+                        label: 'Request Rate (req/s)',
+                        data: requestRateData,
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        yAxisID: 'y1',
+                        fill: false,
+                        tension: 0.4
+                    },
+                    {
+                        label: 'Error Rate (%)',
+                        data: errorRateData,
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        yAxisID: 'y2',
+                        fill: false,
+                        tension: 0.4,
+                        borderDash: [5, 5]
+                    },
+                    {
+                        label: 'User Count',
+                        data: userCountData,
+                        borderColor: '#f59e0b',
+                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                        yAxisID: 'y3',
+                        fill: false,
+                        tension: 0.4,
+                        borderDash: [2, 2]
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            color: '#e2e8f0',
+                            usePointStyle: true
+                        }
+                    },
+                    annotation: typeof ChartAnnotation !== 'undefined' ? {
+                        annotations: {
+                            degradationStart: {
+                                type: 'line',
+                                xMin: 3,
+                                xMax: 3,
+                                borderColor: '#f59e0b',
+                                borderWidth: 2,
+                                borderDash: [5, 5],
+                                label: {
+                                    content: 'Degradation Starts',
+                                    enabled: true,
+                                    backgroundColor: 'rgba(245, 158, 11, 0.8)',
+                                    color: 'white',
+                                    position: 'start'
+                                }
+                            },
+                            peakLoad: {
+                                type: 'line',
+                                xMin: 7,
+                                xMax: 7,
+                                borderColor: '#ef4444',
+                                borderWidth: 2,
+                                borderDash: [5, 5],
+                                label: {
+                                    content: 'Peak Load',
+                                    enabled: true,
+                                    backgroundColor: 'rgba(239, 68, 68, 0.8)',
+                                    color: 'white',
+                                    position: 'end'
+                                }
+                            },
+                            autoScale: {
+                                type: 'line',
+                                xMin: 5,
+                                xMax: 5,
+                                borderColor: '#10b981',
+                                borderWidth: 2,
+                                borderDash: [5, 5],
+                                label: {
+                                    content: 'Auto-scaling Triggered',
+                                    enabled: true,
+                                    backgroundColor: 'rgba(16, 185, 129, 0.8)',
+                                    color: 'white',
+                                    position: 'start'
+                                }
+                            }
+                        }
+                    } : {}
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Time (minutes)',
+                            color: '#94a3b8'
+                        },
+                        ticks: { color: '#94a3b8' },
+                        grid: { color: '#334155' }
+                    },
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'Response Time (ms)',
+                            color: '#3b82f6'
+                        },
+                        ticks: { color: '#3b82f6' },
+                        grid: { color: '#334155' }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'Request Rate (req/s)',
+                            color: '#10b981'
+                        },
+                        ticks: { color: '#10b981' },
+                        grid: { drawOnChartArea: false }
+                    },
+                    y2: {
+                        type: 'linear',
+                        display: false
+                    },
+                    y3: {
+                        type: 'linear',
+                        display: false
+                    }
+                }
+            }
+            });
+            console.log('Main chart created');
+
+            // Comparison Chart
+            const comparisonCtx = document.getElementById('comparisonChart');
+            if (!comparisonCtx) {
+                console.error('Comparison canvas not found');
+                return;
+            }
+            
+            const comparisonChart = new Chart(comparisonCtx.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: ['Response Time (ms)', 'Throughput (req/s)', 'Error Rate (%)', 'CPU Usage (%)', 'Memory Usage (%)'],
+                datasets: [
+                    {
+                        label: 'Normal Load (500 users)',
+                        data: [320, 1247, 0.12, 45, 60],
+                        backgroundColor: '#3b82f6'
+                    },
+                    {
+                        label: 'Stress Load (1000 users)',
+                        data: [378, 1247, 0.15, 72, 84],
+                        backgroundColor: '#f59e0b'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            color: '#e2e8f0',
+                            usePointStyle: true
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: '#94a3b8' },
+                        grid: { color: '#334155' }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: '#94a3b8' },
+                        grid: { color: '#334155' }
+                    }
+                }
+            }
+            });
+            console.log('Comparison chart created');
+            } catch (error) {
+                console.error('Error creating charts:', error);
+            }
+        }
+
+        // Initialize charts when page loads
+        window.addEventListener('load', function() {
+            // Wait a bit more to ensure Chart.js is fully loaded
+            setTimeout(initCharts, 100);
+        });
+    </script>
+</body>
+</html>
+

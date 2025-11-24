@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audit Logs - Admin</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #1a1a1a;
+        }
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .page-header {
+            background: white;
+            padding: 24px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        .page-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: #1a1a1a;
+        }
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #2563eb;
+        }
+        .btn-secondary {
+            background: #f1f3f4;
+            color: #1a1a1a;
+        }
+        .btn-secondary:hover {
+            background: #e8eaed;
+        }
+        .btn-icon {
+            padding: 10px;
+            background: #f1f3f4;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .filter-bar {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        .filter-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .filter-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #666;
+            text-transform: uppercase;
+        }
+        .filter-input, .filter-select {
+            padding: 10px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .filter-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
+        }
+        .stats-summary {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        .stat-card {
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #3b82f6;
+            margin-bottom: 4px;
+        }
+        .stat-label {
+            font-size: 14px;
+            color: #666;
+        }
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+        .table-container {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        .table-header {
+            padding: 20px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .immutable-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            border-radius: 6px;
+            color: #92400e;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        thead {
+            background: #f9fafb;
+        }
+        th {
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 600;
+            color: #666;
+            text-transform: uppercase;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        th.sortable {
+            cursor: pointer;
+            user-select: none;
+        }
+        th.sortable:hover {
+            background: #f1f3f4;
+        }
+        td {
+            padding: 16px;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 14px;
+        }
+        tbody tr:hover {
+            background: #f9fafb;
+        }
+        .user-cell {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #3b82f6;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .user-info {
+            display: flex;
+            flex-direction: column;
+        }
+        .user-name {
+            font-weight: 500;
+            color: #1a1a1a;
+            cursor: pointer;
+        }
+        .user-name:hover {
+            color: #3b82f6;
+        }
+        .role-badge {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-top: 2px;
+        }
+        .role-admin {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .role-ketua {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        .role-pegawai {
+            background: #dcfce7;
+            color: #166534;
+        }
+        .action-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .action-create {
+            background: #dcfce7;
+            color: #166534;
+        }
+        .action-update {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        .action-delete {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .action-login {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .action-read {
+            background: #f3f4f6;
+            color: #374151;
+        }
+        .status-icon {
+            font-size: 18px;
+        }
+        .status-success {
+            color: #10b981;
+        }
+        .status-failed {
+            color: #ef4444;
+        }
+        .status-warning {
+            color: #f59e0b;
+        }
+        .expand-btn {
+            background: none;
+            border: none;
+            color: #3b82f6;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 4px 8px;
+        }
+        .expand-btn:hover {
+            text-decoration: underline;
+        }
+        .expanded-details {
+            background: #f9fafb;
+            padding: 20px;
+            border-top: 2px solid #e0e0e0;
+            display: none;
+        }
+        .expanded-details.show {
+            display: block;
+        }
+        .detail-section {
+            margin-bottom: 20px;
+        }
+        .detail-section h4 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #666;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+        }
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+        .detail-item {
+            padding: 12px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
+        }
+        .detail-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+        .detail-value {
+            font-size: 14px;
+            color: #1a1a1a;
+            font-family: monospace;
+        }
+        .pagination {
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid #e0e0e0;
+        }
+        .pagination-info {
+            color: #666;
+            font-size: 14px;
+        }
+        .pagination-controls {
+            display: flex;
+            gap: 8px;
+        }
+        .pagination-btn {
+            padding: 8px 12px;
+            border: 1px solid #e0e0e0;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .pagination-btn:hover {
+            background: #f9fafb;
+        }
+        .pagination-btn.active {
+            background: #3b82f6;
+            color: white;
+            border-color: #3b82f6;
+        }
+        .retention-info {
+            padding: 16px 20px;
+            background: #f9fafb;
+            border-top: 1px solid #e0e0e0;
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Page Header -->
+        <div class="page-header">
+            <h1 class="page-title">Audit Logs</h1>
+            <div class="header-actions">
+                <button class="btn btn-secondary">Export to CSV</button>
+                <button class="btn btn-secondary">Export to PDF</button>
+                <button class="btn-icon">🔄</button>
+            </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="filter-bar">
+            <div class="filter-row">
+                <div class="filter-group">
+                    <label class="filter-label">Date From</label>
+                    <input type="date" class="filter-input" value="2024-01-01">
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">Date To</label>
+                    <input type="date" class="filter-input" value="2024-01-31">
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">User</label>
+                    <select class="filter-select">
+                        <option>All Users</option>
+                        <option>Admin User</option>
+                        <option>Ketua Tim A</option>
+                        <option>Pegawai B</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">Action Type</label>
+                    <select class="filter-select">
+                        <option>All Actions</option>
+                        <option>Login</option>
+                        <option>Create</option>
+                        <option>Update</option>
+                        <option>Delete</option>
+                        <option>Access</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">Resource Type</label>
+                    <select class="filter-select">
+                        <option>All Resources</option>
+                        <option>Project</option>
+                        <option>User</option>
+                        <option>Task</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">IP Address</label>
+                    <input type="text" class="filter-input" placeholder="192.168.1.100">
+                </div>
+            </div>
+            <div class="filter-actions">
+                <button class="btn btn-primary">Apply Filters</button>
+                <button class="btn btn-secondary">Clear Filters</button>
+            </div>
+        </div>
+
+        <!-- Statistics Summary -->
+        <div class="stats-summary">
+            <div class="stat-card">
+                <div class="stat-value">1,247</div>
+                <div class="stat-label">Total Events</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">3</div>
+                <div class="stat-label">Failed Attempts</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">45</div>
+                <div class="stat-label">Unique Users</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">Admin User</div>
+                <div class="stat-label">Most Active User</div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="table-container">
+                <div class="table-header">
+                    <div class="immutable-badge">
+                        <span>🔒</span>
+                        <span>Immutable Audit Trail</span>
+                    </div>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="sortable">Timestamp ↓</th>
+                            <th>User</th>
+                            <th>Action</th>
+                            <th>Resource</th>
+                            <th>Details</th>
+                            <th>IP Address</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>2024-01-15 14:32:15</td>
+                            <td>
+                                <div class="user-cell">
+                                    <div class="avatar">AU</div>
+                                    <div class="user-info">
+                                        <span class="user-name">Admin User</span>
+                                        <span class="role-badge role-admin">Admin</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="action-badge action-create">➕ Create</span>
+                            </td>
+                            <td>
+                                <div>
+                                    <div style="font-weight: 500;">Project</div>
+                                    <div style="font-size: 12px; color: #666;">PRJ-2024-001</div>
+                                </div>
+                            </td>
+                            <td>Created project 'Survey 2024'</td>
+                            <td>192.168.1.100</td>
+                            <td><span class="status-icon status-success">✅</span></td>
+                            <td>
+                                <button class="expand-btn" onclick="toggleDetails(1)">View Details</button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="expanded-details show" colspan="8" id="details-1">
+                                <div class="detail-section">
+                                    <h4>Event Details</h4>
+                                    <div class="detail-grid">
+                                        <div class="detail-item">
+                                            <div class="detail-label">Event ID</div>
+                                            <div class="detail-value">EVT-2024-001234</div>
+                                        </div>
+                                        <div class="detail-item">
+                                            <div class="detail-label">Session ID</div>
+                                            <div class="detail-value">SESS-abc123def456</div>
+                                        </div>
+                                        <div class="detail-item">
+                                            <div class="detail-label">User Agent</div>
+                                            <div class="detail-value">Mozilla/5.0...</div>
+                                        </div>
+                                        <div class="detail-item">
+                                            <div class="detail-label">Response Status</div>
+                                            <div class="detail-value">200 OK</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="detail-section">
+                                    <h4>Resource Details</h4>
+                                    <div class="detail-grid">
+                                        <div class="detail-item" style="grid-column: 1 / -1;">
+                                            <div class="detail-label">After Values (Created)</div>
+                                            <div class="detail-value" style="white-space: pre-wrap;">{
+  "id": "PRJ-2024-001",
+  "name": "Survey 2024",
+  "status": "planning",
+  "budget": 50000000,
+  "created_at": "2024-01-15T14:32:15Z"
+}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>2024-01-15 14:28:42</td>
+                            <td>
+                                <div class="user-cell">
+                                    <div class="avatar">KT</div>
+                                    <div class="user-info">
+                                        <span class="user-name">Ketua Tim A</span>
+                                        <span class="role-badge role-ketua">Ketua Tim</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="action-badge action-update">✏️ Update</span>
+                            </td>
+                            <td>
+                                <div>
+                                    <div style="font-weight: 500;">Task</div>
+                                    <div style="font-size: 12px; color: #666;">TASK-2024-045</div>
+                                </div>
+                            </td>
+                            <td>Updated task status to 'In Progress'</td>
+                            <td>192.168.1.105</td>
+                            <td><span class="status-icon status-success">✅</span></td>
+                            <td>
+                                <button class="expand-btn" onclick="toggleDetails(2)">View Details</button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>2024-01-15 14:25:10</td>
+                            <td>
+                                <div class="user-cell">
+                                    <div class="avatar">PB</div>
+                                    <div class="user-info">
+                                        <span class="user-name">Pegawai B</span>
+                                        <span class="role-badge role-pegawai">Pegawai</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="action-badge action-login">🔐 Login</span>
+                            </td>
+                            <td>
+                                <div>
+                                    <div style="font-weight: 500;">Authentication</div>
+                                    <div style="font-size: 12px; color: #666;">-</div>
+                                </div>
+                            </td>
+                            <td>User logged in successfully</td>
+                            <td>192.168.1.120</td>
+                            <td><span class="status-icon status-success">✅</span></td>
+                            <td>
+                                <button class="expand-btn" onclick="toggleDetails(3)">View Details</button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>2024-01-15 14:20:33</td>
+                            <td>
+                                <div class="user-cell">
+                                    <div class="avatar">AU</div>
+                                    <div class="user-info">
+                                        <span class="user-name">Admin User</span>
+                                        <span class="role-badge role-admin">Admin</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="action-badge action-delete">🗑️ Delete</span>
+                            </td>
+                            <td>
+                                <div>
+                                    <div style="font-weight: 500;">User</div>
+                                    <div style="font-size: 12px; color: #666;">USR-2024-089</div>
+                                </div>
+                            </td>
+                            <td>Deleted user account</td>
+                            <td>192.168.1.100</td>
+                            <td><span class="status-icon status-success">✅</span></td>
+                            <td>
+                                <button class="expand-btn" onclick="toggleDetails(4)">View Details</button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>2024-01-15 14:15:22</td>
+                            <td>
+                                <div class="user-cell">
+                                    <div class="avatar">??</div>
+                                    <div class="user-info">
+                                        <span class="user-name">Unknown User</span>
+                                        <span class="role-badge" style="background: #fee2e2; color: #991b1b;">Unknown</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="action-badge action-login">🔐 Login</span>
+                            </td>
+                            <td>
+                                <div>
+                                    <div style="font-weight: 500;">Authentication</div>
+                                    <div style="font-size: 12px; color: #666;">-</div>
+                                </div>
+                            </td>
+                            <td>Failed login attempt - Invalid credentials</td>
+                            <td>192.168.1.200</td>
+                            <td><span class="status-icon status-failed">❌</span></td>
+                            <td>
+                                <button class="expand-btn" onclick="toggleDetails(5)">View Details</button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>2024-01-15 14:10:05</td>
+                            <td>
+                                <div class="user-cell">
+                                    <div class="avatar">KT</div>
+                                    <div class="user-info">
+                                        <span class="user-name">Ketua Tim A</span>
+                                        <span class="role-badge role-ketua">Ketua Tim</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="action-badge action-read">👁️ Read</span>
+                            </td>
+                            <td>
+                                <div>
+                                    <div style="font-weight: 500;">Project</div>
+                                    <div style="font-size: 12px; color: #666;">PRJ-2024-001</div>
+                                </div>
+                            </td>
+                            <td>Viewed project details</td>
+                            <td>192.168.1.105</td>
+                            <td><span class="status-icon status-success">✅</span></td>
+                            <td>
+                                <button class="expand-btn" onclick="toggleDetails(6)">View Details</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="pagination">
+                    <div class="pagination-info">Showing 1-10 of 1,247 events</div>
+                    <div class="pagination-controls">
+                        <button class="pagination-btn">Previous</button>
+                        <button class="pagination-btn active">1</button>
+                        <button class="pagination-btn">2</button>
+                        <button class="pagination-btn">3</button>
+                        <button class="pagination-btn">...</button>
+                        <button class="pagination-btn">125</button>
+                        <button class="pagination-btn">Next</button>
+                    </div>
+                </div>
+                <div class="retention-info">
+                    🔒 Logs retained for: 7 years (government compliance)
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleDetails(id) {
+            const details = document.getElementById('details-' + id);
+            if (details) {
+                details.classList.toggle('show');
+            }
+        }
+
+        // Initialize: Show first row expanded
+        document.addEventListener('DOMContentLoaded', function() {
+            // First row is already expanded by default (has 'show' class)
+        });
+    </script>
+</body>
+</html>
+

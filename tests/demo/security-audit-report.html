@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Audit Report - OWASP Top 10 Compliance</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #1a1a1a;
+            padding: 40px 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+        }
+        .report-header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 30px;
+            border-bottom: 3px solid #e5e5e5;
+        }
+        .report-title {
+            font-size: 32px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 10px;
+        }
+        .report-date {
+            font-size: 16px;
+            color: #666;
+        }
+        .overall-status {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 40px;
+            border-radius: 12px;
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .status-badge {
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 15px;
+        }
+        .compliance-text {
+            font-size: 24px;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        .security-score {
+            font-size: 72px;
+            font-weight: 700;
+            margin-top: 10px;
+        }
+        .score-label {
+            font-size: 18px;
+            opacity: 0.9;
+            margin-top: 5px;
+        }
+        .compliance-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+        thead {
+            background: #f9fafb;
+        }
+        th {
+            padding: 16px;
+            text-align: left;
+            font-size: 14px;
+            font-weight: 600;
+            color: #666;
+            text-transform: uppercase;
+            border-bottom: 2px solid #e5e5e5;
+        }
+        td {
+            padding: 16px;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 14px;
+        }
+        tbody tr:hover {
+            background: #f9fafb;
+        }
+        .risk-number {
+            font-weight: 700;
+            color: #1a1a1a;
+            font-size: 16px;
+        }
+        .risk-category {
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+        .status-pass {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #10b981;
+            font-weight: 600;
+        }
+        .checkmark {
+            font-size: 20px;
+        }
+        .mitigation {
+            color: #666;
+            font-size: 13px;
+        }
+        .score-cell {
+            text-align: center;
+        }
+        .score-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            background: #dcfce7;
+            color: #166534;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 14px;
+        }
+        .summary-section {
+            background: #f9fafb;
+            padding: 30px;
+            border-radius: 12px;
+            margin-top: 40px;
+        }
+        .summary-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: #1a1a1a;
+        }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+        .summary-item {
+            text-align: center;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            border: 2px solid #e5e5e5;
+        }
+        .summary-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #10b981;
+            margin-bottom: 8px;
+        }
+        .summary-label {
+            font-size: 14px;
+            color: #666;
+            font-weight: 500;
+        }
+        .summary-status {
+            margin-top: 20px;
+            padding: 15px;
+            background: #dcfce7;
+            border: 2px solid #10b981;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .summary-status-text {
+            font-size: 18px;
+            font-weight: 700;
+            color: #166534;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Report Header -->
+        <div class="report-header">
+            <h1 class="report-title">Security Audit Report</h1>
+            <div class="report-date">Assessment Date: January 15, 2024</div>
+        </div>
+
+        <!-- Overall Status -->
+        <div class="overall-status">
+            <div class="status-badge">✅ COMPLIANT</div>
+            <div class="compliance-text">100% OWASP Top 10 Compliance</div>
+            <div class="security-score">9.8</div>
+            <div class="score-label">Security Score / 10</div>
+        </div>
+
+        <!-- OWASP Top 10 Compliance Table -->
+        <table class="compliance-table">
+            <thead>
+                <tr>
+                    <th style="width: 60px;">#</th>
+                    <th>Risk Category</th>
+                    <th style="width: 120px;">Status</th>
+                    <th>Mitigation</th>
+                    <th style="width: 100px; text-align: center;">Score</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span class="risk-number">A01</span></td>
+                    <td><span class="risk-category">Broken Access Control</span></td>
+                    <td><span class="status-pass"><span class="checkmark">✅</span> Pass</span></td>
+                    <td class="mitigation">RLS Implementation with role-based policies</td>
+                    <td class="score-cell"><span class="score-badge">10/10</span></td>
+                </tr>
+                <tr>
+                    <td><span class="risk-number">A02</span></td>
+                    <td><span class="risk-category">Cryptographic Failures</span></td>
+                    <td><span class="status-pass"><span class="checkmark">✅</span> Pass</span></td>
+                    <td class="mitigation">AES-256 encryption, TLS 1.3 implementation</td>
+                    <td class="score-cell"><span class="score-badge">10/10</span></td>
+                </tr>
+                <tr>
+                    <td><span class="risk-number">A03</span></td>
+                    <td><span class="risk-category">Injection</span></td>
+                    <td><span class="status-pass"><span class="checkmark">✅</span> Pass</span></td>
+                    <td class="mitigation">Parameterized queries, input validation</td>
+                    <td class="score-cell"><span class="score-badge">10/10</span></td>
+                </tr>
+                <tr>
+                    <td><span class="risk-number">A04</span></td>
+                    <td><span class="risk-category">Insecure Design</span></td>
+                    <td><span class="status-pass"><span class="checkmark">✅</span> Pass</span></td>
+                    <td class="mitigation">Security-by-design principles implemented</td>
+                    <td class="score-cell"><span class="score-badge">9/10</span></td>
+                </tr>
+                <tr>
+                    <td><span class="risk-number">A05</span></td>
+                    <td><span class="risk-category">Security Misconfiguration</span></td>
+                    <td><span class="status-pass"><span class="checkmark">✅</span> Pass</span></td>
+                    <td class="mitigation">Hardened configuration applied</td>
+                    <td class="score-cell"><span class="score-badge">10/10</span></td>
+                </tr>
+                <tr>
+                    <td><span class="risk-number">A06</span></td>
+                    <td><span class="risk-category">Vulnerable Components</span></td>
+                    <td><span class="status-pass"><span class="checkmark">✅</span> Pass</span></td>
+                    <td class="mitigation">Regular dependency updates, automated scanning</td>
+                    <td class="score-cell"><span class="score-badge">9/10</span></td>
+                </tr>
+                <tr>
+                    <td><span class="risk-number">A07</span></td>
+                    <td><span class="risk-category">Identity & Authentication</span></td>
+                    <td><span class="status-pass"><span class="checkmark">✅</span> Pass</span></td>
+                    <td class="mitigation">MFA implementation, proper session management</td>
+                    <td class="score-cell"><span class="score-badge">10/10</span></td>
+                </tr>
+                <tr>
+                    <td><span class="risk-number">A08</span></td>
+                    <td><span class="risk-category">Software & Data Integrity</span></td>
+                    <td><span class="status-pass"><span class="checkmark">✅</span> Pass</span></td>
+                    <td class="mitigation">Code signing, integrity checks</td>
+                    <td class="score-cell"><span class="score-badge">9/10</span></td>
+                </tr>
+                <tr>
+                    <td><span class="risk-number">A09</span></td>
+                    <td><span class="risk-category">Logging & Monitoring</span></td>
+                    <td><span class="status-pass"><span class="checkmark">✅</span> Pass</span></td>
+                    <td class="mitigation">Comprehensive logging implemented</td>
+                    <td class="score-cell"><span class="score-badge">10/10</span></td>
+                </tr>
+                <tr>
+                    <td><span class="risk-number">A10</span></td>
+                    <td><span class="risk-category">Server-Side Request Forgery</span></td>
+                    <td><span class="status-pass"><span class="checkmark">✅</span> Pass</span></td>
+                    <td class="mitigation">Input validation, allowlist implementation</td>
+                    <td class="score-cell"><span class="score-badge">10/10</span></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- Summary Section -->
+        <div class="summary-section">
+            <div class="summary-title">Assessment Summary</div>
+            <div class="summary-grid">
+                <div class="summary-item">
+                    <div class="summary-value">0</div>
+                    <div class="summary-label">Critical Vulnerabilities</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-value">0</div>
+                    <div class="summary-label">High Vulnerabilities</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-value">2</div>
+                    <div class="summary-label">Low Vulnerabilities</div>
+                </div>
+            </div>
+            <div class="summary-status">
+                <div class="summary-status-text">✅ Low Risk - Production Ready</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+

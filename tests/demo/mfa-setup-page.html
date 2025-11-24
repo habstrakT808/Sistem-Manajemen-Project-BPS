@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enable Multi-Factor Authentication</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #1a1a1a;
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+        }
+        .page-title {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 30px;
+            color: #1a1a1a;
+        }
+        .steps-indicator {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 40px;
+            position: relative;
+        }
+        .steps-indicator::before {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #e5e5e5;
+            z-index: 0;
+        }
+        .step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            z-index: 1;
+            flex: 1;
+        }
+        .step-number {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            margin-bottom: 10px;
+            background: white;
+            border: 2px solid #e5e5e5;
+            color: #999;
+        }
+        .step.active .step-number {
+            background: #3b82f6;
+            border-color: #3b82f6;
+            color: white;
+        }
+        .step.completed .step-number {
+            background: #10b981;
+            border-color: #10b981;
+            color: white;
+        }
+        .step-label {
+            font-size: 14px;
+            color: #666;
+            text-align: center;
+        }
+        .step.active .step-label {
+            color: #3b82f6;
+            font-weight: 600;
+        }
+        .qr-section {
+            background: #f9fafb;
+            border: 2px dashed #e5e5e5;
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .qr-code-container {
+            margin: 30px 0;
+        }
+        #qrcode {
+            display: inline-block;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .account-name {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #666;
+            font-weight: 500;
+        }
+        .instructions {
+            text-align: left;
+            margin-top: 30px;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+        }
+        .instructions h3 {
+            font-size: 16px;
+            margin-bottom: 15px;
+            color: #1a1a1a;
+        }
+        .instructions ol {
+            margin-left: 20px;
+            line-height: 2;
+            color: #666;
+        }
+        .instructions li {
+            margin-bottom: 8px;
+        }
+        .manual-entry {
+            margin-top: 25px;
+            padding: 20px;
+            background: #f9fafb;
+            border-radius: 8px;
+            border: 1px solid #e5e5e5;
+        }
+        .manual-entry-label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+        .secret-key-container {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .secret-key {
+            flex: 1;
+            padding: 12px;
+            background: white;
+            border: 1px solid #e5e5e5;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            letter-spacing: 2px;
+            color: #1a1a1a;
+        }
+        .copy-btn {
+            padding: 12px 20px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        .copy-btn:hover {
+            background: #2563eb;
+        }
+        .backup-section {
+            margin-top: 40px;
+            padding: 30px;
+            background: #f9fafb;
+            border-radius: 12px;
+            border: 1px solid #e5e5e5;
+        }
+        .backup-section h3 {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #1a1a1a;
+        }
+        .backup-option {
+            margin-bottom: 25px;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e5e5e5;
+        }
+        .backup-option:last-child {
+            margin-bottom: 0;
+        }
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .checkbox-container input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+        .checkbox-container label {
+            font-weight: 600;
+            color: #1a1a1a;
+            cursor: pointer;
+        }
+        .phone-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #e5e5e5;
+            border-radius: 6px;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        .verify-btn {
+            margin-top: 10px;
+            padding: 10px 20px;
+            background: #10b981;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .email-verified {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #10b981;
+        }
+        .checkmark {
+            width: 20px;
+            height: 20px;
+            background: #10b981;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        .security-tips {
+            margin-top: 30px;
+            padding: 20px;
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            border-radius: 6px;
+        }
+        .security-tips h4 {
+            font-size: 16px;
+            margin-bottom: 10px;
+            color: #92400e;
+        }
+        .security-tips ul {
+            margin-left: 20px;
+            color: #78350f;
+            line-height: 1.8;
+        }
+        .actions {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 1px solid #e5e5e5;
+        }
+        .skip-link {
+            color: #666;
+            text-decoration: none;
+            padding: 12px 20px;
+            font-weight: 500;
+        }
+        .skip-link:hover {
+            color: #1a1a1a;
+        }
+        .continue-btn {
+            padding: 12px 30px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .continue-btn:hover {
+            background: #2563eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="page-title">Enable Multi-Factor Authentication</h1>
+
+        <!-- Setup Steps Indicator -->
+        <div class="steps-indicator">
+            <div class="step active">
+                <div class="step-number">1</div>
+                <div class="step-label">Scan QR Code</div>
+            </div>
+            <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-label">Enter Verification Code</div>
+            </div>
+            <div class="step">
+                <div class="step-number">3</div>
+                <div class="step-label">Backup Codes</div>
+            </div>
+        </div>
+
+        <!-- QR Code Section -->
+        <div class="qr-section">
+            <div class="qr-code-container">
+                <div id="qrcode"></div>
+                <div class="account-name">Project Management System: user@bps.go.id</div>
+            </div>
+
+            <div class="instructions">
+                <h3>Setup Instructions</h3>
+                <ol>
+                    <li>Open Google Authenticator on your phone</li>
+                    <li>Tap the + button to add an account</li>
+                    <li>Scan this QR code</li>
+                </ol>
+            </div>
+
+            <div class="manual-entry">
+                <div class="manual-entry-label">Or enter this code manually:</div>
+                <div class="secret-key-container">
+                    <input type="text" class="secret-key" value="JBSW Y3DP EHPK 3PXP" readonly id="secretKey">
+                    <button class="copy-btn" onclick="copySecret()">Copy</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Backup Options Section -->
+        <div class="backup-section">
+            <h3>Backup Methods</h3>
+
+            <div class="backup-option">
+                <div class="checkbox-container">
+                    <input type="checkbox" id="smsBackup">
+                    <label for="smsBackup">Enable SMS verification as backup</label>
+                </div>
+                <input type="tel" class="phone-input" placeholder="+62 812-3456-7890" id="phoneNumber">
+                <button class="verify-btn" onclick="verifyPhone()">Verify Phone Number</button>
+            </div>
+
+            <div class="backup-option">
+                <div class="email-verified">
+                    <div class="checkmark">✓</div>
+                    <div>
+                        <strong>Email verification enabled</strong><br>
+                        <span style="color: #666; font-size: 14px;">user@bps.go.id</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Security Tips -->
+        <div class="security-tips">
+            <h4>🔒 Security Tips</h4>
+            <ul>
+                <li>Keep your authenticator app secure and don't share it with anyone</li>
+                <li>Save backup codes in a safe place - you'll need them if you lose access to your authenticator</li>
+                <li>Enable SMS backup as an additional recovery method</li>
+            </ul>
+        </div>
+
+        <!-- Actions -->
+        <div class="actions">
+            <a href="#" class="skip-link">Skip for now</a>
+            <button class="continue-btn" onclick="continueToVerification()">Continue to Verification</button>
+        </div>
+    </div>
+
+    <script>
+        // Generate QR Code
+        const secretKey = 'JBSWY3DPEHPK3PXP';
+        const accountName = 'Project Management System';
+        const email = 'user@bps.go.id';
+        const issuer = 'Project Management System';
+        
+        // TOTP URI format: otpauth://totp/Issuer:Account?secret=Secret&issuer=Issuer
+        const otpAuthUrl = `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(email)}?secret=${secretKey}&issuer=${encodeURIComponent(issuer)}`;
+
+        QRCode.toCanvas(document.getElementById('qrcode'), otpAuthUrl, {
+            width: 256,
+            margin: 2,
+            color: {
+                dark: '#000000',
+                light: '#FFFFFF'
+            }
+        }, function (error) {
+            if (error) {
+                console.error('QR Code generation error:', error);
+                // Fallback: show placeholder
+                document.getElementById('qrcode').innerHTML = '<div style="width: 256px; height: 256px; background: #f0f0f0; border: 2px dashed #ccc; display: flex; align-items: center; justify-content: center; color: #999;">QR Code Placeholder<br>256x256</div>';
+            }
+        });
+
+        function copySecret() {
+            const secretKeyInput = document.getElementById('secretKey');
+            secretKeyInput.select();
+            document.execCommand('copy');
+            
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.textContent = 'Copied!';
+            btn.style.background = '#10b981';
+            
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.style.background = '#3b82f6';
+            }, 2000);
+        }
+
+        function verifyPhone() {
+            const phone = document.getElementById('phoneNumber').value;
+            if (phone) {
+                alert('Verification code sent to ' + phone);
+            } else {
+                alert('Please enter a phone number');
+            }
+        }
+
+        function continueToVerification() {
+            alert('Proceeding to verification step...');
+        }
+    </script>
+</body>
+</html>
+

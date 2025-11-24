@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Resource Monitoring</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 20px;
+        }
+        .dashboard {
+            max-width: 1920px;
+            margin: 0 auto;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 20px;
+            background: #1e293b;
+            border-radius: 8px;
+        }
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .status-badge {
+            background: #10b981;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        .timestamp {
+            color: #94a3b8;
+            font-size: 14px;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .metric-card {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #3b82f6;
+        }
+        .metric-label {
+            color: #94a3b8;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        .metric-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #e2e8f0;
+        }
+        .metric-unit {
+            font-size: 16px;
+            color: #94a3b8;
+            margin-left: 4px;
+        }
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .chart-container {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .chart-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #e2e8f0;
+        }
+        .chart-wrapper {
+            position: relative;
+            height: 300px;
+        }
+        .alerts {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .alert-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        .no-alerts {
+            color: #10b981;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .time-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .time-btn {
+            padding: 8px 16px;
+            background: #334155;
+            border: none;
+            border-radius: 4px;
+            color: #e2e8f0;
+            cursor: pointer;
+        }
+        .time-btn.active {
+            background: #3b82f6;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="header">
+            <div>
+                <h1 style="font-size: 24px; margin-bottom: 5px;">System Resource Monitoring</h1>
+                <div class="timestamp" id="timestamp"></div>
+            </div>
+            <div class="status">
+                <span style="color: #94a3b8;">Live Monitoring</span>
+                <span class="status-badge">Healthy</span>
+            </div>
+        </div>
+
+        <div class="time-selector">
+            <button class="time-btn active" onclick="setTimeRange('1h')">Last Hour</button>
+            <button class="time-btn" onclick="setTimeRange('24h')">Last 24 Hours</button>
+            <button class="time-btn" onclick="setTimeRange('7d')">Last 7 Days</button>
+        </div>
+
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-label">Current CPU</div>
+                <div class="metric-value"><span id="cpu-current">72</span><span class="metric-unit">%</span></div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Current Memory</div>
+                <div class="metric-value"><span id="memory-current">84</span><span class="metric-unit">%</span></div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Avg Response Time</div>
+                <div class="metric-value"><span id="response-avg">320</span><span class="metric-unit">ms</span></div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Active Connections</div>
+                <div class="metric-value"><span id="connections">487</span></div>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-container">
+                <div class="chart-title">CPU Usage</div>
+                <div class="chart-wrapper">
+                    <canvas id="cpuChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-container">
+                <div class="chart-title">Memory Consumption</div>
+                <div class="chart-wrapper">
+                    <canvas id="memoryChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-container">
+                <div class="chart-title">Response Time Distribution</div>
+                <div class="chart-wrapper">
+                    <canvas id="responseChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-container">
+                <div class="chart-title">Request Rate</div>
+                <div class="chart-wrapper">
+                    <canvas id="requestChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="alerts">
+            <div class="alert-title">System Alerts</div>
+            <div class="no-alerts">
+                <span>✓</span>
+                <span>No alerts - All systems operational</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Update timestamp
+        function updateTimestamp() {
+            const now = new Date();
+            document.getElementById('timestamp').textContent = 
+                `Last updated: ${now.toLocaleString('id-ID')}`;
+        }
+        updateTimestamp();
+        setInterval(updateTimestamp, 1000);
+
+        // Generate time labels
+        function generateTimeLabels(hours = 1) {
+            const labels = [];
+            const now = new Date();
+            for (let i = hours * 12; i >= 0; i--) {
+                const time = new Date(now - i * 5 * 60 * 1000);
+                labels.push(time.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }));
+            }
+            return labels;
+        }
+
+        // Generate CPU data
+        function generateCPUData() {
+            const base = 65;
+            return generateTimeLabels(1).map(() => {
+                return base + Math.random() * 15 + (Math.random() > 0.9 ? 10 : 0);
+            });
+        }
+
+        // Generate Memory data
+        function generateMemoryData() {
+            const base = 75;
+            return generateTimeLabels(1).map(() => {
+                return base + Math.random() * 12;
+            });
+        }
+
+        // Generate Response Time data
+        function generateResponseData() {
+            return generateTimeLabels(1).map(() => {
+                return 250 + Math.random() * 150 + (Math.random() > 0.95 ? 200 : 0);
+            });
+        }
+
+        // Generate Request Rate data
+        function generateRequestData() {
+            const base = 1200;
+            return generateTimeLabels(1).map(() => {
+                return base + Math.random() * 100 - 50;
+            });
+        }
+
+        // CPU Chart
+        const cpuCtx = document.getElementById('cpuChart').getContext('2d');
+        const cpuChart = new Chart(cpuCtx, {
+            type: 'line',
+            data: {
+                labels: generateTimeLabels(1),
+                datasets: [{
+                    label: 'CPU Usage (%)',
+                    data: generateCPUData(),
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: { color: '#94a3b8' },
+                        grid: { color: '#334155' }
+                    },
+                    x: {
+                        ticks: { color: '#94a3b8', maxRotation: 45 },
+                        grid: { color: '#334155' }
+                    }
+                }
+            }
+        });
+
+        // Memory Chart
+        const memoryCtx = document.getElementById('memoryChart').getContext('2d');
+        const memoryChart = new Chart(memoryCtx, {
+            type: 'line',
+            data: {
+                labels: generateTimeLabels(1),
+                datasets: [{
+                    label: 'Memory Usage (%)',
+                    data: generateMemoryData(),
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: { color: '#94a3b8' },
+                        grid: { color: '#334155' }
+                    },
+                    x: {
+                        ticks: { color: '#94a3b8', maxRotation: 45 },
+                        grid: { color: '#334155' }
+                    }
+                }
+            }
+        });
+
+        // Response Time Distribution
+        const responseCtx = document.getElementById('responseChart').getContext('2d');
+        const responseData = Array.from({length: 50}, () => 200 + Math.random() * 400);
+        const responseChart = new Chart(responseCtx, {
+            type: 'bar',
+            data: {
+                labels: Array.from({length: 50}, (_, i) => i),
+                datasets: [{
+                    label: 'Response Time (ms)',
+                    data: responseData,
+                    backgroundColor: '#8b5cf6',
+                    borderColor: '#7c3aed'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: '#94a3b8' },
+                        grid: { color: '#334155' }
+                    },
+                    x: {
+                        display: false
+                    }
+                }
+            }
+        });
+
+        // Request Rate Chart
+        const requestCtx = document.getElementById('requestChart').getContext('2d');
+        const requestChart = new Chart(requestCtx, {
+            type: 'line',
+            data: {
+                labels: generateTimeLabels(1),
+                datasets: [{
+                    label: 'Requests/sec',
+                    data: generateRequestData(),
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: '#94a3b8' },
+                        grid: { color: '#334155' }
+                    },
+                    x: {
+                        ticks: { color: '#94a3b8', maxRotation: 45 },
+                        grid: { color: '#334155' }
+                    }
+                }
+            }
+        });
+
+        // Update metrics periodically
+        setInterval(() => {
+            document.getElementById('cpu-current').textContent = Math.floor(65 + Math.random() * 15);
+            document.getElementById('memory-current').textContent = Math.floor(75 + Math.random() * 12);
+            document.getElementById('response-avg').textContent = Math.floor(300 + Math.random() * 50);
+            document.getElementById('connections').textContent = Math.floor(450 + Math.random() * 100);
+        }, 2000);
+
+        function setTimeRange(range) {
+            document.querySelectorAll('.time-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            // Update charts based on range
+        }
+    </script>
+</body>
+</html>
+
