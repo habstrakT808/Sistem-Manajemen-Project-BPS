@@ -1167,9 +1167,61 @@ _Buat flowchart diagram dengan format sebagai berikut:_
 - **Format File**: PNG atau JPG dengan resolusi minimal 300 DPI
 - **Catatan**: Diagram harus menunjukkan bagaimana real-time updates bekerja dari database hingga UI update, dengan highlight pada automation dan efficiency
 
-## **5.2. Database Schema Design**
+## **5.2. Hasil Requirement Gathering**
 
-### **5.2.1. Core Tables**
+Hasil requirement gathering yang telah dilakukan melalui berbagai metode elicitation menghasilkan comprehensive understanding mengenai kebutuhan sistem yang akan dikembangkan. Hasil ini menjadi foundation untuk semua keputusan desain dan implementasi yang dilakukan dalam pengembangan sistem, memastikan bahwa setiap fitur dan komponen yang dibangun benar-benar addressing actual needs dari stakeholders dan memberikan value yang tangible kepada organisasi.
+
+### **5.2.1. Functional Requirements**
+
+Functional requirements yang teridentifikasi mencakup kebutuhan-kebutuhan fungsional yang harus dipenuhi oleh sistem untuk dapat digunakan secara efektif dalam operasional BPS Kota Batu. Requirements ini dikategorikan berdasarkan modul dan fitur utama yang diperlukan untuk mendukung manajemen kegiatan secara komprehensif.
+
+**User Management Requirements** mencakup kebutuhan untuk mengelola pengguna sistem dengan berbagai peran dan tingkat akses yang berbeda. Sistem harus mampu melakukan user registration dengan validasi data yang lengkap, user authentication dengan security yang robust, dan user authorization dengan role-based access control yang granular. Admin memerlukan capabilities untuk create, update, delete, dan manage user accounts dengan berbagai peran termasuk Admin, Ketua Tim, dan Pegawai. Sistem juga harus menyediakan user profile management yang memungkinkan users untuk mengelola informasi personal mereka, termasuk foto profil, informasi kontak, dan preferensi sistem. Password management dengan requirements untuk strong passwords, password reset functionality, dan password history tracking menjadi essential untuk security compliance. User activity tracking dan audit logging untuk semua user actions diperlukan untuk compliance dan security monitoring.
+
+**Project Management Requirements** mencakup kebutuhan untuk mengelola proyek dari awal hingga akhir dengan comprehensive tracking dan management capabilities. Sistem harus menyediakan project creation wizard yang memandu ketua tim melalui proses pembuatan proyek dengan validasi yang comprehensive, memastikan bahwa semua informasi yang diperlukan telah diisi dengan benar. Project listing dengan filtering, sorting, dan search capabilities memungkinkan users untuk menemukan proyek yang mereka cari dengan mudah. Project detail view yang comprehensive menampilkan semua informasi proyek termasuk status, timeline, budget, team members, dan progress tracking. Project status management dengan workflow yang jelas memungkinkan tracking progress dari planning hingga completion. Project timeline dan milestone tracking memungkinkan monitoring terhadap schedule dan identification potential delays. Project budget management dengan automatic calculation, budget tracking, dan budget alerts memastikan bahwa proyek tetap dalam budget yang telah ditetapkan. Project reporting dengan berbagai jenis reports termasuk progress reports, financial reports, dan completion reports memungkinkan stakeholders untuk mendapatkan insights mengenai status proyek.
+
+**Task Management Requirements** mencakup kebutuhan untuk mengelola tasks dalam konteks proyek dengan assignment, tracking, dan collaboration capabilities. Sistem harus menyediakan task creation dengan assignment ke team members yang sesuai dengan skills dan availability mereka. Task status management dengan workflow yang jelas memungkinkan tracking progress dari pending hingga completed. Task priority management memungkinkan identification dan focus pada tasks yang paling penting. Task deadline management dengan reminders dan notifications memastikan bahwa tasks diselesaikan tepat waktu. Task dependency management memungkinkan definition relationships antara tasks yang mempengaruhi scheduling dan resource allocation. Task comments dan collaboration features memungkinkan team members untuk communicate dan collaborate secara efektif. Task file attachments memungkinkan sharing documents dan resources yang relevan dengan tasks. Task time tracking memungkinkan monitoring terhadap time spent pada tasks untuk resource planning dan performance analysis.
+
+**Resource Management Requirements** mencakup kebutuhan untuk mengelola resources termasuk team members, budget, dan equipment dengan optimal allocation dan tracking. Sistem harus menyediakan team assignment dengan workload balancing yang memastikan bahwa resources didistribusikan secara merata dan optimal. Resource availability tracking memungkinkan identification resources yang available untuk assignment ke proyek baru. Workload visualization dengan charts dan indicators memungkinkan identification overloaded atau underutilized resources. Resource capacity planning memungkinkan forecasting resource needs untuk future projects. Budget allocation dengan automatic calculation berdasarkan project requirements dan regulatory limits memastikan compliance dengan government regulations. Budget tracking dengan real-time updates memungkinkan monitoring terhadap budget utilization dan identification potential overruns. Resource reporting dengan various metrics memungkinkan analysis resource utilization dan efficiency.
+
+**Financial Management Requirements** mencakup kebutuhan untuk mengelola aspek finansial proyek dengan compliance terhadap government regulations dan comprehensive tracking. Sistem harus menyediakan automatic budget calculation dengan enforcement limit 3.3 juta per mitra sesuai regulasi pemerintah yang tidak dapat di-bypass. Financial tracking dengan real-time updates memungkinkan monitoring terhadap semua financial transactions dan budget utilization. Reimbursement management dengan workflow approval yang sesuai dengan government processes memastikan compliance dengan financial regulations. Financial reporting dengan various report types termasuk budget reports, expense reports, dan compliance reports memungkinkan stakeholders untuk mendapatkan insights mengenai financial status proyek. Financial audit trails dengan comprehensive logging memastikan bahwa semua financial activities dapat di-track dan di-audit untuk compliance purposes. Financial alerts dengan notifications untuk budget thresholds dan potential overruns memungkinkan proactive management financial risks.
+
+**Reporting and Analytics Requirements** mencakup kebutuhan untuk menyediakan insights dan reports yang comprehensive untuk decision-making dan monitoring. Sistem harus menyediakan analytics dashboard dengan various metrics dan visualizations yang memungkinkan stakeholders untuk mendapatkan insights mengenai performance dan trends. Custom reports dengan filtering dan export capabilities memungkinkan users untuk generate reports sesuai dengan kebutuhan mereka. Real-time data updates memastikan bahwa reports selalu current dan accurate. Report scheduling dengan automatic generation dan distribution memungkinkan stakeholders untuk receive reports secara regular tanpa manual intervention. Data visualization dengan charts, graphs, dan tables memungkinkan easy understanding complex data. Export capabilities dengan various formats termasuk PDF, Excel, dan CSV memungkinkan sharing dan further analysis reports.
+
+### **5.2.2. Non-Functional Requirements**
+
+Non-functional requirements yang teridentifikasi mencakup aspek-aspek kualitas sistem yang menentukan bagaimana sistem berfungsi dan perform dalam berbagai kondisi. Requirements ini critical untuk memastikan bahwa sistem tidak hanya functional, tetapi juga reliable, secure, performant, dan maintainable.
+
+**Performance Requirements** mencakup kebutuhan untuk sistem yang performant dengan response times yang cepat dan dapat menangani expected load. Sistem harus mampu menangani 500 concurrent users tanpa significant performance degradation, dengan average response time kurang dari 2 detik untuk majority operations. Page load time harus kurang dari 3 detik untuk initial load dan kurang dari 1 detik untuk subsequent page navigations dengan proper caching. Database query performance harus optimal dengan query times kurang dari 500ms untuk majority queries. System harus mampu scale horizontally untuk accommodate future growth tanpa requiring significant architecture changes. Caching strategies harus diimplementasikan untuk reduce server load dan improve response times, dengan cache hit rate target lebih dari 90% untuk frequently accessed data.
+
+**Security Requirements** mencakup kebutuhan untuk sistem yang secure dengan comprehensive security measures yang memenuhi government security standards. Sistem harus mengimplementasikan multi-factor authentication (MFA) dengan TOTP support untuk enhanced security. Password policies harus enforce strong passwords dengan minimum requirements untuk length, complexity, dan expiration. Row-level security (RLS) harus diimplementasikan di database level untuk ensure fine-grained access control. Data encryption harus diimplementasikan untuk data at rest dan data in transit dengan industry-standard encryption algorithms. API security dengan rate limiting, input validation, dan authentication checks harus diimplementasikan untuk prevent attacks. Audit logging dengan comprehensive logging untuk all system activities harus diimplementasikan untuk compliance dan security monitoring. Security compliance dengan government security standards termasuk BSSN requirements harus dipenuhi.
+
+**Usability Requirements** mencakup kebutuhan untuk sistem yang user-friendly dan mudah digunakan oleh users dengan berbagai tingkat technical expertise. User interface harus intuitive dengan clear navigation dan consistent design patterns. Responsive design harus diimplementasikan untuk ensure optimal experience di berbagai devices termasuk desktop, tablet, dan mobile. Accessibility compliance dengan WCAG 2.1 AA standards harus dipenuhi untuk ensure inclusive access. User onboarding dengan guided tours dan help documentation harus disediakan untuk facilitate user adoption. Error messages harus clear dan actionable untuk help users resolve issues. Loading states dan progress indicators harus disediakan untuk provide feedback kepada users selama operations yang memerlukan waktu.
+
+**Reliability Requirements** mencakup kebutuhan untuk sistem yang reliable dengan high availability dan minimal downtime. System availability harus lebih dari 99% dengan planned maintenance windows yang minimal. Error handling dengan graceful degradation harus diimplementasikan untuk ensure bahwa partial failures tidak menyebabkan complete system failure. Data backup dan recovery mechanisms harus diimplementasikan untuk ensure data protection dan business continuity. Monitoring dan alerting systems harus diimplementasikan untuk detect issues early dan enable proactive resolution. Disaster recovery plan harus disediakan untuk ensure business continuity dalam event disasters.
+
+**Maintainability Requirements** mencakup kebutuhan untuk sistem yang maintainable dengan code quality yang tinggi dan documentation yang comprehensive. Code quality dengan best practices, code reviews, dan static analysis harus diimplementasikan untuk ensure maintainable codebase. Comprehensive documentation termasuk technical documentation, user documentation, dan API documentation harus disediakan. Testing coverage dengan comprehensive test suite harus diimplementasikan untuk ensure code quality dan enable safe refactoring. Version control dengan proper branching strategies dan commit practices harus digunakan untuk facilitate collaboration dan code management.
+
+### **5.2.3. Government-Specific Requirements**
+
+Government-specific requirements yang teridentifikasi mencakup kebutuhan-kebutuhan khusus yang unique untuk government applications dan tidak selalu required dalam commercial applications. Requirements ini critical untuk memastikan bahwa sistem memenuhi compliance requirements dan dapat digunakan dalam government context.
+
+**Compliance Requirements** mencakup kebutuhan untuk compliance dengan various government regulations dan standards. Sistem harus compliant dengan BSSN security standards untuk government IT systems. Data protection compliance dengan government data protection regulations harus dipenuhi. Financial compliance dengan government financial regulations termasuk limit enforcement dan audit requirements harus diimplementasikan. Accessibility compliance dengan WCAG standards untuk government applications harus dipenuhi. Documentation requirements dengan comprehensive documentation untuk compliance audits harus disediakan.
+
+**Audit Requirements** mencakup kebutuhan untuk comprehensive audit capabilities yang memenuhi government audit requirements. Sistem harus menyediakan immutable audit trails dengan comprehensive logging untuk all system activities. Audit log retention dengan minimum 7 years retention period sesuai government requirements harus diimplementasikan. Audit log access control dengan proper authorization untuk access audit logs harus diimplementasikan. Audit reporting dengan various report types untuk compliance audits harus disediakan. Audit log export capabilities untuk external audit purposes harus disediakan.
+
+**Process Requirements** mencakup kebutuhan untuk workflows yang sesuai dengan government processes dan approval chains. Sistem harus mengakomodasi multiple approval layers yang common dalam government processes. Workflow customization dengan configurable workflows untuk different types of processes harus disediakan. Approval notifications dengan proper notification mechanisms untuk approval requests harus diimplementasikan. Process documentation dengan comprehensive documentation untuk all processes harus disediakan. Process compliance dengan government standard operating procedures harus dipastikan.
+
+**Data Requirements** mencakup kebutuhan untuk data management yang sesuai dengan government data requirements. Data retention policies dengan proper data retention dan archival mechanisms harus diimplementasikan. Data privacy dengan proper data anonymization dan privacy protection harus dipastikan. Data backup dengan regular backups dan disaster recovery capabilities harus diimplementasikan. Data export capabilities dengan various formats untuk data portability harus disediakan. Data integrity dengan proper validation dan constraints harus dipastikan.
+
+### **5.2.4. Priority and Dependencies**
+
+Priority dan dependencies dari requirements telah dianalisis untuk memastikan bahwa development dapat dilakukan dengan optimal sequencing dan resource allocation. High priority requirements mencakup core functionalities yang essential untuk basic system operation, termasuk user management, project management, task management, dan basic reporting. Medium priority requirements mencakup enhanced features yang improve user experience dan system capabilities, termasuk advanced analytics, custom reporting, dan workflow automation. Low priority requirements mencakup nice-to-have features yang dapat diimplementasikan dalam future releases, termasuk mobile applications, AI-powered insights, dan advanced integrations.
+
+Dependencies antara requirements telah diidentifikasi untuk memastikan bahwa development dilakukan dalam sequence yang logical. Core infrastructure requirements seperti authentication, authorization, dan database schema harus diimplementasikan terlebih dahulu sebelum features yang depend pada infrastructure tersebut. Basic CRUD operations untuk core entities harus diimplementasikan sebelum advanced features yang build on top of basic operations. Integration requirements depend pada completion core features yang akan diintegrasikan. Understanding priority dan dependencies ini memastikan bahwa development dapat dilakukan dengan efficient resource utilization dan minimal blocking issues.
+
+## **5.3. Database Schema Design**
+
+### **5.3.1. Core Tables**
 
 Database dirancang dengan struktur yang normalized untuk memastikan integritas data dan optimalisasi performa. Tabel Users menyimpan informasi pengguna dengan extended profile termasuk email unik, nama lengkap, peran (admin, ketua_tim, pegawai), dan status aktivitas. Setiap pengguna memiliki UUID sebagai primary key dengan timestamp tracking untuk created dan updated dates.
 
@@ -1200,13 +1252,13 @@ _Buat ERD diagram dengan format sebagai berikut:_
 - **Format File**: PNG atau JPG dengan resolusi minimal 300 DPI
 - **Catatan**: ERD harus jelas menunjukkan relationships, cardinalities, dan constraints. Gunakan warna berbeda untuk core tables dan relationship tables
 
-### **5.2.2. Relationship Tables**
+### **5.3.2. Relationship Tables**
 
 Tabel Project Assignments mengelola hubungan many-to-many antara proyek, pengguna, dan mitra. Setiap assignment memiliki role spesifik dan timestamp untuk tracking kapan penugasan dibuat. Unique constraint pada kombinasi project_id dan user_id mencegah duplikasi assignment.
 
 Tabel Financial Transactions menyediakan audit trail lengkap untuk semua transaksi keuangan yang terkait dengan proyek, pengguna, dan mitra. Setiap transaksi dicatat dengan tipe transaksi, jumlah, deskripsi, dan timestamp untuk memastikan transparency dan auditability.
 
-### **5.2.3. Indexing Strategy**
+### **5.3.3. Indexing Strategy**
 
 Strategi indexing dirancang untuk mengoptimalkan performa query berdasarkan pattern akses yang paling sering digunakan. Index dibuat pada kolom-kolom yang sering digunakan untuk filtering dan joining, seperti status proyek, tanggal proyek, ketua tim, dan relasi assignments. Index pada role dan status aktif pengguna mempercepat proses authentication dan authorization. Strategy ini memastikan responsif sistem meskipun dengan volume data yang besar. Composite indexes juga dibuat untuk kombinasi kolom yang sering di-query bersamaan, seperti kombinasi project_id dan user_id pada Project Assignments table untuk mempercepat lookup assignments. Indexing strategy ini terus dievaluasi dan dioptimalkan berdasarkan actual query performance metrics dan slow query logs untuk memastikan optimal performance. Detail lengkap indexing strategy dapat dilihat pada Tabel 5.2.
 
@@ -1222,15 +1274,15 @@ Strategi indexing dirancang untuk mengoptimalkan performa query berdasarkan patt
 
 _Catatan: Semua foreign keys di-index untuk mempercepat JOIN operations. Composite indexes digunakan untuk queries yang filter berdasarkan multiple columns._
 
-## **5.3. Role & Permission Matrix**
+## **5.4. Role & Permission Matrix**
 
-### **5.3.1. Permission Framework**
+### **5.4.1. Permission Framework**
 
 Framework permission dirancang dengan struktur yang terdiri dari Permission interface dan Role interface. Permission interface mendefinisikan akses ke resources dengan spesifikasi action (create, read, update, delete) dan scope (own, team, all). Role interface mengelompokkan permissions ke dalam koleksi yang dapat ditetapkan kepada pengguna berdasarkan peran mereka dalam organisasi.
 
 Framework ini memungkinkan granularity kontrol yang sangat detail, di mana setiap pengguna hanya dapat mengakses informasi dan fungsi yang relevan dengan peran dan tanggung jawab mereka. Sistem ini mendukung implementasi least privilege principle di mana pengguna hanya mendapatkan akses minimum yang diperlukan untuk menjalankan tugas mereka.
 
-### **5.3.2. Role Definitions**
+### **5.4.2. Role Definitions**
 
 Role definitions dirancang berdasarkan analisis kebutuhan aktual dari setiap peran dalam organisasi BPS Kota Batu. Setiap role memiliki set permissions yang spesifik yang memungkinkan mereka untuk menjalankan tugas mereka secara efektif sambil memastikan bahwa mereka tidak memiliki akses yang tidak diperlukan.
 
@@ -1266,9 +1318,9 @@ Pegawai Permissions dirancang untuk memberikan team members dengan akses yang me
 
 _Catatan: ✅ = Allowed, ❌ = Not Allowed. "Own" berarti resources yang dibuat oleh user tersebut, "Team" berarti resources yang terkait dengan tim user, "Assigned" berarti resources yang ditugaskan kepada user._
 
-## **5.4. Feature Specification**
+## **5.5. Feature Specification**
 
-### **5.4.1. Admin Features**
+### **5.5.1. Admin Features**
 
 Admin features dirancang untuk memberikan system administrators dengan tools yang komprehensif untuk mengelola seluruh aspek sistem, memastikan bahwa sistem berjalan dengan optimal dan sesuai dengan kebutuhan organisasi.
 
@@ -1276,7 +1328,7 @@ User Management menyediakan comprehensive tools untuk mengelola user accounts di
 
 System Configuration menyediakan admin dengan tools untuk configure system-wide settings yang mempengaruhi behavior seluruh sistem. Financial limits dan settings memungkinkan admin untuk set dan modify financial constraints seperti monthly limits per mitra, budget thresholds, dan approval workflows yang memastikan compliance dengan regulasi pemerintah. Workload thresholds configuration memungkinkan admin untuk define thresholds untuk workload balancing, seperti maximum tasks per user atau maximum projects per ketua tim, yang digunakan oleh sistem untuk prevent overload dan ensure fair distribution of work. System backup dan maintenance tools memungkinkan admin untuk schedule dan execute backups, perform system maintenance tasks, dan monitor system health untuk ensure availability dan data integrity. Security policy management memungkinkan admin untuk configure security settings seperti password policies, session timeouts, MFA requirements, dan access control rules yang memastikan sistem tetap secure sesuai dengan best practices dan compliance requirements.
 
-### **5.4.2. Ketua Tim Features**
+### **5.5.2. Ketua Tim Features**
 
 Ketua Tim features dirancang untuk memberikan project managers dengan tools yang powerful untuk mengelola proyek mereka secara efektif, dari creation hingga completion, sambil memastikan bahwa mereka memiliki visibility yang diperlukan untuk make informed decisions.
 
@@ -1284,7 +1336,7 @@ Project Management features menyediakan comprehensive tools untuk mengelola life
 
 Analytics Dashboard menyediakan ketua tim dengan comprehensive insights tentang proyek dan tim mereka. Project progress visualization menggunakan charts dan graphs untuk menunjukkan progress proyek secara visual, memudahkan identification of bottlenecks atau areas yang memerlukan attention. Team workload monitoring memberikan visibility ke workload distribution di tim, memungkinkan ketua tim untuk identify imbalances dan redistribute work untuk optimal efficiency. Financial analytics menyediakan insights tentang budget usage, spending patterns, dan financial health dari proyek, memungkinkan ketua tim untuk make data-driven decisions tentang resource allocation. Performance KPI tracking memungkinkan ketua tim untuk monitor key performance indicators seperti on-time completion rate, budget adherence, dan team productivity, memberikan metrics yang dapat digunakan untuk evaluate performance dan identify areas for improvement.
 
-### **5.4.3. Pegawai Features**
+### **5.5.3. Pegawai Features**
 
 Pegawai features dirancang untuk memberikan team members dengan interface yang intuitif dan tools yang mereka butuhkan untuk efficiently manage tasks mereka dan track progress, sambil memberikan visibility ke performance mereka sendiri.
 
@@ -1292,9 +1344,9 @@ Task Management menyediakan comprehensive tools untuk mengelola tasks individual
 
 Personal Dashboard menyediakan pegawai dengan centralized view dari semua informasi yang relevan dengan mereka. Today's schedule overview memberikan quick view ke tasks dan activities yang scheduled untuk hari ini, memungkinkan pegawai untuk plan their day effectively. Active projects monitoring menunjukkan semua proyek yang pegawai terlibat di dalamnya dengan status updates dan progress indicators, memberikan context untuk tasks yang sedang dikerjakan. Performance metrics memberikan pegawai dengan insights tentang performance mereka sendiri, termasuk completion rates, on-time delivery rates, dan productivity trends yang dapat digunakan untuk self-improvement. Notifications center menyediakan centralized location untuk semua notifications termasuk task assignments, deadline reminders, project updates, dan messages dari team members, memastikan bahwa pegawai tidak melewatkan informasi penting.
 
-## **5.5. UI/UX Design Principles**
+## **5.6. UI/UX Design Principles**
 
-### **5.5.1. Design System**
+### **5.6.1. Design System**
 
 Design system dirancang untuk memastikan konsistensi visual di seluruh aplikasi sambil mempertahankan flexibility untuk berbagai use cases. System ini menyediakan foundation yang solid untuk UI/UX development dengan components, patterns, dan guidelines yang dapat digunakan secara konsisten.
 
@@ -1324,7 +1376,7 @@ _Buat visual design system dengan format sebagai berikut:_
 
 Typography system dirancang untuk optimal readability dan hierarchy yang jelas. Headings menggunakan Inter font family yang dipilih karena excellent readability pada berbagai sizes dan modern aesthetic yang sesuai dengan enterprise application. Inter dirancang khusus untuk screen reading dengan optimized letterforms dan spacing yang memastikan clarity pada berbagai resolutions. Body text menggunakan system font stack yang memastikan optimal performance dan native look pada berbagai operating systems, dengan fallback chain yang memastikan readable text bahkan jika preferred fonts tidak tersedia. Font sizes menggunakan responsive scale dari 12px untuk small text hingga 48px untuk hero headings, dengan consistent ratio yang memastikan visual hierarchy yang jelas. Line heights dan letter spacing dioptimalkan untuk setiap size untuk memastikan optimal readability dan comfortable reading experience.
 
-### **5.5.2. Layout Patterns**
+### **5.6.2. Layout Patterns**
 
 Layout patterns dirancang untuk memberikan consistent user experience di seluruh aplikasi sambil memastikan bahwa setiap layout optimal untuk use case spesifiknya. Patterns ini telah di-test untuk usability dan accessibility untuk memastikan bahwa mereka dapat digunakan oleh users dengan berbagai levels of technical expertise.
 
@@ -1349,7 +1401,7 @@ _Buat layout mockup dengan format sebagai berikut:_
 
 Form Patterns dirancang untuk reduce cognitive load dan prevent errors dalam data entry. Multi-step wizards untuk complex processes memecah complex forms menjadi manageable steps, memungkinkan users untuk focus pada satu set of information pada satu waktu. Progress indicators menunjukkan users dimana mereka berada dalam process dan berapa banyak steps yang tersisa, memberikan sense of progress dan reducing abandonment rates. Progressive disclosure digunakan untuk hide advanced options atau additional fields sampai mereka diperlukan, reducing initial complexity dan making forms lebih approachable untuk users yang tidak familiar dengan semua options. Real-time validation dengan helpful error messages memberikan immediate feedback ketika users memasukkan data, memungkinkan mereka untuk correct errors sebelum submission dan reducing frustration. Error messages dirancang untuk be specific dan actionable, telling users not just what's wrong but how to fix it. Auto-save functionality memastikan bahwa data tidak hilang jika users accidentally close browser atau experience network issues, providing peace of mind dan reducing data loss risks.
 
-### **5.5.3. Accessibility Standards**
+### **5.6.3. Accessibility Standards**
 
 Accessibility standards diimplementasikan untuk memastikan bahwa aplikasi dapat digunakan oleh semua users, termasuk those with disabilities, memenuhi both legal requirements dan ethical obligations untuk inclusive design. Standards ini diimplementasikan di seluruh aplikasi dengan consistent approach yang memastikan bahwa accessibility tidak menjadi afterthought tetapi integral part dari design process.
 
@@ -1361,9 +1413,9 @@ Screen reader compatibility memastikan bahwa aplikasi dapat digunakan oleh users
 
 High contrast mode support memastikan bahwa aplikasi tetap usable untuk users dengan visual impairments yang require high contrast untuk readability. Color combinations di-test untuk ensure sufficient contrast ratios, dan system respects user's operating system high contrast settings. Text remains readable pada high contrast backgrounds, dan important information tidak rely solely pada color untuk communication. Focus indicators dan skip links memastikan bahwa keyboard users dapat efficiently navigate aplikasi, dengan skip links yang memungkinkan users untuk skip repetitive navigation elements dan go directly ke main content, significantly improving navigation efficiency untuk keyboard users.
 
-## **5.6. Security Requirements**
+## **5.7. Security Requirements**
 
-### **5.6.1. Authentication Security**
+### **5.7.1. Authentication Security**
 
 Authentication security merupakan foundation dari overall system security, memastikan bahwa hanya authorized users yang dapat mengakses sistem dan data. Implementasi authentication security mengikuti industry best practices dan government security standards untuk memastikan robust protection terhadap unauthorized access.
 
@@ -1371,7 +1423,7 @@ Multi-Factor Authentication (MFA) diimplementasikan untuk add additional layer o
 
 Password Policy dirancang untuk ensure that passwords are strong enough to resist common attack methods seperti brute force atau dictionary attacks. Minimum 12 characters length requirement memastikan bahwa passwords have sufficient entropy untuk resist brute force attacks, dengan research menunjukkan bahwa 12 characters dengan complexity requirements provide good balance antara security dan usability. Complexity requirements mandating combination dari uppercase, lowercase, numbers, dan symbols memastikan bahwa passwords tidak dapat easily guessed atau cracked menggunakan common password lists. Password history tracking prevents users dari reusing recent passwords, memastikan bahwa even if old password compromised, it cannot be reused. Regular expiration enforcement memaksa users untuk periodically change passwords, reducing impact dari potential password compromises, meskipun modern security best practices increasingly question value dari forced password expiration untuk users dengan strong passwords. Policy ini balanced dengan usability considerations untuk ensure that security requirements tidak create excessive burden pada users.
 
-### **5.6.2. Data Protection**
+### **5.7.2. Data Protection**
 
 Data protection mechanisms diimplementasikan untuk ensure bahwa sensitive data tetap secure baik pada saat storage maupun transmission, memenuhi requirements untuk government data protection standards dan protecting against various attack vectors.
 
@@ -1379,7 +1431,7 @@ Encryption diimplementasikan pada multiple levels untuk comprehensive data prote
 
 Access Control diimplementasikan pada multiple levels untuk ensure that users hanya dapat access data yang mereka authorized untuk access. Row-level security (RLS) di PostgreSQL memastikan bahwa access control enforced di database level, memastikan bahwa even if application logic compromised, unauthorized access prevented di database level. RLS policies menggunakan role-based logic untuk determine access rights, memastikan bahwa users hanya dapat see dan modify rows yang sesuai dengan their role dan permissions. Column-level encryption untuk sensitive fields provides additional protection untuk highly sensitive data seperti financial information atau personal identifiers, memastikan bahwa even users dengan row-level access tidak dapat read encrypted columns tanpa proper decryption keys. API rate limiting prevents abuse dan DDoS attacks dengan limiting number of requests yang dapat dibuat dari single IP address dalam time period, protecting system resources dan ensuring fair usage. IP whitelisting untuk admin access provides additional layer of security untuk administrative functions, memastikan bahwa admin access hanya dapat dilakukan dari approved IP addresses, significantly reducing risk dari unauthorized admin access even if credentials compromised.
 
-### **5.6.3. Audit and Compliance**
+### **5.7.3. Audit and Compliance**
 
 Audit and compliance mechanisms diimplementasikan untuk ensure accountability, enable forensic analysis, dan demonstrate compliance dengan various regulatory requirements yang applicable untuk government applications.
 
